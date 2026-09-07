@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """Install Russian Cyrillic aliases and glyphs into Expansion Latin fonts.
 
-This is the source-migration version of the previously verified RU font work.
-It deliberately reuses obsolete accented Latin byte slots so ordinary English
-Pokemon / Move / Ability / Trainer names remain untouched.
+Qarro v3.3.1 safety fix:
+- Expansion Latin font PNGs are 16x16 pixels per glyph, 16 glyphs per row.
+- Russian aliases reuse obsolete accented-Latin byte slots only.
+- Every non-Cyrillic glyph cell is snapshotted and must remain pixel-identical.
+
+This deliberately preserves ordinary English Pokemon / Move / Ability / Trainer
+names and all other non-target glyphs.
 """
 from __future__ import annotations
 
 import argparse
-from collections import Counter
 from pathlib import Path
 
 try:
@@ -43,7 +46,16 @@ GLYPH_HEX = [
     "000000000038043c04380000","0000000000242a3a2a240000","00000000003c241c14240000",
 ]
 assert len(CYRILLIC) == len(CYR_CODES) == len(GLYPH_HEX) == 66
+assert len(set(CYR_CODES)) == len(CYR_CODES)
 assert all(len(bytes.fromhex(glyph)) == 12 for glyph in GLYPH_HEX)
+
+CELL_W = 16
+CELL_H = 16
+COLS = 16
+# gbagfx/tools/font.c fixes the Latin palette to these indexed meanings.
+FONT_BG = 0
+FONT_FG = 1
+FONT_SHADOW = 2
 
 MARKER_START = "@ QARRO_RUSSIAN_CYRILLIC_START"
 MARKER_END = "@ QARRO_RUSSIAN_CYRILLIC_END"
@@ -66,95 +78,88 @@ def patch_charmap(root: Path) -> None:
     print("[cyrillic] charmap: 66 Russian aliases installed")
 
 
-def _ranked_non_bg_pixels(img: Image.Image, bg, cell_w: int, cell_h: int, code: int):
-    x0 = (code % 16) * cell_w
-    y0 = (code // 16) * cell_h
-    counts = Counter(
-        img.getpixel((x, y))
-        for y in range(y0, min(y0 + cell_h, img.height))
-        for x in range(x0, min(x0 + cell_w, img.width))
-        if img.getpixel((x, y)) != bg
-    )
-    return [p for p, _ in counts.most_common()]
+def cell_box(code: int, total_cells: int) -> tuple[int, int, int, int]:
+    if not 0 <= code < total_cells:
+        raise RuntimeError(f"glyph code 0x{code:02X} outside atlas with {total_cells} cells")
+    x0 = (code % COLS) * CELL_W
+    y0 = (code // COLS) * CELL_H
+    return x0, y0, x0 + CELL_W, y0 + CELL_H
 
 
-def sample_colors(img: Image.Image, cell_w: int, cell_h: int):
-    """Find usable ink/shadow indices even on sparse Latin font sheets."""
-    bg = img.getpixel((0, 0))
-
-    # Common glyphs: A, a, 0, !, ?, O, o. Different sheets populate different sets.
-    for code in (0xBB, 0xD5, 0xA1, 0xAB, 0xAC, 0xC9, 0xE3):
-        ranked = _ranked_non_bg_pixels(img, bg, cell_w, cell_h, code)
-        if ranked:
-            ink = ranked[0]
-            shadow = ranked[1] if len(ranked) > 1 else ranked[0]
-            return bg, ink, shadow
-
-    # Sparse sheet fallback: use colors that occur anywhere in the actual image.
-    counts = Counter(pixel for pixel in img.getdata() if pixel != bg)
-    if counts:
-        ranked = [p for p, _ in counts.most_common()]
-        ink = ranked[0]
-        shadow = ranked[1] if len(ranked) > 1 else ranked[0]
-        return bg, ink, shadow
-
-    # Completely blank indexed sheet fallback: derive usable indices from its palette.
-    palette = img.getpalette()
-    if palette is not None and isinstance(bg, int):
-        bg_rgb = tuple(palette[bg * 3:bg * 3 + 3])
-        distinct = []
-        for idx in range(len(palette) // 3):
-            if idx == bg:
-                continue
-            rgb = tuple(palette[idx * 3:idx * 3 + 3])
-            if rgb != bg_rgb:
-                distinct.append(idx)
-            if len(distinct) >= 2:
-                break
-        if distinct:
-            ink = distinct[0]
-            shadow = distinct[1] if len(distinct) > 1 else distinct[0]
-            print("[cyrillic] sparse blank font sheet: using palette fallback")
-            return bg, ink, shadow
-
-    raise RuntimeError("could not determine usable ink colors from font sheet or palette")
+def cell_pixels(img: Image.Image, code: int, total_cells: int) -> bytes:
+    return bytes(img.crop(cell_box(code, total_cells)).getdata())
 
 
 def patch_font(path: Path) -> None:
     img = Image.open(path)
     if img.mode != "P":
-        img = img.convert("P")
-    if img.width % 16 or img.height % 16:
-        raise RuntimeError(f"unexpected font grid {img.size}: {path}")
-    cell_w, cell_h = img.width // 16, img.height // 16
-    if cell_w < 8 or cell_h < 12:
-        raise RuntimeError(f"font cells too small {cell_w}x{cell_h}: {path}")
-    bg, ink, shadow = sample_colors(img, cell_w, cell_h)
-    scale = max(1, min(cell_w // 8, cell_h // 12))
-    glyph_w, glyph_h = 8 * scale, 12 * scale
+        raise RuntimeError(f"expected indexed P-mode font, got {img.mode}: {path}")
+    if img.width != COLS * CELL_W or img.height % CELL_H:
+        raise RuntimeError(f"unexpected Latin font atlas geometry {img.size}: {path}")
+
+    rows = img.height // CELL_H
+    total_cells = COLS * rows
+    target_codes = set(CYR_CODES)
+    if max(target_codes) >= total_cells:
+        raise RuntimeError(f"atlas too small ({total_cells} cells) for Cyrillic mapping: {path}")
+
+    # Strong invariant: every non-target cell must remain byte-for-byte identical.
+    protected_before = {
+        code: cell_pixels(img, code, total_cells)
+        for code in range(total_cells)
+        if code not in target_codes
+    }
+
+    # These are the normal English/digit ranges we explicitly promise to preserve.
+    english_before = {
+        code: cell_pixels(img, code, total_cells)
+        for code in range(0xA1, min(0xEF, total_cells))
+    }
 
     for code, hex_rows in zip(CYR_CODES, GLYPH_HEX):
-        rows = bytes.fromhex(hex_rows)
-        x0, y0 = (code % 16) * cell_w, (code // 16) * cell_h
-        for y in range(y0, y0 + cell_h):
-            for x in range(x0, x0 + cell_w):
-                img.putpixel((x, y), bg)
-        ox = x0 + max(0, (cell_w - glyph_w) // 2)
-        oy = y0 + max(0, (cell_h - glyph_h) // 2)
-        for shadow_pass, color in ((True, shadow), (False, ink)):
-            off = scale if shadow_pass else 0
-            for yy, row in enumerate(rows):
+        rows12 = bytes.fromhex(hex_rows)
+        x0, y0, x1, y1 = cell_box(code, total_cells)
+
+        # Clear exactly one real 16x16 glyph cell, never a 32px pseudo-cell.
+        for y in range(y0, y1):
+            for x in range(x0, x1):
+                img.putpixel((x, y), FONT_BG)
+
+        # Source masks are 8x12. Render 1:1, centered in the 16x16 cell.
+        ox = x0 + (CELL_W - 8) // 2
+        oy = y0 + (CELL_H - 12) // 2
+
+        # One-pixel lower-right shadow, then foreground.
+        for shadow_pass, color in ((True, FONT_SHADOW), (False, FONT_FG)):
+            off = 1 if shadow_pass else 0
+            for yy, row in enumerate(rows12):
                 for xx in range(8):
                     if not (row & (1 << (7 - xx))):
                         continue
-                    px, py = ox + xx * scale + off, oy + yy * scale + off
-                    for dy in range(scale):
-                        for dx in range(scale):
-                            tx, ty = px + dx, py + dy
-                            if x0 <= tx < x0 + cell_w and y0 <= ty < y0 + cell_h:
-                                img.putpixel((tx, ty), color)
+                    tx = ox + xx + off
+                    ty = oy + yy + off
+                    if x0 <= tx < x1 and y0 <= ty < y1:
+                        img.putpixel((tx, ty), color)
+
+    for code, before in protected_before.items():
+        after = cell_pixels(img, code, total_cells)
+        if after != before:
+            raise RuntimeError(
+                f"SAFETY FAIL: non-Cyrillic glyph 0x{code:02X} changed in {path.name}"
+            )
+
+    for code, before in english_before.items():
+        after = cell_pixels(img, code, total_cells)
+        if after != before:
+            raise RuntimeError(
+                f"SAFETY FAIL: protected English glyph 0x{code:02X} changed in {path.name}"
+            )
+
     img.save(path, optimize=False)
-    print(f"[cyrillic] patched {path}")
+    print(
+        f"[cyrillic] patched {path.name}: {img.width}x{img.height}, "
+        f"{rows} rows x {COLS} cols, 66 targets, {len(protected_before)} protected cells unchanged"
+    )
 
 
 def main() -> int:
@@ -168,7 +173,10 @@ def main() -> int:
         raise SystemExit(f"no latin_*.png in {font_dir}")
     for path in paths:
         patch_font(path)
-    print(f"[QARRO_CYRILLIC_V3_3] PASS: {len(paths)} Latin font sheets patched")
+    print(
+        f"[QARRO_CYRILLIC_V3_3_1] PASS: {len(paths)} Latin font sheets patched; "
+        "every non-target glyph verified unchanged"
+    )
     return 0
 
 
