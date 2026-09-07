@@ -4,7 +4,8 @@
 Applied after the proven v3.1 content pass and v3.2 Kanto balance pass.
 
 Goals:
-- Remove the two custom Route 1 item balls that were placed before Viridian City.
+- Remove the two custom Route 1 item balls placed before Viridian City, plus
+  their now-unreachable pickup scripts.
 - Make the remaining custom visible item ball use FireRed's standard `finditem`
   flow so its object flag is set and the ball stays gone after pickup.
 - Broaden early FireRed land encounters with Gen I-V species, with extra Grass,
@@ -33,8 +34,6 @@ def read(path: Path) -> str:
 
 
 def patch_item_balls(root: Path) -> dict:
-    # These two objects were accidentally placed before the first city in v3.1.
-    # Remove only those exact custom objects; vanilla Route 1 content is untouched.
     route1 = root / "data/maps/Route1_Frlg/map.json"
     data = json.loads(read(route1))
     scripts_to_remove = {
@@ -48,9 +47,18 @@ def patch_item_balls(root: Path) -> dict:
     data["object_events"] = [obj for obj in before if obj.get("script") not in scripts_to_remove]
     route1.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
-    # FireRed's normal visible pickup scripts use `finditem`, which runs the
-    # standard find-item flow and causes the selected object's visibility flag
-    # to be set. v3.1 used `giveitem`, so the ball could be collected repeatedly.
+    route1_scripts = root / "data/maps/Route1_Frlg/scripts.inc"
+    text1 = read(route1_scripts)
+    dead_blocks = (
+        "Route1_EventScript_QarroItemPokeballs::\n    giveitem ITEM_POKE_BALL, 5\n    end\n\n",
+        "Route1_EventScript_QarroItemPotion::\n    giveitem ITEM_POTION, 2\n    end\n\n",
+    )
+    for block in dead_blocks:
+        if block not in text1:
+            die("Route1 dead pre-Viridian item script did not match v3.1 baseline")
+        text1 = text1.replace(block, "", 1)
+    route1_scripts.write_text(text1, encoding="utf-8")
+
     route2 = root / "data/maps/Route2_Frlg/scripts.inc"
     text = read(route2)
     old = """Route2_EventScript_QarroItemRepel::\n    giveitem ITEM_REPEL, 2\n    end\n"""
@@ -63,16 +71,14 @@ def patch_item_balls(root: Path) -> dict:
     else:
         die("Route2 custom Repel item script did not match v3.1 baseline")
 
-    print(f"[{MARKER}] item balls: removed 2 pre-Viridian objects; Route2 pickup now uses finditem")
+    print(f"[{MARKER}] item balls: removed 2 pre-Viridian objects/scripts; Route2 pickup now uses finditem")
     return {
         "preViridianItemBallsRemoved": 2,
+        "preViridianItemScriptsRemoved": 2,
         "route2PersistentPickupFixed": True,
     }
 
 
-# Core v3.1 maps are required. Extra nearby maps are patched when their FireRed
-# land tables exist, so early Kanto does not abruptly fall back to vanilla-only
-# species after one screen/cave floor.
 POOLS = {
     "MAP_ROUTE1": [
         "SPECIES_PIDGEY", "SPECIES_ODDISH", "SPECIES_SENTRET", "SPECIES_HOPPIP",
