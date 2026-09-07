@@ -2,8 +2,8 @@
 """Qarro v3.1 content-pass bootstrap.
 
 This keeps the exact content pass from commit 656937d975e48a6a559ff3e06f79b70b1c6fbf2f,
-while removing the two .party lines that CPP interpreted as invalid # directives.
-No gameplay/content changes beyond that first observed build error are made here.
+while removing marker lines that CPP interpreted as invalid # directives.
+No gameplay/content changes beyond observed build errors are made here.
 """
 from __future__ import annotations
 
@@ -29,6 +29,11 @@ def load_base() -> str:
     # marker lines as preprocessing directives in trainers_frlg.party.
     code = code.replace("# QARRO_CONTENT_V3_1_TRAINERS_BEGIN\n", "")
     code = code.replace("# QARRO_CONTENT_V3_1_TRAINERS_END\n", "")
+    # NEXT REAL v3.1 ERROR (run #13): the same happened to the route-script
+    # marker lines. Remove only the three non-functional markers; scripts stay intact.
+    code = code.replace("# QarroV31_Route1\n", "")
+    code = code.replace("# QarroV31_Route2\n", "")
+    code = code.replace("# QarroV31_Route4\n", "")
     return code
 
 
