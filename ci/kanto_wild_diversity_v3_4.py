@@ -5,11 +5,8 @@ Runs after v3.3. Early maps explicitly designed in v3.3 are kept intact. Every
 other FireRed land table keeps its three highest-frequency vanilla slots, then
 receives biome-appropriate Gen II-V species in the remaining slots.
 
-With the standard 12-slot encounter weights this leaves roughly half of each
-late table as its original Kanto core while making Gen II/III/IV/V consistently
-available. Levels and encounter rates are never changed.
-
-No starters, Legendary/Mythical species, Gen VI+ species, Ash Bond or Ash Cap.
+Levels and encounter rates are never changed. No starters, Legendary/Mythical,
+Gen VI+ species, Ash Bond or Ash Cap are touched.
 """
 from __future__ import annotations
 
@@ -19,8 +16,6 @@ from pathlib import Path
 
 MARKER = "QARRO_KANTO_WILD_V3_4"
 
-# Each biome supplies multiple species from each later generation. Selection is
-# deterministic per map so neighboring locations are diverse without RNG builds.
 BIOMES = {
     "route": {
         2: ["SPECIES_HOPPIP", "SPECIES_MAREEP", "SPECIES_SENTRET"],
@@ -72,16 +67,39 @@ BIOMES = {
     },
 }
 
-# Standard FireRed 12-slot weights are approximately
-# 20,20,10,10,10,10,5,5,4,4,1,1. Keep slots 0-2 untouched (50% total).
-# Replacement weight by generation is ~19% Gen II, 15% Gen III,
-# 11% Gen IV, 5% Gen V: close to the project's Kanto regional bias while
-# preserving a majority/near-majority Kanto identity on each late map.
-SLOTS_BY_GEN = {
-    2: [3, 6, 8],
-    3: [4, 7],
-    4: [5, 10],
-    5: [9, 11],
+# Standard FireRed 12-slot weights are approximately 20,20,10,10,10,10,5,5,4,4,1,1.
+# Slots 0-2 stay untouched (~50%). Added later-generation weights are roughly
+# Gen II 19%, Gen III 15%, Gen IV 11%, Gen V 5%.
+SLOTS_BY_GEN = {2: [3, 6, 8], 3: [4, 7], 4: [5, 10], 5: [9, 11]}
+
+# Defensive denylist. Ordinary wild tables must never leak regional starters or
+# any Legendary/Mythical species before FULL_GAME_COMPLETED.
+FORBIDDEN = {
+    "SPECIES_BULBASAUR", "SPECIES_IVYSAUR", "SPECIES_VENUSAUR",
+    "SPECIES_CHARMANDER", "SPECIES_CHARMELEON", "SPECIES_CHARIZARD",
+    "SPECIES_SQUIRTLE", "SPECIES_WARTORTLE", "SPECIES_BLASTOISE",
+    "SPECIES_CHIKORITA", "SPECIES_BAYLEEF", "SPECIES_MEGANIUM",
+    "SPECIES_CYNDAQUIL", "SPECIES_QUILAVA", "SPECIES_TYPHLOSION",
+    "SPECIES_TOTODILE", "SPECIES_CROCONAW", "SPECIES_FERALIGATR",
+    "SPECIES_TREECKO", "SPECIES_GROVYLE", "SPECIES_SCEPTILE",
+    "SPECIES_TORCHIC", "SPECIES_COMBUSKEN", "SPECIES_BLAZIKEN",
+    "SPECIES_MUDKIP", "SPECIES_MARSHTOMP", "SPECIES_SWAMPERT",
+    "SPECIES_TURTWIG", "SPECIES_GROTLE", "SPECIES_TORTERRA",
+    "SPECIES_CHIMCHAR", "SPECIES_MONFERNO", "SPECIES_INFERNAPE",
+    "SPECIES_PIPLUP", "SPECIES_PRINPLUP", "SPECIES_EMPOLEON",
+    "SPECIES_SNIVY", "SPECIES_SERVINE", "SPECIES_SERPERIOR",
+    "SPECIES_TEPIG", "SPECIES_PIGNITE", "SPECIES_EMBOAR",
+    "SPECIES_OSHAWOTT", "SPECIES_DEWOTT", "SPECIES_SAMUROTT",
+    "SPECIES_ARTICUNO", "SPECIES_ZAPDOS", "SPECIES_MOLTRES", "SPECIES_MEWTWO", "SPECIES_MEW",
+    "SPECIES_RAIKOU", "SPECIES_ENTEI", "SPECIES_SUICUNE", "SPECIES_LUGIA", "SPECIES_HO_OH", "SPECIES_CELEBI",
+    "SPECIES_REGIROCK", "SPECIES_REGICE", "SPECIES_REGISTEEL", "SPECIES_LATIAS", "SPECIES_LATIOS",
+    "SPECIES_KYOGRE", "SPECIES_GROUDON", "SPECIES_RAYQUAZA", "SPECIES_JIRACHI", "SPECIES_DEOXYS",
+    "SPECIES_UXIE", "SPECIES_MESPRIT", "SPECIES_AZELF", "SPECIES_DIALGA", "SPECIES_PALKIA",
+    "SPECIES_HEATRAN", "SPECIES_REGIGIGAS", "SPECIES_GIRATINA", "SPECIES_CRESSELIA", "SPECIES_PHIONE",
+    "SPECIES_MANAPHY", "SPECIES_DARKRAI", "SPECIES_SHAYMIN", "SPECIES_ARCEUS",
+    "SPECIES_VICTINI", "SPECIES_COBALION", "SPECIES_TERRAKION", "SPECIES_VIRIZION",
+    "SPECIES_TORNADUS", "SPECIES_THUNDURUS", "SPECIES_RESHIRAM", "SPECIES_ZEKROM", "SPECIES_LANDORUS",
+    "SPECIES_KYUREM", "SPECIES_KELDEO", "SPECIES_MELOETTA", "SPECIES_GENESECT",
 }
 
 
@@ -104,8 +122,7 @@ def biome_for(map_name: str) -> str:
     if any(x in name for x in ("BERRY_FOREST", "PATTERN_BUSH", "VIRIDIAN_FOREST")):
         return "forest"
     if any(x in name for x in (
-        "ROCK_TUNNEL", "VICTORY_ROAD", "CERULEAN_CAVE", "DIGLETTS_CAVE",
-        "MT_MOON", "ALTERING_CAVE",
+        "ROCK_TUNNEL", "VICTORY_ROAD", "CERULEAN_CAVE", "DIGLETTS_CAVE", "MT_MOON", "ALTERING_CAVE",
     )):
         return "cave"
     return "route"
@@ -126,8 +143,6 @@ def main() -> int:
         die(f"missing {path}")
     data = json.loads(path.read_text(encoding="utf-8"))
 
-    # Read v3.3 audit so we preserve exactly the hand-designed early tables that
-    # were actually found/patched on this pinned FireRed source.
     audit_path = root / "build/qarro_runtime_v3_3_audit.json"
     if not audit_path.exists():
         die("v3.3 runtime audit missing; refusing to guess early-map ownership")
@@ -138,6 +153,9 @@ def main() -> int:
 
     species_header = (root / "include/constants/species.h").read_text(encoding="utf-8")
     requested = {species for biome in BIOMES.values() for pool in biome.values() for species in pool}
+    forbidden_requested = sorted(requested & FORBIDDEN)
+    if forbidden_requested:
+        die(f"forbidden starter/legendary species requested: {forbidden_requested}")
     missing_species = sorted(species for species in requested if species not in species_header)
     if missing_species:
         die(f"missing species constants in pinned source: {missing_species}")
@@ -152,9 +170,7 @@ def main() -> int:
     biome_counts = {name: 0 for name in BIOMES}
     for rec in group.get("encounters", []):
         map_name = rec.get("map")
-        if not isinstance(map_name, str):
-            continue
-        if "FireRed" not in rec.get("base_label", ""):
+        if not isinstance(map_name, str) or "FireRed" not in rec.get("base_label", ""):
             continue
         land = rec.get("land_mons")
         if not isinstance(land, dict):
