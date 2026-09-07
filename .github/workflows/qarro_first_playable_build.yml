@@ -101,11 +101,108 @@ jobs:
           python3 kit/Source_Migration/v3_0/tools/validate_pinned_upstream_fingerprint_v3_0.py --self-test
           python3 -m py_compile kit/Source_Migration/v3_0/tools/*.py
 
+      - name: Install FIRST PLAYABLE data and config
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qarro_ci_out_v3_0/logs
+          python3 kit/Source_Migration/v3_0/tools/install_first_playable_v3_0.py upstream \
+            2>&1 | tee qarro_ci_out_v3_0/logs/install_preflight.log
+
+      - name: Fix first real compiler error - Rapid Spin preprocessor layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('upstream/src/data/moves_info.h')
+          s = p.read_text()
+          old = '''        .description = COMPOUND_STRING(
+          #if B_SPEED_BUFFING_RAPID_SPIN >= GEN_8
+                      "Spins to remove traps\\n"
+                      "and raise Speed."),
+                  .additionalEffects = ADDITIONAL_EFFECTS({
+                      .moveEffect = MOVE_EFFECT_STAT_PLUS,
+                      .speed = 1,
+                      .self = TRUE,
+                      .chance = 100,
+                  }),
+          #else
+                      "Spins the body at high\\n"
+                      "speed to remove traps."),
+          #endif
+          '''
+          # Preserve exact upstream indentation rather than relying on YAML indentation.
+          old = old.replace('          #', '    #').replace('                      ', '            ').replace('                  ', '        ')
+          new = '''    #if B_SPEED_BUFFING_RAPID_SPIN >= GEN_8
+                  .description = COMPOUND_STRING(
+                      "Spins to remove traps\\n"
+                      "and raise Speed."),
+                  .additionalEffects = ADDITIONAL_EFFECTS({
+                      .moveEffect = MOVE_EFFECT_STAT_PLUS,
+                      .speed = 1,
+                      .self = TRUE,
+                      .chance = 100,
+                  }),
+              #else
+                  .description = COMPOUND_STRING(
+                      "Spins the body at high\\n"
+                      "speed to remove traps."),
+              #endif
+          '''
+          new = new.replace('              #', '    #').replace('                  ', '        ').replace('                      ', '            ')
+          if old not in s:
+              # More explicit fallback with the exact block from pinned e8bd1cd.
+              old = '''        .description = COMPOUND_STRING(
+              #if B_SPEED_BUFFING_RAPID_SPIN >= GEN_8
+                          "Spins to remove traps\\n"
+                          "and raise Speed."),
+                      .additionalEffects = ADDITIONAL_EFFECTS({
+                          .moveEffect = MOVE_EFFECT_STAT_PLUS,
+                          .speed = 1,
+                          .self = TRUE,
+                          .chance = 100,
+                      }),
+              #else
+                          "Spins the body at high\\n"
+                          "speed to remove traps."),
+              #endif
+              '''.replace('              #', '    #').replace('                          ', '            ').replace('                      ', '        ').replace('              ', '')
+          if old not in s:
+              start = s.index('    [MOVE_RAPID_SPIN] =')
+              end = s.index('        .effect = EFFECT_RAPID_SPIN,', start)
+              before_effect = s[start:end]
+              print(before_effect)
+              raise SystemExit('Pinned Rapid Spin block did not match; refusing broad edit')
+          s2 = s.replace(old, new, 1)
+          p.write_text(s2)
+          print('Applied minimal semantic-preserving Rapid Spin directive-layout fix.')
+          PY
+
       - name: Real ARM make firered
         shell: bash
         run: |
-          bash kit/Source_Migration/v3_0/tools/remote_build_first_playable_v3_0.sh \
-            kit upstream "$GITHUB_WORKSPACE/qarro_ci_out_v3_0"
+          set -o pipefail
+          mkdir -p qarro_ci_out_v3_0/logs
+          make -C upstream clean 2>&1 | tee qarro_ci_out_v3_0/logs/make_clean.log
+          make -C upstream -j4 -O firered 2>&1 | tee qarro_ci_out_v3_0/logs/make_firered.log
+          rc=${PIPESTATUS[0]}
+          exit "$rc"
+
+      - name: Preserve exact build diagnostics and ROM
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p qarro_ci_out_v3_0
+          git -C upstream status --short > qarro_ci_out_v3_0/git_status_v3_0.txt || true
+          git -C upstream diff --no-ext-diff > qarro_ci_out_v3_0/qarro_applied_diff_v3_0.patch || true
+          if [[ -f upstream/src/data/trainers_frlg.h ]]; then cp upstream/src/data/trainers_frlg.h qarro_ci_out_v3_0/trainers_frlg.generated.h; fi
+          for f in pokefirered.map pokefirered.sym; do [[ -f "upstream/$f" ]] && cp "upstream/$f" qarro_ci_out_v3_0/; done
+          if [[ -f upstream/pokefirered.gba ]]; then
+            cp upstream/pokefirered.gba qarro_ci_out_v3_0/Qarro_FIRST_PLAYABLE_v3_0.gba
+            sha256sum qarro_ci_out_v3_0/Qarro_FIRST_PLAYABLE_v3_0.gba > qarro_ci_out_v3_0/Qarro_FIRST_PLAYABLE_v3_0.gba.sha256
+          fi
 
       - name: Upload ROM or exact first failure diagnostics
         if: always()
