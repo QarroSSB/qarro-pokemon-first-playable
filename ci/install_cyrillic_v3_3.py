@@ -38,11 +38,12 @@ GLYPH_HEX = [
     "00000000001c2222221c0000","00000000003c242424240000","00000000003c2222223c2020",
     "00000000001c2020201c0000","00000000003e080808080000","000000000022141408080830",
     "00000808081c2a2a2a1c0808","000000000036140814360000","0000000000242424243e0200",
-    "000000000024243c04040000","00000000002a2a2a2a2a3e0000","0000000000545454547e0200",
+    "000000000024243c04040000","00000000002a2a2a2a3e0000","0000000000545454547e0200",
     "000000000060203e223e0000","000000000022223a2a3a0000","000000000020203c243c0000",
     "000000000038043c04380000","0000000000242a3a2a240000","00000000003c241c14240000",
 ]
 assert len(CYRILLIC) == len(CYR_CODES) == len(GLYPH_HEX) == 66
+assert all(len(bytes.fromhex(glyph)) == 12 for glyph in GLYPH_HEX)
 
 MARKER_START = "@ QARRO_RUSSIAN_CYRILLIC_START"
 MARKER_END = "@ QARRO_RUSSIAN_CYRILLIC_END"
@@ -78,13 +79,7 @@ def _ranked_non_bg_pixels(img: Image.Image, bg, cell_w: int, cell_h: int, code: 
 
 
 def sample_colors(img: Image.Image, cell_w: int, cell_h: int):
-    """Find usable ink/shadow indices even on sparse Latin font sheets.
-
-    Some Expansion latin_*.png sheets intentionally leave the ordinary A slot
-    empty. Prefer common ASCII glyph cells, then any used non-background color,
-    and finally any distinct palette entries. This keeps the installer fail-closed
-    only for genuinely unusable indexed images rather than for sparse sheets.
-    """
+    """Find usable ink/shadow indices even on sparse Latin font sheets."""
     bg = img.getpixel((0, 0))
 
     # Common glyphs: A, a, 0, !, ?, O, o. Different sheets populate different sets.
