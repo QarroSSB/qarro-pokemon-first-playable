@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 def patch_symbol(text: str, symbol: str, value: str, *, required: bool = True) -> tuple[str, bool]:
-    rx = re.compile(rf'(?m)^([^\n]*\b{re.escape(symbol)}\b[^\n]*?=_\(")(.*?)("\);[^\n]*)$')
+    rx = re.compile(rf'(?m)^([^\n]*\b{re.escape(symbol)}\b[^\n]*?\s*=\s*_\(")(.*?)("\);[^\n]*)$')
     matches = list(rx.finditer(text))
     if not matches:
         if required:
