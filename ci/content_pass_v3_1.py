@@ -34,6 +34,13 @@ def load_base() -> str:
     code = code.replace("# QarroV31_Route1\n", "")
     code = code.replace("# QarroV31_Route2\n", "")
     code = code.replace("# QarroV31_Route4\n", "")
+    # Run #14: hidden-item events must use flags >= FLAG_HIDDEN_ITEMS_START.
+    # The pinned Expansion marks 0x264-0x267 explicitly unused, so reserve
+    # those four flags for the four new hidden items only.
+    code = code.replace('"FLAG_0x0B4"', '"FLAG_UNUSED_0x264"')
+    code = code.replace('"FLAG_0x0B5"', '"FLAG_UNUSED_0x265"')
+    code = code.replace('"FLAG_0x0B2"', '"FLAG_UNUSED_0x266"')
+    code = code.replace('"FLAG_0x0B3"', '"FLAG_UNUSED_0x267"')
     return code
 
 
