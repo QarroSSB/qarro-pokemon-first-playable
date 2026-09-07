@@ -14,7 +14,7 @@ from pathlib import Path
 
 TARGETS = {
     "TRAINER_LEADER_BROCK": ([21, 21, 22, 22, 23, 24], [13, 13, 14, 14, 15, 16]),
-    "TRAINER_LEADER_MISTY": ([31, 31, 32, 32, 33, 34], [19, 19, 20, 20, 21, 22]),
+    "TRAINER_LEADER_MISTY": ([27, 27, 28, 28, 29, 30], [19, 19, 20, 20, 21, 22]),
     "TRAINER_LEADER_LT_SURGE": ([40, 40, 41, 41, 42, 43], [25, 25, 26, 26, 27, 28]),
     "TRAINER_LEADER_ERIKA": ([49, 49, 50, 50, 51, 52], [31, 31, 32, 32, 33, 34]),
     "TRAINER_LEADER_KOGA": ([57, 57, 58, 58, 59, 60], [37, 37, 38, 38, 39, 40]),
