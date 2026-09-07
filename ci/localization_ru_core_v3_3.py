@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Qarro v3.3 first safe Russian localization chunk.
+"""Qarro v3.3/v3.4 safe Russian localization layer.
 
-Translate high-visibility menus and system UI while preserving English species,
-move, ability, and trainer proper names. The pass is intentionally narrow and
-fails closed on required anchors so it cannot silently broad-edit source data.
+Translate high-visibility menus/system UI plus the custom early-route dialogue
+introduced by the Qarro v3.1 content pass. English Pokemon, Move and Ability
+proper names are deliberately preserved.
 """
 from __future__ import annotations
 
@@ -80,6 +80,50 @@ def patch_option_menu(path: Path) -> int:
         changed += 1
         print(f"[ru-core] option: {old} -> {new}")
     path.write_text(text, encoding="utf-8")
+    return changed
+
+
+def patch_exact_strings(path: Path, mapping: dict[str, str]) -> int:
+    if not path.exists():
+        raise RuntimeError(f"missing {path}")
+    text = path.read_text(encoding="utf-8")
+    changed = 0
+    for old, new in mapping.items():
+        if new in text:
+            continue
+        count = text.count(old)
+        if count != 1:
+            raise RuntimeError(f"{path}: expected one exact text anchor {old!r}, got {count}")
+        text = text.replace(old, new, 1)
+        changed += 1
+        print(f"[ru-route] {path.name}: {old!r} -> {new!r}")
+    path.write_text(text, encoding="utf-8")
+    return changed
+
+
+def patch_custom_route_dialogue(root: Path) -> int:
+    changed = 0
+    changed += patch_exact_strings(root / "data/maps/Route1_Frlg/scripts.inc", {
+        '    .string "KANTO isn\'t the whole world!\\nLet\'s battle!$"': '    .string "КАНТО — не весь мир!\\nДавай сразимся!$"',
+        '    .string "Okay, your team is stronger!$"': '    .string "Ладно, твоя команда сильнее!$"',
+        '    .string "You\'ll meet POKéMON from many regions.$"': '    .string "Ты встретишь ПОКЕМОНОВ из разных регионов.$"',
+        '    .string "My POKéMON came from far away.\\nReady?$"': '    .string "Мои ПОКЕМОНЫ прибыли издалека.\\nГотов?$"',
+        '    .string "That was a good battle!$"': '    .string "Это был хороший бой!$"',
+        '    .string "Different regions mean different tactics.$"': '    .string "Разные регионы — разные тактики.$"',
+    })
+    changed += patch_exact_strings(root / "data/maps/Route2_Frlg/scripts.inc", {
+        '    .string "Electric POKéMON aren\'t just PIKACHU!$"': '    .string "Электрические ПОКЕМОНЫ — не только PIKACHU!$"',
+        '    .string "You grounded my plan!$"': '    .string "Ты сорвал мой план!$"',
+        '    .string "I\'ll train with POKéMON from every region.$"': '    .string "Я буду тренироваться с ПОКЕМОНАМИ всех регионов.$"',
+        '    .string "Bugs evolved in every region.\\nTake a look!$"': '    .string "Насекомые есть в каждом регионе.\\nСмотри!$"',
+        '    .string "My bugs need more training!$"': '    .string "Моим насекомым нужно больше тренировок!$"',
+        '    .string "Forests hide many different species.$"': '    .string "В лесах скрывается множество разных видов.$"',
+    })
+    changed += patch_exact_strings(root / "data/maps/Route4_Frlg/scripts.inc", {
+        '    .string "I trained by MT. MOON.\\nLet\'s see what you learned!$"': '    .string "Я тренировался у MT. MOON.\\nПокажи, чему научился!$"',
+        '    .string "You made it through!$"': '    .string "Ты справился!$"',
+        '    .string "Your PC will need room for many species.$"': '    .string "В твоём ПК понадобится место для многих видов.$"',
+    })
     return changed
 
 
@@ -188,8 +232,9 @@ def main() -> int:
     changed += patch_file(root / "src/main_menu.c", main_menu)
     changed += patch_option_menu(root / "src/option_menu.c")
     changed += patch_file(root / "src/strings.c", core)
+    changed += patch_custom_route_dialogue(root)
 
-    print(f"[QARRO_RU_CORE_V3_3] PASS: {changed} visible UI/system strings localized")
+    print(f"[QARRO_RU_CORE_V3_3] PASS: {changed} visible UI/system/route strings localized")
     return 0
 
 
