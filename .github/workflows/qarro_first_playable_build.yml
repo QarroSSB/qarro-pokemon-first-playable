@@ -113,52 +113,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-
-          p = Path('upstream/src/data/moves_info.h')
-          s = p.read_text()
-          start = s.index('        .description = COMPOUND_STRING(\n    #if B_SPEED_BUFFING_RAPID_SPIN >= GEN_8')
-          end = s.index('        .effect = EFFECT_RAPID_SPIN,', start)
-          actual = s[start:end]
-          expected = '''        .description = COMPOUND_STRING(
-    #if B_SPEED_BUFFING_RAPID_SPIN >= GEN_8
-            "Spins to remove traps\\n"
-            "and raise Speed."),
-        .additionalEffects = ADDITIONAL_EFFECTS({
-            .moveEffect = MOVE_EFFECT_STAT_PLUS,
-            .speed = 1,
-            .self = TRUE,
-            .chance = 100,
-        }),
-    #else
-            "Spins the body at high\\n"
-            "speed to remove traps."),
-    #endif
-'''
-          if actual != expected:
-              print('Unexpected pinned Rapid Spin block; refusing broad edit.')
-              print(repr(actual))
-              raise SystemExit(1)
-          fixed = '''    #if B_SPEED_BUFFING_RAPID_SPIN >= GEN_8
-        .description = COMPOUND_STRING(
-            "Spins to remove traps\\n"
-            "and raise Speed."),
-        .additionalEffects = ADDITIONAL_EFFECTS({
-            .moveEffect = MOVE_EFFECT_STAT_PLUS,
-            .speed = 1,
-            .self = TRUE,
-            .chance = 100,
-        }),
-    #else
-        .description = COMPOUND_STRING(
-            "Spins the body at high\\n"
-            "speed to remove traps."),
-    #endif
-'''
-          p.write_text(s[:start] + fixed + s[end:])
-          print('Applied minimal semantic-preserving Rapid Spin directive-layout fix.')
-          PY
+          python3 qarro-repo/ci/fix_rapid_spin_first_error.py upstream
 
       - name: Real ARM make firered
         shell: bash
