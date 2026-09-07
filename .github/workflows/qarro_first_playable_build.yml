@@ -1,15 +1,17 @@
 name: Qarro FIRST PLAYABLE v3.0
 
 on:
-  workflow_dispatch:
   push:
     branches: [main]
-    paths:
-      - 'Qarro_FIRST_PLAYABLE_BUILD_KIT_v3_0.zip'
-      - '.github/workflows/qarro_first_playable_build.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+env:
+  PINNED: e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7
+  KIT_TGZ_SHA256: 95ca1dd309d79ecfed86e21b441725c8b68b7ec0368efc33dcf790be0d62eed9
+  KIT_B64_SHA256: 19e30690575cf31d941f9e183c7e52f452238a4d18759577c520909a718e01c1
 
 jobs:
   build-firered:
@@ -18,13 +20,19 @@ jobs:
     steps:
       - name: Checkout Qarro build repository
         uses: actions/checkout@v4
+        with:
+          path: qarro-repo
 
-      - name: Extract exact FIRST PLAYABLE v3.0 Build Kit
+      - name: Reconstruct FIRST PLAYABLE v3.0 kit
+        shell: bash
         run: |
-          rm -rf kitpkg
-          mkdir -p kitpkg
-          unzip -q Qarro_FIRST_PLAYABLE_BUILD_KIT_v3_0.zip -d kitpkg
-          test -f kitpkg/Qarro_FIRST_PLAYABLE_BUILD_KIT_v3_0/Source_Migration/v3_0/tools/install_first_playable_v3_0.py
+          set -euo pipefail
+          mkdir -p kit
+          cat qarro-repo/kit_parts/qarro_kit_v3_0.part*.b64 > kit/qarro_kit_text.tar.gz.b64
+          echo "$KIT_B64_SHA256  kit/qarro_kit_text.tar.gz.b64" | sha256sum -c -
+          base64 -d kit/qarro_kit_text.tar.gz.b64 > kit/qarro_kit_text.tar.gz
+          echo "$KIT_TGZ_SHA256  kit/qarro_kit_text.tar.gz" | sha256sum -c -
+          tar -xzf kit/qarro_kit_text.tar.gz -C kit
 
       - name: Checkout exact Expansion 1.17.0
         uses: actions/checkout@v4
@@ -33,27 +41,35 @@ jobs:
           ref: e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7
           path: upstream
 
-      - name: Install upstream Ubuntu dependencies
+      - name: Install FireRed ARM build dependencies
+        shell: bash
         run: |
+          set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential binutils-arm-none-eabi gcc-arm-none-eabi \
-            libnewlib-arm-none-eabi git libpng-dev python3 unzip
+            build-essential \
+            binutils-arm-none-eabi \
+            gcc-arm-none-eabi \
+            libnewlib-arm-none-eabi \
+            libpng-dev \
+            python3
+          arm-none-eabi-gcc --version | head -n 1
 
-      - name: Validate kit and pinned upstream
+      - name: Validate exact FIRST BOOT kit
+        shell: bash
         run: |
-          QARRO="$GITHUB_WORKSPACE/kitpkg/Qarro_FIRST_PLAYABLE_BUILD_KIT_v3_0"
-          python3 "$QARRO/Source_Migration/v3_0/tools/validate_build_kit_v3_0.py" "$QARRO/Source_Migration/v3_0"
-          python3 "$QARRO/Source_Migration/v3_0/tools/validate_pinned_upstream_fingerprint_v3_0.py" --self-test
-          python3 -m py_compile "$QARRO"/Source_Migration/v3_0/tools/*.py
+          set -euo pipefail
+          python3 kit/Source_Migration/v3_0/tools/validate_build_kit_v3_0.py kit/Source_Migration/v3_0
+          python3 kit/Source_Migration/v3_0/tools/validate_pinned_upstream_fingerprint_v3_0.py --self-test
+          python3 -m py_compile kit/Source_Migration/v3_0/tools/*.py
 
-      - name: Build FIRST BOOT baseline
+      - name: Real ARM make firered
+        shell: bash
         run: |
-          QARRO="$GITHUB_WORKSPACE/kitpkg/Qarro_FIRST_PLAYABLE_BUILD_KIT_v3_0"
-          bash "$QARRO/Source_Migration/v3_0/tools/remote_build_first_playable_v3_0.sh" \
-            "$QARRO" "$GITHUB_WORKSPACE/upstream" "$GITHUB_WORKSPACE/qarro_ci_out_v3_0"
+          bash kit/Source_Migration/v3_0/tools/remote_build_first_playable_v3_0.sh \
+            kit upstream "$GITHUB_WORKSPACE/qarro_ci_out_v3_0"
 
-      - name: Upload ROM or exact failure diagnostics
+      - name: Upload ROM or exact first failure diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
