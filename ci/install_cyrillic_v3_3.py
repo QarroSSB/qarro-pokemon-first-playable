@@ -38,7 +38,7 @@ GLYPH_HEX = [
     "00000000001c2222221c0000","00000000003c242424240000","00000000003c2222223c2020",
     "00000000001c2020201c0000","00000000003e080808080000","000000000022141408080830",
     "00000808081c2a2a2a1c0808","000000000036140814360000","0000000000242424243e0200",
-    "000000000024243c04040000","00000000002a2a2a2a3e0000","0000000000545454547e0200",
+    "000000000024243c04040000","00000000002a2a2a2a2a3e0000","0000000000545454547e0200",
     "000000000060203e223e0000","000000000022223a2a3a0000","000000000020203c243c0000",
     "000000000038043c04380000","0000000000242a3a2a240000","00000000003c241c14240000",
 ]
@@ -65,21 +65,64 @@ def patch_charmap(root: Path) -> None:
     print("[cyrillic] charmap: 66 Russian aliases installed")
 
 
-def sample_colors(img: Image.Image, cell_w: int, cell_h: int):
-    code = 0xBB  # Latin A
+def _ranked_non_bg_pixels(img: Image.Image, bg, cell_w: int, cell_h: int, code: int):
     x0 = (code % 16) * cell_w
     y0 = (code // 16) * cell_h
-    bg = img.getpixel((0, 0))
     counts = Counter(
         img.getpixel((x, y))
         for y in range(y0, min(y0 + cell_h, img.height))
         for x in range(x0, min(x0 + cell_w, img.width))
         if img.getpixel((x, y)) != bg
     )
-    if not counts:
-        raise RuntimeError("could not sample Latin A ink colors")
-    ranked = [p for p, _ in counts.most_common()]
-    return bg, ranked[0], ranked[1] if len(ranked) > 1 else ranked[0]
+    return [p for p, _ in counts.most_common()]
+
+
+def sample_colors(img: Image.Image, cell_w: int, cell_h: int):
+    """Find usable ink/shadow indices even on sparse Latin font sheets.
+
+    Some Expansion latin_*.png sheets intentionally leave the ordinary A slot
+    empty. Prefer common ASCII glyph cells, then any used non-background color,
+    and finally any distinct palette entries. This keeps the installer fail-closed
+    only for genuinely unusable indexed images rather than for sparse sheets.
+    """
+    bg = img.getpixel((0, 0))
+
+    # Common glyphs: A, a, 0, !, ?, O, o. Different sheets populate different sets.
+    for code in (0xBB, 0xD5, 0xA1, 0xAB, 0xAC, 0xC9, 0xE3):
+        ranked = _ranked_non_bg_pixels(img, bg, cell_w, cell_h, code)
+        if ranked:
+            ink = ranked[0]
+            shadow = ranked[1] if len(ranked) > 1 else ranked[0]
+            return bg, ink, shadow
+
+    # Sparse sheet fallback: use colors that occur anywhere in the actual image.
+    counts = Counter(pixel for pixel in img.getdata() if pixel != bg)
+    if counts:
+        ranked = [p for p, _ in counts.most_common()]
+        ink = ranked[0]
+        shadow = ranked[1] if len(ranked) > 1 else ranked[0]
+        return bg, ink, shadow
+
+    # Completely blank indexed sheet fallback: derive usable indices from its palette.
+    palette = img.getpalette()
+    if palette is not None and isinstance(bg, int):
+        bg_rgb = tuple(palette[bg * 3:bg * 3 + 3])
+        distinct = []
+        for idx in range(len(palette) // 3):
+            if idx == bg:
+                continue
+            rgb = tuple(palette[idx * 3:idx * 3 + 3])
+            if rgb != bg_rgb:
+                distinct.append(idx)
+            if len(distinct) >= 2:
+                break
+        if distinct:
+            ink = distinct[0]
+            shadow = distinct[1] if len(distinct) > 1 else distinct[0]
+            print("[cyrillic] sparse blank font sheet: using palette fallback")
+            return bg, ink, shadow
+
+    raise RuntimeError("could not determine usable ink colors from font sheet or palette")
 
 
 def patch_font(path: Path) -> None:
