@@ -118,65 +118,45 @@ jobs:
 
           p = Path('upstream/src/data/moves_info.h')
           s = p.read_text()
-          old = '''        .description = COMPOUND_STRING(
-          #if B_SPEED_BUFFING_RAPID_SPIN >= GEN_8
-                      "Spins to remove traps\\n"
-                      "and raise Speed."),
-                  .additionalEffects = ADDITIONAL_EFFECTS({
-                      .moveEffect = MOVE_EFFECT_STAT_PLUS,
-                      .speed = 1,
-                      .self = TRUE,
-                      .chance = 100,
-                  }),
-          #else
-                      "Spins the body at high\\n"
-                      "speed to remove traps."),
-          #endif
-          '''
-          # Preserve exact upstream indentation rather than relying on YAML indentation.
-          old = old.replace('          #', '    #').replace('                      ', '            ').replace('                  ', '        ')
-          new = '''    #if B_SPEED_BUFFING_RAPID_SPIN >= GEN_8
-                  .description = COMPOUND_STRING(
-                      "Spins to remove traps\\n"
-                      "and raise Speed."),
-                  .additionalEffects = ADDITIONAL_EFFECTS({
-                      .moveEffect = MOVE_EFFECT_STAT_PLUS,
-                      .speed = 1,
-                      .self = TRUE,
-                      .chance = 100,
-                  }),
-              #else
-                  .description = COMPOUND_STRING(
-                      "Spins the body at high\\n"
-                      "speed to remove traps."),
-              #endif
-          '''
-          new = new.replace('              #', '    #').replace('                  ', '        ').replace('                      ', '            ')
-          if old not in s:
-              # More explicit fallback with the exact block from pinned e8bd1cd.
-              old = '''        .description = COMPOUND_STRING(
-              #if B_SPEED_BUFFING_RAPID_SPIN >= GEN_8
-                          "Spins to remove traps\\n"
-                          "and raise Speed."),
-                      .additionalEffects = ADDITIONAL_EFFECTS({
-                          .moveEffect = MOVE_EFFECT_STAT_PLUS,
-                          .speed = 1,
-                          .self = TRUE,
-                          .chance = 100,
-                      }),
-              #else
-                          "Spins the body at high\\n"
-                          "speed to remove traps."),
-              #endif
-              '''.replace('              #', '    #').replace('                          ', '            ').replace('                      ', '        ').replace('              ', '')
-          if old not in s:
-              start = s.index('    [MOVE_RAPID_SPIN] =')
-              end = s.index('        .effect = EFFECT_RAPID_SPIN,', start)
-              before_effect = s[start:end]
-              print(before_effect)
-              raise SystemExit('Pinned Rapid Spin block did not match; refusing broad edit')
-          s2 = s.replace(old, new, 1)
-          p.write_text(s2)
+          start = s.index('        .description = COMPOUND_STRING(\n    #if B_SPEED_BUFFING_RAPID_SPIN >= GEN_8')
+          end = s.index('        .effect = EFFECT_RAPID_SPIN,', start)
+          actual = s[start:end]
+          expected = '''        .description = COMPOUND_STRING(
+    #if B_SPEED_BUFFING_RAPID_SPIN >= GEN_8
+            "Spins to remove traps\\n"
+            "and raise Speed."),
+        .additionalEffects = ADDITIONAL_EFFECTS({
+            .moveEffect = MOVE_EFFECT_STAT_PLUS,
+            .speed = 1,
+            .self = TRUE,
+            .chance = 100,
+        }),
+    #else
+            "Spins the body at high\\n"
+            "speed to remove traps."),
+    #endif
+'''
+          if actual != expected:
+              print('Unexpected pinned Rapid Spin block; refusing broad edit.')
+              print(repr(actual))
+              raise SystemExit(1)
+          fixed = '''    #if B_SPEED_BUFFING_RAPID_SPIN >= GEN_8
+        .description = COMPOUND_STRING(
+            "Spins to remove traps\\n"
+            "and raise Speed."),
+        .additionalEffects = ADDITIONAL_EFFECTS({
+            .moveEffect = MOVE_EFFECT_STAT_PLUS,
+            .speed = 1,
+            .self = TRUE,
+            .chance = 100,
+        }),
+    #else
+        .description = COMPOUND_STRING(
+            "Spins the body at high\\n"
+            "speed to remove traps."),
+    #endif
+'''
+          p.write_text(s[:start] + fixed + s[end:])
           print('Applied minimal semantic-preserving Rapid Spin directive-layout fix.')
           PY
 
