@@ -1,0 +1,82 @@
+name: Qarro FIRST PLAYABLE v3.0
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/qarro_first_playable_build.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-firered:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout Qarro build repository
+        uses: actions/checkout@v4
+
+      - name: Reconstruct exact FIRST PLAYABLE v3.0 Build Kit
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/kit"
+          cat "$GITHUB_WORKSPACE"/.qarro_payload/buildkit.b64.part* \
+            | base64 --decode > "$RUNNER_TEMP/Qarro_FIRST_PLAYABLE_BUILD_KIT_v3_0.zip"
+          echo "8d51558e472a77578440a31bb84545b732e6eba4d11a622f9a4d0f8e2544a1ac  $RUNNER_TEMP/Qarro_FIRST_PLAYABLE_BUILD_KIT_v3_0.zip" \
+            | sha256sum --check --strict
+          unzip -q "$RUNNER_TEMP/Qarro_FIRST_PLAYABLE_BUILD_KIT_v3_0.zip" -d "$GITHUB_WORKSPACE/kit"
+          test -d "$GITHUB_WORKSPACE/kit/Qarro_FIRST_PLAYABLE_BUILD_KIT_v3_0/Source_Migration/v3_0"
+
+      - name: Checkout exact Expansion 1.17.0
+        uses: actions/checkout@v4
+        with:
+          repository: rh-hideout/pokeemerald-expansion
+          ref: e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7
+          path: upstream
+
+      - name: Install upstream FireRed build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            binutils-arm-none-eabi \
+            gcc-arm-none-eabi \
+            libnewlib-arm-none-eabi \
+            libpng-dev \
+            python3
+
+      - name: Validate exact v3.0 kit
+        shell: bash
+        run: |
+          set -euo pipefail
+          KIT="$GITHUB_WORKSPACE/kit/Qarro_FIRST_PLAYABLE_BUILD_KIT_v3_0"
+          python3 "$KIT/Source_Migration/v3_0/tools/validate_build_kit_v3_0.py" \
+            "$KIT/Source_Migration/v3_0"
+          python3 "$KIT/Source_Migration/v3_0/tools/validate_pinned_upstream_fingerprint_v3_0.py" \
+            --self-test
+          python3 -m py_compile "$KIT"/Source_Migration/v3_0/tools/*.py
+
+      - name: Build FIRST BOOT baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          KIT="$GITHUB_WORKSPACE/kit/Qarro_FIRST_PLAYABLE_BUILD_KIT_v3_0"
+          bash "$KIT/Source_Migration/v3_0/tools/remote_build_first_playable_v3_0.sh" \
+            "$KIT" \
+            "$GITHUB_WORKSPACE/upstream" \
+            "$GITHUB_WORKSPACE/qarro_ci_out_v3_0"
+
+      - name: Upload ROM or exact failure diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Qarro-FIRST-PLAYABLE-v3.0-${{ github.run_number }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: qarro_ci_out_v3_0/**
