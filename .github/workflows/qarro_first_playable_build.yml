@@ -1,4 +1,4 @@
-name: Qarro FIRST PLAYABLE v3.3 Russian foundation
+name: Qarro FIRST PLAYABLE v3.3 runtime + Russian foundation
 
 on:
   push:
@@ -104,6 +104,7 @@ jobs:
             kit/Source_Migration/v3_0/tools/*.py \
             qarro-repo/ci/content_pass_v3_1.py \
             qarro-repo/ci/balance_kanto_v3_2.py \
+            qarro-repo/ci/runtime_content_v3_3.py \
             qarro-repo/ci/install_cyrillic_v3_3.py \
             qarro-repo/ci/localization_ru_core_v3_3.py
 
@@ -134,6 +135,13 @@ jobs:
           set -euo pipefail
           python3 qarro-repo/ci/balance_kanto_v3_2.py upstream \
             2>&1 | tee qarro_ci_out_v3_3/logs/balance_kanto_v3_2.log
+
+      - name: Apply v3.3 runtime item and encounter corrections
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 qarro-repo/ci/runtime_content_v3_3.py upstream \
+            2>&1 | tee qarro_ci_out_v3_3/logs/runtime_content_v3_3.log
 
       - name: Install v3.3 Cyrillic font and charmap
         shell: bash
@@ -168,6 +176,7 @@ jobs:
           git -C upstream diff --no-ext-diff > qarro_ci_out_v3_3/qarro_applied_diff_v3_3.patch || true
           if [[ -f upstream/src/data/trainers_frlg.h ]]; then cp upstream/src/data/trainers_frlg.h qarro_ci_out_v3_3/trainers_frlg.generated.h; fi
           if [[ -f upstream/build/qarro_content_v3_1_audit.json ]]; then cp upstream/build/qarro_content_v3_1_audit.json qarro_ci_out_v3_3/; fi
+          if [[ -f upstream/build/qarro_runtime_v3_3_audit.json ]]; then cp upstream/build/qarro_runtime_v3_3_audit.json qarro_ci_out_v3_3/; fi
           for f in pokefirered.map pokefirered.sym; do [[ -f "upstream/$f" ]] && cp "upstream/$f" qarro_ci_out_v3_3/; done
           if [[ -f upstream/pokefirered.gba ]]; then
             cp upstream/pokefirered.gba qarro_ci_out_v3_3/Qarro_FIRST_PLAYABLE_v3_3.gba
