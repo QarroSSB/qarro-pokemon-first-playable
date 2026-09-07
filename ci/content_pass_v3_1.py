@@ -34,6 +34,14 @@ def load_base() -> str:
     code = code.replace("# QarroV31_Route1\n", "")
     code = code.replace("# QarroV31_Route2\n", "")
     code = code.replace("# QarroV31_Route4\n", "")
+    # NEXT REAL v3.1 ERROR (run #14): hidden-item map events require flags in
+    # the dedicated FRLG hidden-item range (>= FLAG_HIDDEN_ITEMS_START / 0x3E8).
+    # Use four pinned-source unused hidden-item flags; ordinary object hide flags
+    # FLAG_0x0AF..FLAG_0x0B1 remain unchanged.
+    code = code.replace('"flag": "FLAG_0x0B2"', '"flag": "FLAG_UNUSED_0x4A7"')
+    code = code.replace('"flag": "FLAG_0x0B3"', '"flag": "FLAG_UNUSED_0x4A8"')
+    code = code.replace('"flag": "FLAG_0x0B4"', '"flag": "FLAG_UNUSED_0x4A9"')
+    code = code.replace('"flag": "FLAG_0x0B5"', '"flag": "FLAG_UNUSED_0x4AA"')
     return code
 
 
