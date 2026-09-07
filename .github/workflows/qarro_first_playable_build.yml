@@ -1,4 +1,4 @@
-name: Qarro FIRST PLAYABLE v3.1 content
+name: Qarro FIRST PLAYABLE v3.2 balanced
 
 on:
   push:
@@ -99,15 +99,15 @@ jobs:
           set -euo pipefail
           python3 kit/Source_Migration/v3_0/tools/validate_build_kit_v3_0.py kit/Source_Migration/v3_0
           python3 kit/Source_Migration/v3_0/tools/validate_pinned_upstream_fingerprint_v3_0.py --self-test
-          python3 -m py_compile kit/Source_Migration/v3_0/tools/*.py qarro-repo/ci/content_pass_v3_1.py
+          python3 -m py_compile kit/Source_Migration/v3_0/tools/*.py qarro-repo/ci/content_pass_v3_1.py qarro-repo/ci/balance_kanto_v3_2.py
 
       - name: Install FIRST PLAYABLE data and config
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p qarro_ci_out_v3_1/logs
+          mkdir -p qarro_ci_out_v3_2/logs
           python3 kit/Source_Migration/v3_0/tools/install_first_playable_v3_0.py upstream \
-            2>&1 | tee qarro_ci_out_v3_1/logs/install_preflight.log
+            2>&1 | tee qarro_ci_out_v3_2/logs/install_preflight.log
 
       - name: Fix pinned Gen V compiler directive layouts
         shell: bash
@@ -120,15 +120,22 @@ jobs:
         run: |
           set -euo pipefail
           python3 qarro-repo/ci/content_pass_v3_1.py upstream \
-            2>&1 | tee qarro_ci_out_v3_1/logs/content_pass_v3_1.log
+            2>&1 | tee qarro_ci_out_v3_2/logs/content_pass_v3_1.log
+
+      - name: Apply v3.2 low-grind Kanto gym balance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 qarro-repo/ci/balance_kanto_v3_2.py upstream \
+            2>&1 | tee qarro_ci_out_v3_2/logs/balance_kanto_v3_2.log
 
       - name: Real ARM make firered
         shell: bash
         run: |
           set -o pipefail
-          mkdir -p qarro_ci_out_v3_1/logs
-          make -C upstream clean 2>&1 | tee qarro_ci_out_v3_1/logs/make_clean.log
-          make -C upstream -j4 -O firered 2>&1 | tee qarro_ci_out_v3_1/logs/make_firered.log
+          mkdir -p qarro_ci_out_v3_2/logs
+          make -C upstream clean 2>&1 | tee qarro_ci_out_v3_2/logs/make_clean.log
+          make -C upstream -j4 -O firered 2>&1 | tee qarro_ci_out_v3_2/logs/make_firered.log
           rc=${PIPESTATUS[0]}
           exit "$rc"
 
@@ -136,22 +143,22 @@ jobs:
         if: always()
         shell: bash
         run: |
-          mkdir -p qarro_ci_out_v3_1
-          git -C upstream status --short > qarro_ci_out_v3_1/git_status_v3_1.txt || true
-          git -C upstream diff --no-ext-diff > qarro_ci_out_v3_1/qarro_applied_diff_v3_1.patch || true
-          if [[ -f upstream/src/data/trainers_frlg.h ]]; then cp upstream/src/data/trainers_frlg.h qarro_ci_out_v3_1/trainers_frlg.generated.h; fi
-          if [[ -f upstream/build/qarro_content_v3_1_audit.json ]]; then cp upstream/build/qarro_content_v3_1_audit.json qarro_ci_out_v3_1/; fi
-          for f in pokefirered.map pokefirered.sym; do [[ -f "upstream/$f" ]] && cp "upstream/$f" qarro_ci_out_v3_1/; done
+          mkdir -p qarro_ci_out_v3_2
+          git -C upstream status --short > qarro_ci_out_v3_2/git_status_v3_2.txt || true
+          git -C upstream diff --no-ext-diff > qarro_ci_out_v3_2/qarro_applied_diff_v3_2.patch || true
+          if [[ -f upstream/src/data/trainers_frlg.h ]]; then cp upstream/src/data/trainers_frlg.h qarro_ci_out_v3_2/trainers_frlg.generated.h; fi
+          if [[ -f upstream/build/qarro_content_v3_1_audit.json ]]; then cp upstream/build/qarro_content_v3_1_audit.json qarro_ci_out_v3_2/; fi
+          for f in pokefirered.map pokefirered.sym; do [[ -f "upstream/$f" ]] && cp "upstream/$f" qarro_ci_out_v3_2/; done
           if [[ -f upstream/pokefirered.gba ]]; then
-            cp upstream/pokefirered.gba qarro_ci_out_v3_1/Qarro_FIRST_PLAYABLE_v3_1.gba
-            sha256sum qarro_ci_out_v3_1/Qarro_FIRST_PLAYABLE_v3_1.gba > qarro_ci_out_v3_1/Qarro_FIRST_PLAYABLE_v3_1.gba.sha256
+            cp upstream/pokefirered.gba qarro_ci_out_v3_2/Qarro_FIRST_PLAYABLE_v3_2.gba
+            sha256sum qarro_ci_out_v3_2/Qarro_FIRST_PLAYABLE_v3_2.gba > qarro_ci_out_v3_2/Qarro_FIRST_PLAYABLE_v3_2.gba.sha256
           fi
 
       - name: Upload ROM or exact first failure diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Qarro-FIRST-PLAYABLE-v3.1-${{ github.run_number }}
+          name: Qarro-FIRST-PLAYABLE-v3.2-${{ github.run_number }}
           if-no-files-found: warn
           retention-days: 30
-          path: qarro_ci_out_v3_1/**
+          path: qarro_ci_out_v3_2/**
