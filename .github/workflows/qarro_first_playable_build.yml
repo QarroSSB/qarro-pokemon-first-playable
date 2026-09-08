@@ -175,6 +175,21 @@ jobs:
           rc=${PIPESTATUS[0]}
           exit "$rc"
 
+      - name: Publish exact make failure tail
+        if: failure()
+        shell: bash
+        run: |
+          {
+            echo "### make firered failure diagnostics"
+            echo
+            echo '```text'
+            grep -nEi 'error:|fatal|undefined reference|no rule to make target|not found|failed' qarro_ci_out_v3_4/logs/make_firered.log | tail -n 80 || true
+            echo
+            echo '--- tail ---'
+            tail -n 160 qarro_ci_out_v3_4/logs/make_firered.log || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Preserve exact build diagnostics and ROM
         if: always()
         shell: bash
