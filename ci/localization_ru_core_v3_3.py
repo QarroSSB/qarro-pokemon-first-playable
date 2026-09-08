@@ -104,15 +104,15 @@ def patch_exact_strings(path: Path, mapping: dict[str, str]) -> int:
 def patch_custom_route_dialogue(root: Path) -> int:
     changed = 0
     changed += patch_exact_strings(root / "data/maps/Route1_Frlg/scripts.inc", {
-        '    .string "KANTO isn\'t the whole world!\\nLet\'s battle!$"': '    .string "КАНТО — не весь мир!\\nДавай сразимся!$"',
+        '    .string "KANTO isn\'t the whole world!\\nLet\'s battle!$"': '    .string "КАНТО - не весь мир!\\nДавай сразимся!$"',
         '    .string "Okay, your team is stronger!$"': '    .string "Ладно, твоя команда сильнее!$"',
         '    .string "You\'ll meet POKéMON from many regions.$"': '    .string "Ты встретишь ПОКЕМОНОВ из разных регионов.$"',
         '    .string "My POKéMON came from far away.\\nReady?$"': '    .string "Мои ПОКЕМОНЫ прибыли издалека.\\nГотов?$"',
         '    .string "That was a good battle!$"': '    .string "Это был хороший бой!$"',
-        '    .string "Different regions mean different tactics.$"': '    .string "Разные регионы — разные тактики.$"',
+        '    .string "Different regions mean different tactics.$"': '    .string "Разные регионы - разные тактики.$"',
     })
     changed += patch_exact_strings(root / "data/maps/Route2_Frlg/scripts.inc", {
-        '    .string "Electric POKéMON aren\'t just PIKACHU!$"': '    .string "Электрические ПОКЕМОНЫ — не только PIKACHU!$"',
+        '    .string "Electric POKéMON aren\'t just PIKACHU!$"': '    .string "Электрические ПОКЕМОНЫ - не только PIKACHU!$"',
         '    .string "You grounded my plan!$"': '    .string "Ты сорвал мой план!$"',
         '    .string "I\'ll train with POKéMON from every region.$"': '    .string "Я буду тренироваться с ПОКЕМОНАМИ всех регионов.$"',
         '    .string "Bugs evolved in every region.\\nTake a look!$"': '    .string "Насекомые есть в каждом регионе.\\nСмотри!$"',
