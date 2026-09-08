@@ -1,240 +1,175 @@
 #!/usr/bin/env python3
-"""Qarro v3.3/v3.4 safe Russian localization layer.
+"""Qarro Russian localization bootstrap + phase-1 descriptions.
 
-Translate high-visibility menus/system UI plus the custom early-route dialogue
-introduced by the Qarro v3.1 content pass. English Pokemon, Move and Ability
-proper names are deliberately preserved.
+Keep the exact green v3.4 core localization from commit f7f5d677, then add
+concise Russian descriptions for the historically prepared Brock/Misty move
+and ability set. Pokemon, Move and Ability proper names stay English.
+
+No Ash Bond / Ash Cap changes.
 """
 from __future__ import annotations
 
+import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
+BASE_COMMIT = "f7f5d67773203ef16e32e827167fa10f2886a215"
+BASE_PATH = "ci/localization_ru_core_v3_3.py"
+MARKER = "QARRO_RU_DESC_V3_5"
 
-def patch_symbol(text: str, symbol: str, value: str, *, required: bool = True) -> tuple[str, bool]:
-    rx = re.compile(rf'(?m)^([^\n]*\b{re.escape(symbol)}\b[^\n]*?\s*=\s*_\(")(.*?)("\);[^\n]*)$')
-    matches = list(rx.finditer(text))
-    if not matches:
-        if required:
-            raise RuntimeError(f"missing localization anchor: {symbol}")
-        return text, False
-    if len(matches) != 1:
-        raise RuntimeError(f"{symbol}: expected one localization anchor, got {len(matches)}")
-    current = matches[0].group(2)
-    if current == value:
-        return text, False
-    text = rx.sub(lambda m: f"{m.group(1)}{value}{m.group(3)}", text, count=1)
-    print(f"[ru-core] {symbol}: {current!r} -> {value!r}")
-    return text, True
+MOVE_DESCRIPTIONS = {
+    "MOVE_EARTHQUAKE": ("Мощное землетрясение.", "Бьёт всех вокруг."),
+    "MOVE_ROCK_POLISH": ("Резко повышает", "Скорость пользователя."),
+    "MOVE_ROCK_SLIDE": ("Обрушивает камни.", "Может вызвать испуг."),
+    "MOVE_EXPLOSION": ("Наносит огромный урон.", "Пользователь падает."),
+    "MOVE_ICE_FANG": ("Ледяной укус. Может", "заморозить или испугать."),
+    "MOVE_THUNDER_FANG": ("Электрический укус.", "Паралич или испуг."),
+    "MOVE_CRUNCH": ("Сильный укус. Может", "снизить Защиту цели."),
+    "MOVE_DRAGON_DANCE": ("Повышает Атаку", "и Скорость пользователя."),
+    "MOVE_SURF": ("Мощная волна бьёт", "всех вокруг пользователя."),
+    "MOVE_ICE_BEAM": ("Ледяной луч. Может", "заморозить цель."),
+    "MOVE_EARTH_POWER": ("Сила земли. Может", "снизить Сп. защиту."),
+    "MOVE_SHELL_SMASH": ("Резко усиливает атаку", "и Скорость, снижая защиту."),
+    "MOVE_TOXIC": ("Сильно отравляет цель.", "Урон растёт каждый ход."),
+    "MOVE_RECOVER": ("Восстанавливает", "половину максимальных HP."),
+    "MOVE_GIGA_DRAIN": ("Высасывает HP цели", "и лечит пользователя."),
+    "MOVE_ANCIENT_POWER": ("Древняя сила. Может", "повысить все параметры."),
+    "MOVE_DRAIN_PUNCH": ("Удар лечит пользователя", "частью нанесённого урона."),
+    "MOVE_THUNDER_WAVE": ("Электрическая волна", "парализует цель."),
+    "MOVE_CURSE": ("Повышает Атаку и Защиту,", "но снижает Скорость."),
+    "MOVE_STEALTH_ROCK": ("Камни ранят врагов", "при выходе на поле."),
+    "MOVE_GYRO_BALL": ("Чем медленнее покемон,", "тем сильнее атака."),
+    "MOVE_DRAGON_TAIL": ("Удар хвостом вынуждает", "цель покинуть поле."),
+    "MOVE_ENCORE": ("Цель повторяет", "последнюю атаку."),
+    "MOVE_ROCK_TOMB": ("Обрушивает камни", "и снижает Скорость цели."),
+    "MOVE_PROTECT": ("Защищает от большинства", "атак в этот ход."),
+    "MOVE_REST": ("Полностью лечит HP и статус,", "но усыпляет пользователя."),
+    "MOVE_STONE_EDGE": ("Острые камни. Высокий", "шанс критического удара."),
+    "MOVE_HYDRO_PUMP": ("Мощнейшая струя воды", "обрушивается на цель."),
+    "MOVE_SCALD": ("Обдаёт цель кипятком.", "Может вызвать ожог."),
+    "MOVE_HYPNOSIS": ("Гипноз погружает", "цель в сон."),
+    "MOVE_PERISH_SONG": ("Услышавшие песню падут", "через 3 хода без смены."),
+    "MOVE_DRAGON_PULSE": ("Ударная волна", "драконьей энергии."),
+    "MOVE_RAIN_DANCE": ("Вызывает дождь", "на несколько ходов."),
+    "MOVE_PSYCHIC": ("Психическая атака. Может", "снизить Сп. защиту."),
+    "MOVE_TELEKINESIS": ("Поднимает цель и делает", "атаки по ней точнее."),
+    "MOVE_WATERFALL": ("Водный таран. Может", "заставить цель дрогнуть."),
+    "MOVE_BOUNCE": ("Взлетает и бьёт позже.", "Может парализовать."),
+    "MOVE_CALM_MIND": ("Повышает Сп. атаку", "и Сп. защиту."),
+    "MOVE_THUNDERBOLT": ("Сильный разряд. Может", "парализовать цель."),
+    "MOVE_THUNDER": ("Мощнейшая молния. Может", "парализовать цель."),
+    "MOVE_RAPID_SPIN": ("Атакует вращением", "и убирает ловушки."),
+    "MOVE_SLACK_OFF": ("Восстанавливает", "половину максимальных HP."),
+    "MOVE_ICICLE_SPEAR": ("Ледяные копья бьют", "от 2 до 5 раз."),
+    "MOVE_ROCK_BLAST": ("Камни поражают цель", "от 2 до 5 раз."),
+    "MOVE_RAZOR_SHELL": ("Режет острым панцирем.", "Может снизить Защиту."),
+    "MOVE_OUTRAGE": ("Бьёт несколько ходов,", "затем вызывает смятение."),
+    "MOVE_IRON_HEAD": ("Удар стальной головой.", "Может вызвать испуг."),
+    "MOVE_EXTRASENSORY": ("Невидимая сила. Может", "заставить цель дрогнуть."),
+}
+
+ABILITY_DESCRIPTIONS = {
+    "ABILITY_STURDY": ("При полном HP переживает", "удар, оставляя 1 HP."),
+    "ABILITY_PRESSURE": ("Враг тратит больше PP", "на направленные атаки."),
+    "ABILITY_SAND_STREAM": ("При выходе вызывает", "песчаную бурю."),
+    "ABILITY_SHELL_ARMOR": ("Защищает покемона", "от критических ударов."),
+    "ABILITY_STORM_DRAIN": ("Поглощает Водные атаки", "и повышает Сп. атаку."),
+    "ABILITY_CLEAR_BODY": ("Не даёт противнику", "снижать параметры."),
+    "ABILITY_LIGHTNING_ROD": ("Поглощает Электро-атаки", "и повышает Сп. атаку."),
+    "ABILITY_DRIZZLE": ("При выходе вызывает", "дождь."),
+    "ABILITY_SWIFT_SWIM": ("Во время дождя", "Скорость удваивается."),
+    "ABILITY_NATURAL_CURE": ("Лечит статус покемона", "при уходе с поля."),
+    "ABILITY_INTIMIDATE": ("При выходе снижает", "Атаку противников."),
+    "ABILITY_VOLT_ABSORB": ("Электро-атаки лечат", "вместо нанесения урона."),
+    "ABILITY_UNAWARE": ("Игнорирует изменения", "параметров противника."),
+    "ABILITY_SKILL_LINK": ("Многоударные атаки", "всегда бьют максимум раз."),
+    "ABILITY_REGENERATOR": ("При уходе восстанавливает", "треть максимальных HP."),
+    "ABILITY_WATER_ABSORB": ("Водные атаки лечат", "вместо нанесения урона."),
+}
 
 
-def patch_file(path: Path, mapping: dict[str, str]) -> int:
-    if not path.exists():
-        raise RuntimeError(f"missing {path}")
+def load_base() -> str:
+    repo = Path(__file__).resolve().parents[1]
+    subprocess.run(
+        ["git", "-C", str(repo), "fetch", "--quiet", "--depth=1", "origin", BASE_COMMIT],
+        check=True,
+    )
+    return subprocess.check_output(
+        ["git", "-C", str(repo), "show", f"{BASE_COMMIT}:{BASE_PATH}"],
+        text=True,
+    )
+
+
+def encode_description(lines: tuple[str, str]) -> str:
+    if len(lines) != 2 or any(not line for line in lines):
+        raise RuntimeError(f"invalid two-line description: {lines!r}")
+    if any("—" in line or "…" in line for line in lines):
+        raise RuntimeError(f"unsupported typography in description: {lines!r}")
+    return lines[0].replace('"', '\\"') + "\\n" + lines[1].replace('"', '\\"')
+
+
+def patch_table(path: Path, entries: dict[str, tuple[str, str]], prefix: str) -> int:
     text = path.read_text(encoding="utf-8")
     changed = 0
-    for symbol, value in mapping.items():
-        text, did = patch_symbol(text, symbol, value)
-        changed += int(did)
-    path.write_text(text, encoding="utf-8")
-    return changed
-
-
-def patch_option_menu(path: Path) -> int:
-    text = path.read_text(encoding="utf-8")
-    mapping = {
-        "gText_Option": "НАСТРОЙКИ",
-        "gText_TextSpeedSlow": "{COLOR GREEN}{SHADOW LIGHT_GREEN}МЕДЛ.",
-        "gText_TextSpeedMid": "{COLOR GREEN}{SHADOW LIGHT_GREEN}СРЕД.",
-        "gText_TextSpeedFast": "{COLOR GREEN}{SHADOW LIGHT_GREEN}БЫСТР.",
-        "gText_BattleSceneOn": "{COLOR GREEN}{SHADOW LIGHT_GREEN}ВКЛ",
-        "gText_BattleSceneOff": "{COLOR GREEN}{SHADOW LIGHT_GREEN}ВЫКЛ",
-        "gText_BattleStyleShift": "{COLOR GREEN}{SHADOW LIGHT_GREEN}СМЕНА",
-        "gText_BattleStyleSet": "{COLOR GREEN}{SHADOW LIGHT_GREEN}ФИКС.",
-        "gText_SoundMono": "{COLOR GREEN}{SHADOW LIGHT_GREEN}МОНО",
-        "gText_SoundStereo": "{COLOR GREEN}{SHADOW LIGHT_GREEN}СТЕРЕО",
-        "gText_FrameType": "{COLOR GREEN}{SHADOW LIGHT_GREEN}ТИП",
-        "gText_ButtonTypeNormal": "{COLOR GREEN}{SHADOW LIGHT_GREEN}ОБЫЧН.",
-    }
-    changed = 0
-    for symbol, value in mapping.items():
-        text, did = patch_symbol(text, symbol, value)
-        changed += int(did)
-
-    exact = {
-        'COMPOUND_STRING("TEXT SPEED")': 'COMPOUND_STRING("СКОР. ТЕКСТА")',
-        'COMPOUND_STRING("BATTLE SCENE")': 'COMPOUND_STRING("АНИМ. БОЯ")',
-        'COMPOUND_STRING("BATTLE STYLE")': 'COMPOUND_STRING("СТИЛЬ БОЯ")',
-        'COMPOUND_STRING("SOUND")': 'COMPOUND_STRING("ЗВУК")',
-        'COMPOUND_STRING("BUTTON MODE")': 'COMPOUND_STRING("КНОПКИ")',
-        'COMPOUND_STRING("FRAME")': 'COMPOUND_STRING("РАМКА")',
-        'COMPOUND_STRING("CANCEL")': 'COMPOUND_STRING("НАЗАД")',
-    }
-    for old, new in exact.items():
-        if new in text:
+    for key, lines in entries.items():
+        token = f"[{key}] ="
+        start = text.find(token)
+        if start < 0:
+            raise RuntimeError(f"{path}: missing entry {key}")
+        next_start = text.find(f"\n    [{prefix}", start + len(token))
+        end = len(text) if next_start < 0 else next_start
+        block = text[start:end]
+        rx = re.compile(r"(?s)(\.description\s*=\s*COMPOUND_STRING\()(.*?)(\),)")
+        matches = list(rx.finditer(block))
+        if len(matches) != 1:
+            raise RuntimeError(f"{path}: {key} expected one description, got {len(matches)}")
+        encoded = encode_description(lines)
+        replacement = f'.description = COMPOUND_STRING("{encoded}"),'
+        current = matches[0].group(0)
+        if current == replacement:
             continue
-        if text.count(old) != 1:
-            raise RuntimeError(f"option anchor count for {old!r}: {text.count(old)}")
-        text = text.replace(old, new, 1)
+        block = block[:matches[0].start()] + replacement + block[matches[0].end():]
+        text = text[:start] + block + text[end:]
         changed += 1
-        print(f"[ru-core] option: {old} -> {new}")
+        print(f"[ru-desc] {key}: description localized")
     path.write_text(text, encoding="utf-8")
-    return changed
-
-
-def patch_exact_strings(path: Path, mapping: dict[str, str]) -> int:
-    if not path.exists():
-        raise RuntimeError(f"missing {path}")
-    text = path.read_text(encoding="utf-8")
-    changed = 0
-    for old, new in mapping.items():
-        if new in text:
-            continue
-        count = text.count(old)
-        if count != 1:
-            raise RuntimeError(f"{path}: expected one exact text anchor {old!r}, got {count}")
-        text = text.replace(old, new, 1)
-        changed += 1
-        print(f"[ru-route] {path.name}: {old!r} -> {new!r}")
-    path.write_text(text, encoding="utf-8")
-    return changed
-
-
-def patch_custom_route_dialogue(root: Path) -> int:
-    changed = 0
-    changed += patch_exact_strings(root / "data/maps/Route1_Frlg/scripts.inc", {
-        '    .string "KANTO isn\'t the whole world!\\nLet\'s battle!$"': '    .string "КАНТО - не весь мир!\\nДавай сразимся!$"',
-        '    .string "Okay, your team is stronger!$"': '    .string "Ладно, твоя команда сильнее!$"',
-        '    .string "You\'ll meet POKéMON from many regions.$"': '    .string "Ты встретишь ПОКЕМОНОВ из разных регионов.$"',
-        '    .string "My POKéMON came from far away.\\nReady?$"': '    .string "Мои ПОКЕМОНЫ прибыли издалека.\\nГотов?$"',
-        '    .string "That was a good battle!$"': '    .string "Это был хороший бой!$"',
-        '    .string "Different regions mean different tactics.$"': '    .string "Разные регионы - разные тактики.$"',
-    })
-    changed += patch_exact_strings(root / "data/maps/Route2_Frlg/scripts.inc", {
-        '    .string "Electric POKéMON aren\'t just PIKACHU!$"': '    .string "Электрические ПОКЕМОНЫ - не только PIKACHU!$"',
-        '    .string "You grounded my plan!$"': '    .string "Ты сорвал мой план!$"',
-        '    .string "I\'ll train with POKéMON from every region.$"': '    .string "Я буду тренироваться с ПОКЕМОНАМИ всех регионов.$"',
-        '    .string "Bugs evolved in every region.\\nTake a look!$"': '    .string "Насекомые есть в каждом регионе.\\nСмотри!$"',
-        '    .string "My bugs need more training!$"': '    .string "Моим насекомым нужно больше тренировок!$"',
-        '    .string "Forests hide many different species.$"': '    .string "В лесах скрывается множество разных видов.$"',
-    })
-    changed += patch_exact_strings(root / "data/maps/Route4_Frlg/scripts.inc", {
-        '    .string "I trained by MT. MOON.\\nLet\'s see what you learned!$"': '    .string "Я тренировался у MT. MOON.\\nПокажи, чему научился!$"',
-        '    .string "You made it through!$"': '    .string "Ты справился!$"',
-        '    .string "Your PC will need room for many species.$"': '    .string "В твоём ПК понадобится место для многих видов.$"',
-    })
     return changed
 
 
 def main() -> int:
+    code = load_base()
+    ns = {
+        "__name__": "qarro_ru_core_v34_base",
+        "__file__": str(Path(__file__).resolve()),
+    }
+    exec(compile(code, f"{BASE_COMMIT}:{BASE_PATH}", "exec"), ns)
+    rc = int(ns["main"]() or 0)
+    if rc:
+        return rc
+
     if len(sys.argv) != 2:
         print(f"usage: {Path(sys.argv[0]).name} <upstream-root>", file=sys.stderr)
         return 2
     root = Path(sys.argv[1]).resolve()
+    moves = patch_table(root / "src/data/moves_info.h", MOVE_DESCRIPTIONS, "MOVE_")
+    abilities = patch_table(root / "src/data/abilities.h", ABILITY_DESCRIPTIONS, "ABILITY_")
 
-    main_menu = {
-        "gText_SaveFileCorrupted": "Файл сохранения повреждён.\\nБудет загружена предыдущая копия.",
-        "gText_SaveFileErased": "Файл сохранения удалён\\nиз-за повреждения данных.",
-        "gText_BatteryRunDry": "Внутренняя батарея разряжена.\\nИграть можно.\\pСобытия, зависящие от часов,\\nработать не будут.",
-        "gText_MainMenuNewGame": "НОВАЯ ИГРА",
-        "gText_MainMenuContinue": "ПРОДОЛЖИТЬ",
-        "gText_MainMenuOption": "НАСТРОЙКИ",
-        "gText_MainMenuMysteryGift": "ТАЙНЫЙ ПОДАРОК",
-        "gText_MainMenuMysteryGift2": "ТАЙНЫЙ ПОДАРОК",
-        "gText_MainMenuMysteryEvents": "ТАЙНЫЕ СОБЫТИЯ",
-        "gText_WirelessNotConnected": "Беспроводной адаптер\\nне подключён.",
-        "gText_ContinueMenuPlayer": "ИГРОК",
-        "gText_ContinueMenuTime": "ВРЕМЯ",
-        "gText_ContinueMenuPokedex": "ПОКЕДЕКС",
-        "gText_ContinueMenuBadges": "ЗНАЧКИ",
+    audit = {
+        "marker": MARKER,
+        "moveDescriptionsLocalized": moves,
+        "abilityDescriptionsLocalized": abilities,
+        "pokemonNamesEnglish": True,
+        "moveNamesEnglish": True,
+        "abilityNamesEnglish": True,
+        "ashBondTouched": False,
+        "ashCapTouched": False,
     }
-
-    core = {
-        "gText_Pokemon": "ПОКЕМОН",
-        "gText_Pokedex": "ПОКЕДЕКС",
-        "gText_Time": "ВРЕМЯ",
-        "gText_Badges": "ЗНАЧКИ",
-        "gText_Next": "{A_BUTTON}ДАЛЕЕ",
-        "gText_NextBack": "{A_BUTTON}ДАЛЕЕ {B_BUTTON}НАЗАД",
-        "gText_AButtonExit": "{A_BUTTON}ВЫХОД",
-        "gText_Boy": "МАЛЬЧИК",
-        "gText_Girl": "ДЕВОЧКА",
-        "gText_Name": "ИМЯ",
-        "gText_FlyToWhere": "КУДА ЛЕТЕТЬ?",
-        "gMenuText_Use": "ИСП.",
-        "gMenuText_Toss": "ВЫБРОС.",
-        "gMenuText_Register": "НАЗНАЧ.",
-        "gMenuText_Give": "ДАТЬ",
-        "gMenuText_Confirm": "ГОТОВО",
-        "gText_Cancel": "НАЗАД",
-        "gText_Cancel2": "НАЗАД",
-        "gText_None": "НЕТ",
-        "gText_GoBackPrevMenu": "Вернуться в\\nпредыдущее меню.",
-        "gText_WhatWouldYouLike": "Что вы хотите сделать?",
-        "gMenuText_Give2": "ДАТЬ",
-        "gText_CloseBag": "ЗАКРЫТЬ СУМКУ",
-        "gText_NoPokemon": "Здесь нет\\nПОКЕМОНОВ.",
-        "gText_TheField": "поле",
-        "gText_TheBattle": "бой",
-        "gText_ThePokemonList": "список ПОКЕМОНОВ",
-        "gText_TheShop": "магазин",
-        "gText_ThePC": "ПК",
-        "gText_ShopBuy": "КУПИТЬ",
-        "gText_ShopSell": "ПРОДАТЬ",
-        "gText_ShopQuit": "ВЫХОД",
-        "gText_ThatItemIsSoldOut": "Извините, этот предмет закончился.{PAUSE_UNTIL_PRESS}",
-        "gText_SoldOut": "НЕТ В НАЛИЧИИ",
-        "gText_InBagVar1": "В СУМКЕ: {STR_VAR_1}",
-        "gText_QuitShopping": "Закончить покупки.",
-        "gText_HereYouGoThankYou": "Вот, пожалуйста!\\nБольшое спасибо.",
-        "gText_YouDontHaveMoney": "У вас недостаточно денег.{PAUSE_UNTIL_PRESS}",
-        "gText_NoMoreRoomForThis": "В сумке больше нет места\\nдля этого предмета.{PAUSE_UNTIL_PRESS}",
-        "gText_AnythingElseICanHelp": "Могу помочь ещё чем-нибудь?",
-        "gText_Register": "НАЗНАЧ.",
-        "gText_Attack3": "АТАКА",
-        "gText_Defense3": "ЗАЩИТА",
-        "gText_SpAtk4": "СП. АТК",
-        "gText_SpDef4": "СП. ЗАЩ",
-        "gText_Speed2": "СКОРОСТЬ",
-        "gText_TypeSlash": "ТИП/",
-        "gText_Power": "СИЛА",
-        "gText_Accuracy2": "ТОЧНОСТЬ",
-        "gText_Status": "СТАТУС",
-        "gText_ExpPoints": "ОПЫТ",
-        "gText_NextLv": "ДО УР.",
-        "gText_Switch": "СМЕНИТЬ",
-        "gText_PkmnInfo": "ИНФО ПОКЕМОНА",
-        "gText_PkmnSkills": "ПАРАМЕТРЫ",
-        "gText_BattleMoves": "АТАКИ",
-        "gText_Info": "ИНФО",
-        "gText_NoItems": "Предметов нет.{PAUSE_UNTIL_PRESS}",
-        "gText_BagIsFull": "СУМКА заполнена.{PAUSE_UNTIL_PRESS}",
-        "gText_Information": "ИНФОРМАЦИЯ",
-        "gText_Yes": "ДА",
-        "gText_No": "НЕТ",
-        "gText_HallOfFame": "ЗАЛ СЛАВЫ",
-        "gText_LogOff": "ВЫЙТИ",
-        "gText_MenuOptionPokedex": "ПОКЕДЕКС",
-        "gText_MenuOptionPokemon": "ПОКЕМОНЫ",
-        "gText_MenuOptionBag": "СУМКА",
-        "gText_MenuOptionSave": "СОХРАНИТЬ",
-        "gText_MenuOptionOption": "НАСТРОЙКИ",
-        "gText_MenuOptionExit": "ВЫХОД",
-        "gText_Exit": "ВЫХОД",
-        "gText_YourPartysFull": "Ваша команда заполнена!{PAUSE_UNTIL_PRESS}",
-        "gText_InParty": "В КОМАНДЕ",
-        "gText_SaveCompleted": "Сохранение завершено.",
-        "gText_SaveFailed": "Ошибка сохранения…",
-    }
-
-    changed = 0
-    changed += patch_file(root / "src/main_menu.c", main_menu)
-    changed += patch_option_menu(root / "src/option_menu.c")
-    changed += patch_file(root / "src/strings.c", core)
-    changed += patch_custom_route_dialogue(root)
-
-    print(f"[QARRO_RU_CORE_V3_3] PASS: {changed} visible UI/system/route strings localized")
+    out = root / "build/qarro_ru_descriptions_v3_5_audit.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(audit, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"[{MARKER}] PASS: {moves} move + {abilities} ability descriptions localized; names/Ash untouched")
     return 0
 
 
