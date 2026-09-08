@@ -2,9 +2,9 @@
 """Targeted v3.5 follow-up for conditional move descriptions.
 
 Execute the exact phase-1 RU description patch from commit 1a5adc5d, while
-handling only the verified dual description branches for Rapid Spin and
-Rock Slide in pinned Expansion 1.17.0. Every other conditional entry remains
-fail-closed and preserved until it is inspected separately.
+handling only verified conditional description branches in pinned Expansion
+1.17.0. Every other conditional entry remains fail-closed and preserved until
+it is inspected separately.
 
 No Ash Bond / Ash Cap changes.
 """
@@ -126,6 +126,43 @@ def patch_rock_slide(block: str) -> tuple[str, bool]:
     return block, changed
 
 
+def patch_ice_fang(block: str) -> tuple[str, bool]:
+    if "#if B_USE_FROSTBITE" not in block:
+        raise RuntimeError("MOVE_ICE_FANG: expected frostbite conditional missing")
+    if block.count("#else") != 1 or block.count("#endif") < 1:
+        raise RuntimeError("MOVE_ICE_FANG: expected exactly one description #else branch")
+
+    prefix = re.compile(r'"May cause flinching or(?:\\n|\\\s*)"\s*')
+    matches = list(prefix.finditer(block))
+    if len(matches) != 1:
+        raise RuntimeError(f"MOVE_ICE_FANG: shared description prefix expected once, got {len(matches)}")
+    block = block[:matches[0].start()] + '"Может вызвать испуг или\\n"\n            ' + block[matches[0].end():]
+
+    branches = (
+        (
+            re.compile(r'"leave the foe with frostbite\."\),'),
+            '"обморожение у цели."),',
+            "frostbite",
+        ),
+        (
+            re.compile(r'"freeze the foe\."\),'),
+            '"заморозить цель."),',
+            "freeze",
+        ),
+    )
+    for rx, replacement, branch_name in branches:
+        matches = list(rx.finditer(block))
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"MOVE_ICE_FANG: {branch_name} branch expected once, got {len(matches)}"
+            )
+        block = block[:matches[0].start()] + replacement + block[matches[0].end():]
+
+    if "May cause flinching or" in block or "leave the foe with frostbite" in block or "freeze the foe" in block:
+        raise RuntimeError("MOVE_ICE_FANG: English description text remained after patch")
+    return block, True
+
+
 def patch_table(path: Path, entries: dict[str, tuple[str, str]], prefix: str) -> int:
     text = path.read_text(encoding="utf-8")
     changed_entries = 0
@@ -145,20 +182,18 @@ def patch_table(path: Path, entries: dict[str, tuple[str, str]], prefix: str) ->
         if first_close < 0:
             raise RuntimeError(f"{path}: {key} unterminated description")
 
-        if key == "MOVE_RAPID_SPIN":
-            block, changed = patch_rapid_spin(block)
+        special = {
+            "MOVE_RAPID_SPIN": (patch_rapid_spin, "both conditional descriptions localized"),
+            "MOVE_ROCK_SLIDE": (patch_rock_slide, "both conditional descriptions localized"),
+            "MOVE_ICE_FANG": (patch_ice_fang, "both conditional descriptions localized"),
+        }.get(key)
+        if special is not None:
+            func, message = special
+            block, changed = func(block)
             if changed:
                 text = text[:start] + block + text[end:]
                 changed_entries += 1
-                print("[ru-desc] MOVE_RAPID_SPIN: both conditional descriptions localized")
-            continue
-
-        if key == "MOVE_ROCK_SLIDE":
-            block, changed = patch_rock_slide(block)
-            if changed:
-                text = text[:start] + block + text[end:]
-                changed_entries += 1
-                print("[ru-desc] MOVE_ROCK_SLIDE: both conditional descriptions localized")
+                print(f"[ru-desc] {key}: {message}")
             continue
 
         if re.search(r"(?m)^\s*#(?:if|elif|else|endif)\b", block):
