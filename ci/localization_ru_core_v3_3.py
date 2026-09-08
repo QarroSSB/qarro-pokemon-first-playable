@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Targeted v3.5 follow-up for Rapid Spin's dual description branches.
+"""Targeted v3.5 follow-up for conditional move descriptions.
 
-Execute the exact phase-1 RU description patch from commit 1a5adc5d, but
-replace only its table patcher so MOVE_RAPID_SPIN is allowed to have exactly
-two conditional .description branches in pinned Expansion 1.17.0. Every other
-entry remains fail-closed at exactly one description.
+Execute the exact phase-1 RU description patch from commit 1a5adc5d, while
+handling only the verified dual description branches for Rapid Spin and
+Rock Slide in pinned Expansion 1.17.0. Every other conditional entry remains
+fail-closed and preserved until it is inspected separately.
 
 No Ash Bond / Ash Cap changes.
 """
@@ -85,6 +85,47 @@ def patch_rapid_spin(block: str) -> tuple[str, bool]:
     return block, changed
 
 
+def patch_rock_slide(block: str) -> tuple[str, bool]:
+    if "#if B_UPDATED_MOVE_DATA >= GEN_2" not in block:
+        raise RuntimeError("MOVE_ROCK_SLIDE: expected updated-move-data conditional missing")
+    if block.count("#else") != 1 or block.count("#endif") < 1:
+        raise RuntimeError("MOVE_ROCK_SLIDE: expected exactly one description #else branch")
+
+    branches = (
+        (
+            re.compile(
+                r'"Large boulders are hurled\.(?:\\n|\\\s*)"\s*'
+                r'"May cause flinching\."\),'
+            ),
+            ("Обрушивает камни.", "Может вызвать испуг."),
+            "Gen2+",
+        ),
+        (
+            re.compile(
+                r'"Hits the foes with an(?:\\n|\\\s*)"\s*'
+                r'"avalanche of boulders\."\),'
+            ),
+            ("Обрушивает на врагов", "лавину валунов."),
+            "Gen1",
+        ),
+    )
+
+    changed = False
+    for rx, translated, branch_name in branches:
+        matches = list(rx.finditer(block))
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"MOVE_ROCK_SLIDE: {branch_name} description expected once, got {len(matches)}"
+            )
+        replacement = c_source_description(translated)
+        block = block[:matches[0].start()] + replacement + block[matches[0].end():]
+        changed = True
+
+    if "Large boulders are hurled" in block or "avalanche of boulders" in block:
+        raise RuntimeError("MOVE_ROCK_SLIDE: English description text remained after patch")
+    return block, changed
+
+
 def patch_table(path: Path, entries: dict[str, tuple[str, str]], prefix: str) -> int:
     text = path.read_text(encoding="utf-8")
     changed_entries = 0
@@ -110,6 +151,14 @@ def patch_table(path: Path, entries: dict[str, tuple[str, str]], prefix: str) ->
                 text = text[:start] + block + text[end:]
                 changed_entries += 1
                 print("[ru-desc] MOVE_RAPID_SPIN: both conditional descriptions localized")
+            continue
+
+        if key == "MOVE_ROCK_SLIDE":
+            block, changed = patch_rock_slide(block)
+            if changed:
+                text = text[:start] + block + text[end:]
+                changed_entries += 1
+                print("[ru-desc] MOVE_ROCK_SLIDE: both conditional descriptions localized")
             continue
 
         if re.search(r"(?m)^\s*#(?:if|elif|else|endif)\b", block):
