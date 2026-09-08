@@ -39,6 +39,52 @@ def encode_description(lines: tuple[str, str]) -> str:
     return lines[0].replace('"', '\\"') + "\\n" + lines[1].replace('"', '\\"')
 
 
+def c_source_description(lines: tuple[str, str]) -> str:
+    if len(lines) != 2 or any(not line for line in lines):
+        raise RuntimeError(f"invalid two-line source description: {lines!r}")
+    if any("—" in line or "…" in line for line in lines):
+        raise RuntimeError(f"unsupported typography in source description: {lines!r}")
+    return (
+        '"' + lines[0].replace('"', '\\"') + '\\' + '\n'
+        '            "' + lines[1].replace('"', '\\"') + '"),'
+    )
+
+
+def patch_rapid_spin(block: str) -> tuple[str, bool]:
+    if "#if B_SPEED_BUFFING_RAPID_SPIN >= GEN_8" not in block:
+        raise RuntimeError("MOVE_RAPID_SPIN: expected Gen 8 Speed conditional missing")
+    if block.count("#else") != 1 or block.count("#endif") < 1:
+        raise RuntimeError("MOVE_RAPID_SPIN: expected exactly one description #else branch")
+
+    branches = (
+        (
+            re.compile(r'"Spins to remove traps\\\s*"\s*"and raise Speed\."\),'),
+            ("Убирает ловушки и", "повышает Скорость."),
+            "Gen8+",
+        ),
+        (
+            re.compile(r'"Spins the body at high\\\s*"\s*"speed to remove traps\."\),'),
+            ("Вращается и убирает", "ловушки с поля."),
+            "pre-Gen8",
+        ),
+    )
+
+    changed = False
+    for rx, translated, branch_name in branches:
+        matches = list(rx.finditer(block))
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"MOVE_RAPID_SPIN: {branch_name} description expected once, got {len(matches)}"
+            )
+        replacement = c_source_description(translated)
+        block = block[:matches[0].start()] + replacement + block[matches[0].end():]
+        changed = True
+
+    if "Spins to remove traps" in block or "speed to remove traps" in block:
+        raise RuntimeError("MOVE_RAPID_SPIN: English description text remained after patch")
+    return block, changed
+
+
 def patch_table(path: Path, entries: dict[str, tuple[str, str]], prefix: str) -> int:
     text = path.read_text(encoding="utf-8")
     changed_entries = 0
@@ -57,6 +103,14 @@ def patch_table(path: Path, entries: dict[str, tuple[str, str]], prefix: str) ->
         first_close = block.find("),", desc_start)
         if first_close < 0:
             raise RuntimeError(f"{path}: {key} unterminated description")
+
+        if key == "MOVE_RAPID_SPIN":
+            block, changed = patch_rapid_spin(block)
+            if changed:
+                text = text[:start] + block + text[end:]
+                changed_entries += 1
+                print("[ru-desc] MOVE_RAPID_SPIN: both conditional descriptions localized")
+            continue
 
         if re.search(r"(?m)^\s*#(?:if|elif|else|endif)\b", block):
             print(f"[ru-desc] {key}: conditional description preserved (English)")
@@ -79,6 +133,7 @@ def patch_table(path: Path, entries: dict[str, tuple[str, str]], prefix: str) ->
 
     path.write_text(text, encoding="utf-8")
     return changed_entries
+
 
 def main() -> int:
     code = load_base()
