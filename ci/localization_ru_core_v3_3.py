@@ -50,31 +50,36 @@ def patch_table(path: Path, entries: dict[str, tuple[str, str]], prefix: str) ->
         next_start = text.find(f"\n    [{prefix}", start + len(token))
         end = len(text) if next_start < 0 else next_start
         block = text[start:end]
-        rx = re.compile(r"(?s)(\.description\s*=\s*COMPOUND_STRING\()(.*?)(\),)")
-        matches = list(rx.finditer(block))
-        expected_count = 2 if key == "MOVE_RAPID_SPIN" else 1
-        if len(matches) != expected_count:
-            raise RuntimeError(
-                f"{path}: {key} expected {expected_count} description(s), got {len(matches)}"
-            )
+
+        desc_start = block.find(".description")
+        if desc_start < 0:
+            raise RuntimeError(f"{path}: {key} missing description")
+        first_close = block.find("),", desc_start)
+        if first_close < 0:
+            raise RuntimeError(f"{path}: {key} unterminated description")
+
+        desc_prefix = block[desc_start:first_close + 2]
+        if "#if" in desc_prefix or "#elif" in desc_prefix or "#else" in desc_prefix:
+            print(f"[ru-desc] {key}: conditional description preserved (English)")
+            continue
+
+        rx = re.compile(r"(?s)(\\.description\\s*=\\s*COMPOUND_STRING\\()(.*?)(\\),)")
+        match = rx.search(block)
+        if match is None:
+            raise RuntimeError(f"{path}: {key} description parse failed")
 
         encoded = encode_description(lines)
         replacement = f'.description = COMPOUND_STRING("{encoded}"),'
-        changed_this_entry = False
-        for match in reversed(matches):
-            if match.group(0) == replacement:
-                continue
-            block = block[:match.start()] + replacement + block[match.end():]
-            changed_this_entry = True
-        if changed_this_entry:
-            text = text[:start] + block + text[end:]
-            changed_entries += 1
-            suffix = " (2 conditional branches)" if expected_count == 2 else ""
-            print(f"[ru-desc] {key}: description localized{suffix}")
+        if match.group(0) == replacement:
+            continue
+
+        block = block[:match.start()] + replacement + block[match.end():]
+        text = text[:start] + block + text[end:]
+        changed_entries += 1
+        print(f"[ru-desc] {key}: description localized")
 
     path.write_text(text, encoding="utf-8")
     return changed_entries
-
 
 def main() -> int:
     code = load_base()
