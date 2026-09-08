@@ -58,8 +58,7 @@ def patch_table(path: Path, entries: dict[str, tuple[str, str]], prefix: str) ->
         if first_close < 0:
             raise RuntimeError(f"{path}: {key} unterminated description")
 
-        desc_prefix = block[desc_start:first_close + 2]
-        if "#if" in desc_prefix or "#elif" in desc_prefix or "#else" in desc_prefix:
+        if re.search(r"(?m)^\\s*#(?:if|elif|else|endif)\\b", block):
             print(f"[ru-desc] {key}: conditional description preserved (English)")
             continue
 
