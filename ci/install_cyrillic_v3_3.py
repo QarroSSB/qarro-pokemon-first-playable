@@ -2,17 +2,18 @@
 """Targeted narrow-font fixes for the v3.3.3 per-font Cyrillic scaler.
 
 Reuses the exact per-font scaler from commit 6593ba7. Only while rendering
-latin_narrow.png, uppercase Cyrillic Д, Ё, Й and Ц use compact source masks.
+latin_narrow.png, uppercase Cyrillic Д, Ё, Й, Ц and Щ use compact source masks.
 Their full source forms remain unchanged in all other eight font atlases.
 
 CI history:
-- run #50: Д overflow y=0..18;
-- run #51: compact Д still y=0..16;
-- run #52: Д passed; Ё overflow y=-4..14;
-- run #53: Д/Ё passed; Й overflow y=-4..16;
-- run #54: Д/Ё/Й passed; Ц overflow y=0..18.
+- #50 Д overflow y=0..18
+- #51 compact Д still y=0..16
+- #52 Д passed; Ё y=-4..14
+- #53 Д/Ё passed; Й y=-4..16
+- #54 Д/Ё/Й passed; Ц y=0..18
+- #55 Д/Ё/Й/Ц passed; Щ y=0..18
 
-The narrow Ц retains its bottom bar and descender while shortening the tall
+The narrow Ц/Щ retain their bottom bars and descenders while shortening the
 vertical body into the native capital-height envelope. All fail-closed checks
 remain active. English, every other Cyrillic glyph, Ash Bond and Ash Cap are
 untouched.
@@ -30,6 +31,7 @@ SPECIALS = {
     "Ё": ("0014003e20203e20203e0000", "000000143e20203e203e0000"),
     "Й": ("0028380026262e2a3a323200", "00000038262e2a3a32320000"),
     "Ц": ("0000004444444444447e0202", "00000044444444447e020000"),
+    "Щ": ("0000005454545454547e0202", "00000054545454547e020000"),
 }
 
 
@@ -74,7 +76,7 @@ def main() -> int:
                 ns["GLYPH_HEX"][idx] = narrow
                 ns["SOURCE_BBOXES"][idx] = ns["source_bbox"](narrow)
             print(
-                "[cyrillic-v3335] latin_narrow: compact Д + Ё + Й + Ц masks enabled; "
+                "[cyrillic-v3336] latin_narrow: compact Д + Ё + Й + Ц + Щ masks enabled; "
                 "other font variants keep full forms"
             )
             return original_patch_font(path)
