@@ -145,7 +145,7 @@ def patch_ice_fang(block: str) -> tuple[str, bool]:
             "frostbite",
         ),
         (
-            re.compile(r'"freeze the foe\."\),'),
+            re.compile(r'"leave the foe frozen\."\),'),
             '"заморозить цель."),',
             "freeze",
         ),
@@ -158,7 +158,7 @@ def patch_ice_fang(block: str) -> tuple[str, bool]:
             )
         block = block[:matches[0].start()] + replacement + block[matches[0].end():]
 
-    if "May cause flinching or" in block or "leave the foe with frostbite" in block or "freeze the foe" in block:
+    if "May cause flinching or" in block or "leave the foe with frostbite" in block or "leave the foe frozen" in block:
         raise RuntimeError("MOVE_ICE_FANG: English description text remained after patch")
     return block, True
 
