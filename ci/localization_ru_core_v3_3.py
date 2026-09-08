@@ -62,7 +62,7 @@ def patch_table(path: Path, entries: dict[str, tuple[str, str]], prefix: str) ->
             print(f"[ru-desc] {key}: conditional description preserved (English)")
             continue
 
-        rx = re.compile(r"(?s)(\\.description\\s*=\\s*COMPOUND_STRING\\()(.*?)(\\),)")
+        rx = re.compile(r"(?s)(\.description\s*=\s*COMPOUND_STRING\()(.*?)(\),)")
         match = rx.search(block)
         if match is None:
             raise RuntimeError(f"{path}: {key} description parse failed")
