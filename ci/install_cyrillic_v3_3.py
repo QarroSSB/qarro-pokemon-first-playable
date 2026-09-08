@@ -13,10 +13,12 @@ CI history:
 - #54 Д/Ё/Й passed; Ц y=0..18
 - #55 Д/Ё/Й/Ц passed; Щ y=0..18
 - #56 all five uppercase fixes passed; lowercase б y=-6..14
+- #57 first compact б improved to y=-3..11 but still clipped above the cell
 
-The narrow б keeps its recognizable upper hook/bowl but shortens the ascender
-so it fits the native lowercase envelope. All fail-closed checks remain active.
-English, every other Cyrillic glyph, Ash Bond and Ash Cap are untouched.
+The second narrow б is anchored directly to the lowercase baseline with a
+four-row compact hook/bowl, avoiding top clipping while preserving the letter's
+identity at narrow UI scale. All fail-closed checks remain active. English,
+every other Cyrillic glyph, Ash Bond and Ash Cap are untouched.
 """
 from __future__ import annotations
 
@@ -32,7 +34,7 @@ SPECIALS = {
     "Й": ("0028380026262e2a3a323200", "00000038262e2a3a32320000"),
     "Ц": ("0000004444444444447e0202", "00000044444444447e020000"),
     "Щ": ("0000005454545454547e0202", "00000054545454547e020000"),
-    "б": ("0000001e303c2222221c0000", "000000001e3c22221c000000"),
+    "б": ("0000001e303c2222221c0000", "0000000000001e3c221c0000"),
 }
 
 
@@ -77,7 +79,7 @@ def main() -> int:
                 ns["GLYPH_HEX"][idx] = narrow
                 ns["SOURCE_BBOXES"][idx] = ns["source_bbox"](narrow)
             print(
-                "[cyrillic-v3337] latin_narrow: compact Д Ё Й Ц Щ б masks enabled; "
+                "[cyrillic-v3338] latin_narrow: compact Д Ё Й Ц Щ б masks enabled; "
                 "other font variants keep full forms"
             )
             return original_patch_font(path)
