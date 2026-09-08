@@ -35,6 +35,7 @@ SPECIALS = {
     "Ц": ("0000004444444444447e0202", "00000044444444447e020000"),
     "Щ": ("0000005454545454547e0202", "00000054545454547e020000"),
     "б": ("0000001e303c2222221c0000", "0000000000001e3c221c0000"),
+    "д": ("00000000003c2424247e4200", "00000000003c24247e420000"),
 }
 
 
@@ -79,7 +80,7 @@ def main() -> int:
                 ns["GLYPH_HEX"][idx] = narrow
                 ns["SOURCE_BBOXES"][idx] = ns["source_bbox"](narrow)
             print(
-                "[cyrillic-v3338] latin_narrow: compact Д Ё Й Ц Щ б masks enabled; "
+                "[cyrillic-v3339] latin_narrow: compact Д Ё Й Ц Щ б д masks enabled; "
                 "other font variants keep full forms"
             )
             return original_patch_font(path)
