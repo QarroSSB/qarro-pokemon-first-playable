@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Targeted follow-up for the first v3.3.3 per-font Cyrillic CI overflow.
+"""Targeted follow-up for the first v3.3.3 per-font Cyrillic overflow.
 
-Reuses the exact per-font scaler from commit 6593ba7 and changes only the
-source bitmap for uppercase Cyrillic Д. In latin_narrow the original Д is two
-source rows deeper than the ordinary uppercase baseline and scaled to y=0..18,
-which correctly tripped the fail-closed 16px cell check.
+Reuses the exact per-font scaler from commit 6593ba7. Only while rendering
+latin_narrow.png, uppercase Cyrillic Д uses a compact narrow-font source mask.
+The original full Д remains unchanged in all other eight font atlases.
 
-The replacement removes one duplicated vertical body row while preserving the
-same Д shape and one-row descender relative to А. No other glyph, charmap slot,
-width rule, English text, Ash Bond or Ash Cap code is changed.
+Run #50 proved the full glyph overflowed latin_narrow to y=18. Run #51 proved
+removing one body row still reached y=16 including shadow. This narrow-only
+mask removes the final excess row without clipping or weakening fail-closed
+checks. English, all other Cyrillic glyphs, Ash Bond and Ash Cap are untouched.
 """
 from __future__ import annotations
 
@@ -17,8 +17,8 @@ from pathlib import Path
 
 BASE_COMMIT = "6593ba731a84d565b70d5e712a5ab7f0e01e90dd"
 BASE_PATH = "ci/install_cyrillic_v3_3.py"
-OLD_D = "0000003c24242424247e4242"
-NEW_D = "0000003c242424247e424200"
+FULL_D = "0000003c24242424247e4242"
+NARROW_D = "0000003c2424247e42420000"
 
 
 def load_base() -> dict:
@@ -42,18 +42,30 @@ def load_base() -> dict:
 def main() -> int:
     ns = load_base()
     idx = ns["CYRILLIC"].index("Д")
-    if ns["GLYPH_HEX"][idx] != OLD_D:
-        raise RuntimeError(
-            "uppercase Д source bitmap changed from the verified v3.3.3 baseline"
-        )
+    if ns["GLYPH_HEX"][idx] != FULL_D:
+        raise RuntimeError("uppercase Д changed from verified v3.3.3 source")
 
-    ns["GLYPH_HEX"][idx] = NEW_D
-    ns["SOURCE_BBOXES"][idx] = ns["source_bbox"](NEW_D)
+    original_patch_font = ns["patch_font"]
 
-    print(
-        "[cyrillic-v3331] uppercase Д: removed one duplicated body row to fit "
-        "native narrow-font cell; all other glyph sources unchanged"
-    )
+    def patch_font_narrow_d(path):
+        if path.name != "latin_narrow.png":
+            return original_patch_font(path)
+
+        old_hex = ns["GLYPH_HEX"][idx]
+        old_bbox = ns["SOURCE_BBOXES"][idx]
+        try:
+            ns["GLYPH_HEX"][idx] = NARROW_D
+            ns["SOURCE_BBOXES"][idx] = ns["source_bbox"](NARROW_D)
+            print(
+                "[cyrillic-v3332] latin_narrow: compact uppercase Д mask "
+                "enabled; other font variants keep full Д"
+            )
+            return original_patch_font(path)
+        finally:
+            ns["GLYPH_HEX"][idx] = old_hex
+            ns["SOURCE_BBOXES"][idx] = old_bbox
+
+    ns["patch_font"] = patch_font_narrow_d
     return int(ns["main"]() or 0)
 
 
