@@ -45,7 +45,7 @@ def c_source_description(lines: tuple[str, str]) -> str:
     if any("—" in line or "…" in line for line in lines):
         raise RuntimeError(f"unsupported typography in source description: {lines!r}")
     return (
-        '"' + lines[0].replace('"', '\\"') + '\\' + '\n'
+        '"' + lines[0].replace('"', '\\"') + '\\n"' + '\n'
         '            "' + lines[1].replace('"', '\\"') + '"),'
     )
 
@@ -58,12 +58,12 @@ def patch_rapid_spin(block: str) -> tuple[str, bool]:
 
     branches = (
         (
-            re.compile(r'"Spins to remove traps\\\s*"\s*"and raise Speed\."\),'),
+            re.compile(r'"Spins to remove traps\\n"\s*"and raise Speed\."\),'),
             ("Убирает ловушки и", "повышает Скорость."),
             "Gen8+",
         ),
         (
-            re.compile(r'"Spins the body at high\\\s*"\s*"speed to remove traps\."\),'),
+            re.compile(r'"Spins the body at high\\n"\s*"speed to remove traps\."\),'),
             ("Вращается и убирает", "ловушки с поля."),
             "pre-Gen8",
         ),
