@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
-"""Install Russian Cyrillic aliases and glyphs into Expansion Latin fonts.
+"""Install Russian Cyrillic aliases, glyphs and matching text metrics.
 
-Qarro v3.3.1 safety fix:
+Qarro v3.3.2 runtime font fix:
 - Expansion Latin font PNGs are 16x16 pixels per glyph, 16 glyphs per row.
 - Russian aliases reuse obsolete accented-Latin byte slots only.
-- Every non-Cyrillic glyph cell is snapshotted and must remain pixel-identical.
+- Cyrillic masks are left-aligned to the Latin glyph origin instead of centered.
+- Hard-coded Latin glyph-width tables are updated for the 66 Cyrillic byte slots.
+- Every non-Cyrillic glyph cell and width entry must remain unchanged.
 
 This deliberately preserves ordinary English Pokemon / Move / Ability / Trainer
-names and all other non-target glyphs.
+names and all other non-target glyphs. No Ash Bond / Ash Cap code is touched.
 """
 from __future__ import annotations
 
 import argparse
+import re
 from pathlib import Path
 
 try:
@@ -52,13 +55,48 @@ assert all(len(bytes.fromhex(glyph)) == 12 for glyph in GLYPH_HEX)
 CELL_W = 16
 CELL_H = 16
 COLS = 16
-# gbagfx/tools/font.c fixes the Latin palette to these indexed meanings.
 FONT_BG = 0
 FONT_FG = 1
 FONT_SHADOW = 2
 
 MARKER_START = "@ QARRO_RUSSIAN_CYRILLIC_START"
 MARKER_END = "@ QARRO_RUSSIAN_CYRILLIC_END"
+EXPECTED_WIDTH_ARRAYS = {
+    "gFontSmallNarrowLatinGlyphWidths",
+    "gFontSmallLatinGlyphWidths",
+    "gFontNormalLatinGlyphWidths",
+    "gFontShortLatinGlyphWidths",
+    "gFontNarrowLatinGlyphWidths",
+    "gFontNarrowerLatinGlyphWidths",
+    "gFontSmallNarrowerLatinGlyphWidths",
+    "gFontShortNarrowLatinGlyphWidths",
+    "gFontShortNarrowerLatinGlyphWidths",
+}
+
+
+def glyph_geometry(hex_rows: str) -> tuple[int, int]:
+    """Return source left edge and runtime advance including 1px shadow."""
+    rows12 = bytes.fromhex(hex_rows)
+    xs = [
+        xx
+        for row in rows12
+        for xx in range(8)
+        if row & (1 << (7 - xx))
+    ]
+    if not xs:
+        raise RuntimeError("empty Cyrillic source glyph")
+    left = min(xs)
+    right = max(xs)
+    width = (right - left + 1) + 1
+    if not 1 <= width <= 8:
+        raise RuntimeError(f"invalid calculated Cyrillic width {width}")
+    return left, width
+
+
+CYR_METRICS = {
+    code: glyph_geometry(hex_rows)
+    for code, hex_rows in zip(CYR_CODES, GLYPH_HEX)
+}
 
 
 def patch_charmap(root: Path) -> None:
@@ -103,33 +141,32 @@ def patch_font(path: Path) -> None:
     if max(target_codes) >= total_cells:
         raise RuntimeError(f"atlas too small ({total_cells} cells) for Cyrillic mapping: {path}")
 
-    # Strong invariant: every non-target cell must remain byte-for-byte identical.
     protected_before = {
         code: cell_pixels(img, code, total_cells)
         for code in range(total_cells)
         if code not in target_codes
     }
-
-    # These are the normal English/digit ranges we explicitly promise to preserve.
     english_before = {
         code: cell_pixels(img, code, total_cells)
         for code in range(0xA1, min(0xEF, total_cells))
     }
 
-    for code, hex_rows in zip(CYR_CODES, GLYPH_HEX):
+    for ch, code, hex_rows in zip(CYRILLIC, CYR_CODES, GLYPH_HEX):
         rows12 = bytes.fromhex(hex_rows)
+        source_left, expected_width = CYR_METRICS[code]
         x0, y0, x1, y1 = cell_box(code, total_cells)
 
-        # Clear exactly one real 16x16 glyph cell, never a 32px pseudo-cell.
         for y in range(y0, y1):
             for x in range(x0, x1):
                 img.putpixel((x, y), FONT_BG)
 
-        # Source masks are 8x12. Render 1:1, centered in the 16x16 cell.
-        ox = x0 + (CELL_W - 8) // 2
-        oy = y0 + (CELL_H - 12) // 2
+        # Latin runtime glyphs begin at x=0 inside each cell. Normalize the
+        # 8px source mask so its first foreground pixel also lands at x=0.
+        ox = x0 - source_left
+        # Source masks already contain vertical padding. Lowercase gets one
+        # extra row to match the Latin lowercase baseline more closely.
+        oy = y0 + (1 if ch.islower() else 0)
 
-        # One-pixel lower-right shadow, then foreground.
         for shadow_pass, color in ((True, FONT_SHADOW), (False, FONT_FG)):
             off = 1 if shadow_pass else 0
             for yy, row in enumerate(rows12):
@@ -141,13 +178,29 @@ def patch_font(path: Path) -> None:
                     if x0 <= tx < x1 and y0 <= ty < y1:
                         img.putpixel((tx, ty), color)
 
+        cell = img.crop((x0, y0, x1, y1))
+        visible = [
+            (x, y)
+            for y in range(CELL_H)
+            for x in range(CELL_W)
+            if cell.getpixel((x, y)) in (FONT_FG, FONT_SHADOW)
+        ]
+        if not visible:
+            raise RuntimeError(f"empty rendered Cyrillic glyph {ch} / 0x{code:02X}")
+        min_x = min(x for x, _ in visible)
+        max_x = max(x for x, _ in visible)
+        if min_x != 0 or max_x + 1 != expected_width:
+            raise RuntimeError(
+                f"glyph geometry mismatch {ch} / 0x{code:02X}: "
+                f"x={min_x}..{max_x}, expected width={expected_width}"
+            )
+
     for code, before in protected_before.items():
         after = cell_pixels(img, code, total_cells)
         if after != before:
             raise RuntimeError(
                 f"SAFETY FAIL: non-Cyrillic glyph 0x{code:02X} changed in {path.name}"
             )
-
     for code, before in english_before.items():
         after = cell_pixels(img, code, total_cells)
         if after != before:
@@ -158,7 +211,67 @@ def patch_font(path: Path) -> None:
     img.save(path, optimize=False)
     print(
         f"[cyrillic] patched {path.name}: {img.width}x{img.height}, "
-        f"{rows} rows x {COLS} cols, 66 targets, {len(protected_before)} protected cells unchanged"
+        "66 left-aligned targets; non-target cells unchanged"
+    )
+
+
+def patch_width_tables(path: Path) -> None:
+    text = path.read_text(encoding="utf-8")
+    array_rx = re.compile(
+        r"(?ms)^(?P<head>(?:ALIGNED\(4\)\s+)?const u8 "
+        r"(?P<name>gFont[A-Za-z0-9_]*LatinGlyphWidths)\[\]\s*=\s*\{)"
+        r"(?P<body>.*?)(?P<tail>^\};)"
+    )
+    matches = list(array_rx.finditer(text))
+    names = {m.group("name") for m in matches}
+    if names != EXPECTED_WIDTH_ARRAYS:
+        raise RuntimeError(
+            f"unexpected Latin width tables in {path}: "
+            f"found={sorted(names)}, expected={sorted(EXPECTED_WIDTH_ARRAYS)}"
+        )
+
+    replacements: list[tuple[int, int, str]] = []
+    target_codes = set(CYR_CODES)
+    protected_codes = set(range(0xA1, 0xEF))
+
+    for match in matches:
+        body = match.group("body")
+        tokens = list(re.finditer(r"\b\d+\b", body))
+        if len(tokens) != 512:
+            raise RuntimeError(
+                f"{match.group('name')}: expected 512 width entries, got {len(tokens)}"
+            )
+        before = [int(t.group()) for t in tokens]
+        after = list(before)
+        for code in CYR_CODES:
+            after[code] = CYR_METRICS[code][1]
+
+        for code in range(512):
+            if code not in target_codes and after[code] != before[code]:
+                raise RuntimeError(
+                    f"SAFETY FAIL: non-Cyrillic width 0x{code:02X} changed in {match.group('name')}"
+                )
+        for code in protected_codes:
+            if after[code] != before[code]:
+                raise RuntimeError(
+                    f"SAFETY FAIL: English width 0x{code:02X} changed in {match.group('name')}"
+                )
+
+        body_start = match.start("body")
+        for code in CYR_CODES:
+            token = tokens[code]
+            replacements.append(
+                (body_start + token.start(), body_start + token.end(), str(after[code]))
+            )
+
+    for start, end, value in sorted(replacements, reverse=True):
+        text = text[:start] + value + text[end:]
+
+    path.write_text(text, encoding="utf-8")
+    widths = sorted({CYR_METRICS[code][1] for code in CYR_CODES})
+    print(
+        f"[cyrillic] widths: patched {len(matches)} Latin tables at 66 target codes; "
+        f"advances={widths}; English/non-target widths unchanged"
     )
 
 
@@ -167,15 +280,18 @@ def main() -> int:
     ap.add_argument("upstream", type=Path)
     root = ap.parse_args().upstream.resolve()
     patch_charmap(root)
+
     font_dir = root / "graphics/fonts"
     paths = sorted(font_dir.glob("latin_*.png"))
-    if not paths:
-        raise SystemExit(f"no latin_*.png in {font_dir}")
+    if len(paths) != 9:
+        raise SystemExit(f"expected 9 latin_*.png font sheets in {font_dir}, got {len(paths)}")
     for path in paths:
         patch_font(path)
+
+    patch_width_tables(root / "src/fonts.c")
     print(
-        f"[QARRO_CYRILLIC_V3_3_1] PASS: {len(paths)} Latin font sheets patched; "
-        "every non-target glyph verified unchanged"
+        "[QARRO_CYRILLIC_V3_3_2] PASS: Cyrillic glyph origin + width metrics corrected; "
+        "every non-target glyph/width verified unchanged; Ash code untouched"
     )
     return 0
 
