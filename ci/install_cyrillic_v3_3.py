@@ -2,18 +2,20 @@
 """Targeted narrow-font fixes for the v3.3.3 per-font Cyrillic scaler.
 
 Reuses the exact per-font scaler from commit 6593ba7. Only while rendering
-latin_narrow.png, uppercase Cyrillic Д, Ё and Й use compact source masks. Their
-full source forms remain unchanged in all other eight font atlases.
+latin_narrow.png, uppercase Cyrillic Д, Ё, Й and Ц use compact source masks.
+Their full source forms remain unchanged in all other eight font atlases.
 
 CI history:
-- run #50: full Д overflowed latin_narrow to y=18;
-- run #51: first compact Д still reached y=16 including shadow;
-- run #52: narrow Д passed; Ё failed at y=-4..14;
-- run #53: narrow Д and Ё passed; Й failed at y=-4..16.
+- run #50: Д overflow y=0..18;
+- run #51: compact Д still y=0..16;
+- run #52: Д passed; Ё overflow y=-4..14;
+- run #53: Д/Ё passed; Й overflow y=-4..16;
+- run #54: Д/Ё/Й passed; Ц overflow y=0..18.
 
-The narrow Й compresses its breve and body into the native capital-height
-window without clipping. All fail-closed checks remain active. English, every
-other Cyrillic glyph, Ash Bond and Ash Cap are untouched.
+The narrow Ц retains its bottom bar and descender while shortening the tall
+vertical body into the native capital-height envelope. All fail-closed checks
+remain active. English, every other Cyrillic glyph, Ash Bond and Ash Cap are
+untouched.
 """
 from __future__ import annotations
 
@@ -22,12 +24,13 @@ from pathlib import Path
 
 BASE_COMMIT = "6593ba731a84d565b70d5e712a5ab7f0e01e90dd"
 BASE_PATH = "ci/install_cyrillic_v3_3.py"
-FULL_D = "0000003c24242424247e4242"
-NARROW_D = "0000003c2424247e42420000"
-FULL_YO = "0014003e20203e20203e0000"
-NARROW_YO = "000000143e20203e203e0000"
-FULL_SHORT_I = "0028380026262e2a3a323200"
-NARROW_SHORT_I = "00000038262e2a3a32320000"
+
+SPECIALS = {
+    "Д": ("0000003c24242424247e4242", "0000003c2424247e42420000"),
+    "Ё": ("0014003e20203e20203e0000", "000000143e20203e203e0000"),
+    "Й": ("0028380026262e2a3a323200", "00000038262e2a3a32320000"),
+    "Ц": ("0000004444444444447e0202", "00000044444444447e020000"),
+}
 
 
 def load_base() -> dict:
@@ -50,13 +53,8 @@ def load_base() -> dict:
 
 def main() -> int:
     ns = load_base()
-    specials = {
-        "Д": (FULL_D, NARROW_D),
-        "Ё": (FULL_YO, NARROW_YO),
-        "Й": (FULL_SHORT_I, NARROW_SHORT_I),
-    }
-    indices = {ch: ns["CYRILLIC"].index(ch) for ch in specials}
-    for ch, (full, _) in specials.items():
+    indices = {ch: ns["CYRILLIC"].index(ch) for ch in SPECIALS}
+    for ch, (full, _) in SPECIALS.items():
         if ns["GLYPH_HEX"][indices[ch]] != full:
             raise RuntimeError(f"uppercase {ch} changed from verified v3.3.3 source")
 
@@ -71,12 +69,12 @@ def main() -> int:
             for idx in indices.values()
         }
         try:
-            for ch, (_, narrow) in specials.items():
+            for ch, (_, narrow) in SPECIALS.items():
                 idx = indices[ch]
                 ns["GLYPH_HEX"][idx] = narrow
                 ns["SOURCE_BBOXES"][idx] = ns["source_bbox"](narrow)
             print(
-                "[cyrillic-v3334] latin_narrow: compact Д + Ё + Й masks enabled; "
+                "[cyrillic-v3335] latin_narrow: compact Д + Ё + Й + Ц masks enabled; "
                 "other font variants keep full forms"
             )
             return original_patch_font(path)
