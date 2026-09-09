@@ -90,6 +90,7 @@ def main() -> int:
                 "р": SPECIALS["р"],
                 "у": SPECIALS["у"],
                 "ф": SPECIALS["ф"],
+                "ц": SPECIALS["ц"],
             }
         else:
             return original_patch_font(path)
