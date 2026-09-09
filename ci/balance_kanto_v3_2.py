@@ -82,6 +82,39 @@ def enable_exp_share_after_pokedex(root: Path) -> Path:
     return path
 
 
+def apply_test_profile(test_module, root: Path) -> int:
+    """Apply the verified Gym edits and validate legends only inside Gym blocks."""
+    party_path = root / "src/data/trainers_frlg.party"
+    if not party_path.exists():
+        raise RuntimeError(f"missing {party_path}")
+
+    text = party_path.read_text(encoding="utf-8")
+    for trainer, cfg in test_module.LEADERS.items():
+        text = test_module.patch_leader(text, trainer, cfg)
+    party_path.write_text(text, encoding="utf-8")
+
+    exp_path = enable_exp_share_after_pokedex(root)
+
+    final = party_path.read_text(encoding="utf-8")
+    for trainer, cfg in test_module.LEADERS.items():
+        token = f"=== {trainer} ==="
+        start = final.find(token)
+        if start < 0:
+            raise RuntimeError(f"missing final trainer block: {trainer}")
+        next_start = final.find("\n=== ", start + len(token))
+        end = len(final) if next_start < 0 else next_start
+        block = final[start:end]
+        if re.search(rf"(?m)^{re.escape(cfg['legend'])}(?: @ [^\n]+)?$", block):
+            raise RuntimeError(f"legendary remained in Gym block {trainer}: {cfg['legend']}")
+
+    print(
+        "[QARRO_TEST_GYM5_EXP_SHARE] PASS: all 8 Kanto gyms use native 5-of-6, "
+        "no legendary Gym candidates remain; party-wide Exp Share activates after "
+        f"Pokedex via {exp_path.relative_to(root)}"
+    )
+    return 0
+
+
 def main() -> int:
     ns = load_base()
     rc = int(ns["main"]() or 0)
@@ -89,8 +122,7 @@ def main() -> int:
         return rc
 
     test_module = load_test_module()
-    test_module.force_gen6_exp_share = enable_exp_share_after_pokedex
-    rc = int(test_module.main() or 0)
+    rc = apply_test_profile(test_module, Path(sys.argv[1]).resolve())
     if rc == 0:
         print(
             "[QARRO_TEST_WRAPPER] PASS: stable v3.2 + native 5-of-6 no-legend gyms "
