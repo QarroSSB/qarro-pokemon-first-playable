@@ -1,0 +1,179 @@
+name: Qarro Gym 5-of-6 Test ROM
+
+on:
+  push:
+    branches: [test/gym-5of6-v1]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PINNED: e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7
+  KIT_TGZ_SHA256: 95ca1dd309d79ecfed86e21b441725c8b68b7ec0368efc33dcf790be0d62eed9
+  KIT_B64_SHA256: 19e30690575cf31d941f9e183c7e52f452238a4d18759577c520909a718e01c1
+
+jobs:
+  build-gym-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout Qarro test branch
+        uses: actions/checkout@v4
+        with:
+          path: qarro-repo
+
+      - name: Reconstruct FIRST PLAYABLE v3.0 kit
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p kit/normalized_parts
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          expected = [
+              ('part00', 6000, '3e940e9b1a1d3b1ef4a4414a1a1fa943a76daecdee7bc7298c28d42dbfdf4ce6'),
+              ('part01', 6000, 'e94329bbc06c3c5b957cb61bdd7d598866fb2491682d6057d54d5d8ad6c0ac54'),
+              ('part02', 6000, '166ecb7390b18d9880810dd9e9e2b5bb2a14609cb94a2a35967cd397b0c218d7'),
+              ('part03', 6000, '70a4fa13ef17c2778aeffb53dea204476003c202372e25c87e71c3a2d18002ee'),
+              ('part04', 6000, '4bcc27379e86b2ce3ce3b8183a47ba355406349e4a79b68fc826b4bf474f1321'),
+              ('part05', 5320, '25b0c7a8c5ba212ffa5740107a14d5c94a3f1fddc4c3ccc84d08989c5c21779e'),
+          ]
+          srcdir = Path('qarro-repo/kit_parts')
+          outdir = Path('kit/normalized_parts')
+          for short, expected_len, expected_sha in expected:
+              src = srcdir / f'qarro_kit_v3_0.{short}.b64'
+              data = src.read_bytes()
+              digest = hashlib.sha256(data).hexdigest()
+              if digest == expected_sha:
+                  fixed = data
+              elif len(data) == expected_len + 1:
+                  fixed = None
+                  for i in range(len(data)):
+                      candidate = data[:i] + data[i+1:]
+                      if hashlib.sha256(candidate).hexdigest() == expected_sha:
+                          fixed = candidate
+                          break
+                  if fixed is None:
+                      raise SystemExit(f'{short}: one-byte transport repair failed')
+              else:
+                  raise SystemExit(f'{short}: checksum/size mismatch')
+              if len(fixed) != expected_len or hashlib.sha256(fixed).hexdigest() != expected_sha:
+                  raise SystemExit(f'{short}: normalized verification failed')
+              (outdir / f'{short}.b64').write_bytes(fixed)
+          PY
+          cat kit/normalized_parts/part*.b64 > kit/qarro_kit_text.tar.gz.b64
+          echo "$KIT_B64_SHA256  kit/qarro_kit_text.tar.gz.b64" | sha256sum -c -
+          base64 -d kit/qarro_kit_text.tar.gz.b64 > kit/qarro_kit_text.tar.gz
+          echo "$KIT_TGZ_SHA256  kit/qarro_kit_text.tar.gz" | sha256sum -c -
+          tar -xzf kit/qarro_kit_text.tar.gz -C kit
+
+      - name: Checkout exact Expansion 1.17.0
+        uses: actions/checkout@v4
+        with:
+          repository: rh-hideout/pokeemerald-expansion
+          ref: e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7
+          path: upstream
+
+      - name: Install ARM build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential binutils-arm-none-eabi gcc-arm-none-eabi libnewlib-arm-none-eabi libpng-dev python3 python3-pil
+
+      - name: Validate scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 kit/Source_Migration/v3_0/tools/validate_build_kit_v3_0.py kit/Source_Migration/v3_0
+          python3 -m py_compile qarro-repo/ci/*.py
+
+      - name: Install FIRST PLAYABLE baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qarro_gym_test_out/logs
+          python3 kit/Source_Migration/v3_0/tools/install_first_playable_v3_0.py upstream 2>&1 | tee qarro_gym_test_out/logs/install.log
+          python3 qarro-repo/ci/fix_rapid_spin_first_error.py upstream
+          python3 qarro-repo/ci/content_pass_v3_1.py upstream 2>&1 | tee qarro_gym_test_out/logs/content.log
+          python3 qarro-repo/ci/balance_kanto_v3_2.py upstream 2>&1 | tee qarro_gym_test_out/logs/balance.log
+          python3 qarro-repo/ci/runtime_content_v3_3.py upstream 2>&1 | tee qarro_gym_test_out/logs/runtime.log
+          python3 qarro-repo/ci/kanto_wild_diversity_v3_4.py upstream 2>&1 | tee qarro_gym_test_out/logs/wild.log
+
+      - name: Apply Gym 5-of-6 test mechanic
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 qarro-repo/ci/gym_5of6_test_v1.py upstream 2>&1 | tee qarro_gym_test_out/logs/gym_5of6.log
+          make -C upstream/tools/trainerproc clean
+          make -C upstream/tools/trainerproc
+          make -C upstream src/data/trainers_frlg.h
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          text = Path('upstream/src/data/trainers_frlg.h').read_text(encoding='utf-8')
+          ids = [
+              'TRAINER_LEADER_BROCK','TRAINER_LEADER_MISTY','TRAINER_LEADER_LT_SURGE','TRAINER_LEADER_ERIKA',
+              'TRAINER_LEADER_KOGA','TRAINER_LEADER_SABRINA','TRAINER_LEADER_BLAINE','TRAINER_LEADER_GIOVANNI'
+          ]
+          for tid in ids:
+              m = re.search(rf'\[{tid}\]\s*=\s*\{{(.*?)\n\s*\}},', text, re.S)
+              if not m:
+                  raise SystemExit(f'missing generated trainer {tid}')
+              block = m.group(1)
+              if '.partySize = 5,' not in block or '.poolSize = 6,' not in block:
+                  raise SystemExit(f'{tid}: generated 5-of-6 contract missing')
+          print('GENERATED TRAINER CONTRACT PASS: all 8 Kanto Leaders partySize=5 poolSize=6')
+          PY
+
+      - name: Install proven Russian layer from green baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 qarro-repo/ci/install_cyrillic_v3_3.py upstream 2>&1 | tee qarro_gym_test_out/logs/cyrillic.log
+          python3 qarro-repo/ci/localization_ru_core_v3_3.py upstream 2>&1 | tee qarro_gym_test_out/logs/localization.log
+
+      - name: Build FireRed test ROM
+        shell: bash
+        run: |
+          set -o pipefail
+          make -C upstream clean 2>&1 | tee qarro_gym_test_out/logs/make_clean.log
+          make -C upstream -j4 -O firered 2>&1 | tee qarro_gym_test_out/logs/make_firered.log
+          rc=${PIPESTATUS[0]}
+          exit "$rc"
+
+      - name: Package test ROM and proof
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp upstream/pokefirered.gba qarro_gym_test_out/Qarro_GYM_5OF6_TEST_v1.gba
+          sha256sum qarro_gym_test_out/Qarro_GYM_5OF6_TEST_v1.gba > qarro_gym_test_out/Qarro_GYM_5OF6_TEST_v1.gba.sha256
+          cp upstream/src/data/trainers_frlg.h qarro_gym_test_out/trainers_frlg.generated.h
+          git -C upstream diff --no-ext-diff > qarro_gym_test_out/qarro_gym_5of6_applied.patch
+          cat > qarro_gym_test_out/TEST_NOTES_RU.txt <<'EOF'
+          Qarro Gym 5-of-6 TEST v1
+          - Основа: последняя зелёная v3.4 линия run #49.
+          - 8 лидеров Kanto: полный roster 6, в бою выбираются 5.
+          - Выбор использует native trainer pool Expansion 1.17.0.
+          - Consistent RNG включён: на одном save у того же лидера пятёрка стабильна после reset/retry.
+          - Elite Four / Champion / Postgame не изменены и остаются 6v6.
+          - Ash Bond / Ash Cap не затронуты.
+          EOF
+
+      - name: Preserve failure diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          mkdir -p qarro_gym_test_out
+          git -C upstream diff --no-ext-diff > qarro_gym_test_out/qarro_gym_5of6_applied.patch || true
+          [[ -f upstream/src/data/trainers_frlg.h ]] && cp upstream/src/data/trainers_frlg.h qarro_gym_test_out/trainers_frlg.generated.h || true
+
+      - name: Upload Gym test artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Qarro-GYM-5OF6-TEST-${{ github.run_number }}
+          retention-days: 30
+          path: qarro_gym_test_out/**
