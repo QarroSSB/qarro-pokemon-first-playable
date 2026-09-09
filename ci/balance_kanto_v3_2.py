@@ -49,6 +49,17 @@ def main() -> int:
     rc = int(ns["main"]() or 0)
     if rc != 0:
         return rc
+
+    # Diagnostic-only guardrail for the current fail-closed EXP Share blocker.
+    # Print exact source occurrences so the next patch can bind to one verified
+    # native definition instead of guessing across src/*.c.
+    if len(sys.argv) == 2:
+        src = Path(sys.argv[1]).resolve() / "src"
+        subprocess.run(
+            ["grep", "-RIn", "-C", "4", "IsGen6ExpShareEnabled", str(src)],
+            check=False,
+        )
+
     test_module = load_test_module()
     rc = int(test_module.main() or 0)
     if rc == 0:
