@@ -93,6 +93,8 @@ def main() -> int:
                 "ц": SPECIALS["ц"],
                 "щ": SPECIALS["щ"],
             }
+        elif path.name == "latin_normal.png":
+            selected = {"Д": SPECIALS["Д"]}
         else:
             return original_patch_font(path)
 
