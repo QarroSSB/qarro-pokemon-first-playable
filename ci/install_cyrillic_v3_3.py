@@ -74,21 +74,25 @@ def main() -> int:
     original_patch_font = ns["patch_font"]
 
     def patch_font_narrow_specials(path):
-        if path.name != "latin_narrow.png":
+        if path.name == "latin_narrow.png":
+            selected = SPECIALS
+        elif path.name == "latin_narrower.png":
+            selected = {"Д": SPECIALS["Д"]}
+        else:
             return original_patch_font(path)
 
+        selected_indices = {indices[ch] for ch in selected}
         saved = {
             idx: (ns["GLYPH_HEX"][idx], ns["SOURCE_BBOXES"][idx])
-            for idx in indices.values()
+            for idx in selected_indices
         }
         try:
-            for ch, (_, narrow) in SPECIALS.items():
+            for ch, (_, narrow) in selected.items():
                 idx = indices[ch]
                 ns["GLYPH_HEX"][idx] = narrow
                 ns["SOURCE_BBOXES"][idx] = ns["source_bbox"](narrow)
             print(
-                "[cyrillic-v3340] latin_narrow: targeted compact Cyrillic masks enabled; "
-                "other font variants keep full forms"
+                f"[cyrillic-v3340] {path.name}: targeted compact Cyrillic masks enabled"
             )
             return original_patch_font(path)
         finally:
