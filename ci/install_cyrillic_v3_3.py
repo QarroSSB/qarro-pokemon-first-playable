@@ -77,7 +77,7 @@ def main() -> int:
         if path.name == "latin_narrow.png":
             selected = SPECIALS
         elif path.name == "latin_narrower.png":
-            selected = {"Д": SPECIALS["Д"]}
+            selected = {"Д": (SPECIALS["Д"][0], "000000003c24247e42000000")}
         else:
             return original_patch_font(path)
 
