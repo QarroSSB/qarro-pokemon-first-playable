@@ -8,6 +8,7 @@ profile. Main is untouched. Ash Bond / Ash Cap are untouched.
 from __future__ import annotations
 
 import importlib.util
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -44,26 +45,57 @@ def load_test_module():
     return module
 
 
+def enable_exp_share_after_pokedex(root: Path) -> Path:
+    """Enable Expansion's native party-wide Exp Share after the Pokédex flag."""
+    path = root / "include/config/item.h"
+    if not path.exists():
+        raise RuntimeError(f"missing {path}")
+    text = path.read_text(encoding="utf-8")
+
+    flag_pattern = re.compile(r"(?m)^(#define\s+I_EXP_SHARE_FLAG\s+)(\S+)(.*)$")
+    flag_matches = list(flag_pattern.finditer(text))
+    if len(flag_matches) != 1:
+        raise RuntimeError(f"I_EXP_SHARE_FLAG: expected one define, found {len(flag_matches)}")
+    current_flag = flag_matches[0].group(2)
+    if current_flag == "0":
+        text = flag_pattern.sub(
+            lambda m: f"{m.group(1)}FLAG_SYS_POKEDEX_GET{m.group(3)}",
+            text,
+            count=1,
+        )
+    elif current_flag != "FLAG_SYS_POKEDEX_GET":
+        raise RuntimeError(
+            f"I_EXP_SHARE_FLAG: expected 0 or FLAG_SYS_POKEDEX_GET, got {current_flag}"
+        )
+
+    item_pattern = re.compile(r"(?m)^#define\s+I_EXP_SHARE_ITEM\s+(\S+).*$")
+    item_matches = list(item_pattern.finditer(text))
+    if len(item_matches) != 1 or item_matches[0].group(1) != "GEN_5":
+        observed = [m.group(1) for m in item_matches]
+        raise RuntimeError(f"I_EXP_SHARE_ITEM: expected exactly GEN_5, got {observed}")
+
+    path.write_text(text, encoding="utf-8")
+    print(
+        "[exp-share-test] native party Exp Share activates after Pokedex via "
+        "I_EXP_SHARE_FLAG=FLAG_SYS_POKEDEX_GET; item mode remains GEN_5"
+    )
+    return path
+
+
 def main() -> int:
     ns = load_base()
     rc = int(ns["main"]() or 0)
     if rc != 0:
         return rc
 
-    # Diagnostic-only guardrail for the current fail-closed EXP Share blocker.
-    # Print exact source occurrences so the next patch can bind to one verified
-    # native definition instead of guessing across src/*.c.
-    if len(sys.argv) == 2:
-        src = Path(sys.argv[1]).resolve() / "src"
-        subprocess.run(
-            ["grep", "-RIn", "-C", "4", "IsGen6ExpShareEnabled", str(src)],
-            check=False,
-        )
-
     test_module = load_test_module()
+    test_module.force_gen6_exp_share = enable_exp_share_after_pokedex
     rc = int(test_module.main() or 0)
     if rc == 0:
-        print("[QARRO_TEST_WRAPPER] PASS: stable v3.2 + 5-mon gyms + party Exp Share")
+        print(
+            "[QARRO_TEST_WRAPPER] PASS: stable v3.2 + native 5-of-6 no-legend gyms "
+            "+ party Exp Share after Pokedex"
+        )
     return rc
 
 
