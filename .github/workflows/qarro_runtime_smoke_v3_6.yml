@@ -1,8 +1,8 @@
-name: Qarro runtime smoke v3.6
+name: Qarro runtime smoke v3.8
 
 on:
   workflow_run:
-    workflows: ["Qarro FIRST PLAYABLE v3.5 quality-of-life + Russian foundation"]
+    workflows: ["Qarro FIRST PLAYABLE v3.8 readable RU+EN foundation"]
     types: [completed]
   workflow_dispatch:
   push:
@@ -51,10 +51,10 @@ jobs:
           printf '%s\n' "$run_id" > source_run_id.txt
 
           artifact_id="$(gh api "repos/$REPO/actions/runs/$run_id/artifacts" \
-            --jq '.artifacts[] | select(.name | startswith("Qarro-FIRST-PLAYABLE-v3.5-")) | .id' \
+            --jq '.artifacts[] | select(.name | startswith("Qarro-FIRST-PLAYABLE-v3.8-")) | .id' \
             | head -n 1)"
           if [[ -z "$artifact_id" ]]; then
-            echo "No Qarro FIRST PLAYABLE ROM artifact found for run $run_id" >&2
+            echo "No Qarro FIRST PLAYABLE v3.8 ROM artifact found for run $run_id" >&2
             exit 1
           fi
           gh api -H 'Accept: application/vnd.github+json' \
@@ -91,8 +91,6 @@ jobs:
           cat runtime_smoke/mgba_boot.log || true
           echo "mGBA exit=$rc elapsed=${elapsed}s"
 
-          # A healthy interactive emulator should still be running when our
-          # deterministic timeout fires. Any earlier exit is treated as a boot failure.
           if [[ "$rc" -ne 124 ]]; then
             echo "mGBA exited before the 8-second smoke window (rc=$rc)" >&2
             exit 1
@@ -105,18 +103,16 @@ jobs:
             echo "mGBA log contains a fatal/load failure" >&2
             exit 1
           fi
-          echo "QARRO_RUNTIME_SMOKE_V3_6 PASS: ROM stayed alive in mGBA for 8 seconds"
+          echo "QARRO_RUNTIME_SMOKE_V3_8 PASS: ROM stayed alive in mGBA for 8 seconds"
 
       - name: Upload runtime smoke evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Qarro-runtime-smoke-v3.6-${{ github.run_number }}
+          name: Qarro-runtime-smoke-v3.8-${{ github.run_number }}
           retention-days: 30
           if-no-files-found: warn
           path: |
             runtime_smoke/**
             rom.sha256
             source_run_id.txt
-
-# Pixel-7 bootstrap marker: validate the latest green source-built ROM in mGBA.
