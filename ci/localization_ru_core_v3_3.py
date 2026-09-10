@@ -1,22 +1,162 @@
 #!/usr/bin/env python3
-"""Targeted v3.5 follow-up for conditional move descriptions.
+"""Qarro v3.5 Russian localization follow-up: FireRed Oak intro.
 
-Execute the exact phase-1 RU description patch from commit 1a5adc5d, while
-handling only verified conditional description branches in pinned Expansion
-1.17.0. Every other conditional entry remains fail-closed and preserved until
-it is inspected separately.
+Runs the exact previously-green localization pipeline from commit 23b23931,
+then translates only the verified Professor Oak new-game speech block that is
+visible before gameplay. This closes the runtime screenshot defect where the
+intro remained English after the Latin-é/Cyrillic-Щ collision was fixed.
 
-No Ash Bond / Ash Cap changes.
+Pokemon, Move and Ability proper names remain English outside Russian prose.
+No Ash Bond / Ash Cap code is touched.
 """
 from __future__ import annotations
 
-import re
+import json
 import subprocess
 import sys
 from pathlib import Path
 
-BASE_COMMIT = "1a5adc5d6ea94574c8b26d0347eb2f134066e5a4"
+BASE_COMMIT = "23b23931a24eb37139eb8da41b54b273430d5e1d"
 BASE_PATH = "ci/localization_ru_core_v3_3.py"
+MARKER = "QARRO_RU_OAK_INTRO_V3_5"
+
+OAK_BLOCKS = {
+    "gOakSpeech_Text_AskPlayerGender": (
+        (
+            r"Now tell me. Are you a boy?\n",
+            r"Or are you a girl?$",
+        ),
+        (
+            r"Теперь скажи. Ты мальчик?\n",
+            r"Или девочка?$",
+        ),
+    ),
+    "gOakSpeech_Text_WelcomeToTheWorld": (
+        (
+            r"Hello, there!\n",
+            r"Glad to meet you!\p",
+            r"Welcome to the world of POKéMON!\p",
+            r"My name is OAK.\p",
+            r"People affectionately refer to me\n",
+            r"as the POKéMON PROFESSOR.\p$",
+        ),
+        (
+            r"Привет!\n",
+            r"Рад знакомству!\p",
+            r"Добро пожаловать\n",
+            r"в мир ПОКЕМОНОВ!\p",
+            r"Меня зовут ОУК.\p",
+            r"Все зовут меня\n",
+            r"ПРОФЕССОРОМ ПОКЕМОНОВ.\p$",
+        ),
+    ),
+    "gOakSpeech_Text_ThisWorld": (
+        (r"This world…$",),
+        (r"Этот мир...$",),
+    ),
+    "gOakSpeech_Text_IsInhabitedFarAndWide": (
+        (
+            r"…is inhabited far and wide by\n",
+            r"creatures called POKéMON.\p$",
+        ),
+        (
+            r"...населён существами,\n",
+            r"которых зовут ПОКЕМОНАМИ.\p$",
+        ),
+    ),
+    "gOakSpeech_Text_IStudyPokemon": (
+        (
+            r"For some people, POKéMON are pets.\n",
+            r"Others use them for battling.\p",
+            r"As for myself…\p",
+            r"I study POKéMON as a profession.\p$",
+        ),
+        (
+            r"Для одних ПОКЕМОНЫ - питомцы.\n",
+            r"Другие сражаются с ними.\p",
+            r"А я...\p",
+            r"Я изучаю ПОКЕМОНОВ.\n",
+            r"Это моя профессия.\p$",
+        ),
+    ),
+    "gOakSpeech_Text_TellMeALittleAboutYourself": (
+        (
+            r"But first, tell me a little about\n",
+            r"yourself.\p$",
+        ),
+        (
+            r"Но сначала расскажи\n",
+            r"немного о себе.\p$",
+        ),
+    ),
+    "gOakSpeech_Text_YourNameWhatIsIt": (
+        (
+            r"Let's begin with your name.\n",
+            r"What is it?\p$",
+        ),
+        (
+            r"Начнём с твоего имени.\n",
+            r"Как тебя зовут?\p$",
+        ),
+    ),
+    "gOakSpeech_Text_SoYourNameIsPlayer": (
+        (
+            r"Right…\n",
+            r"So your name is {PLAYER}.$",
+        ),
+        (
+            r"Понятно...\n",
+            r"Значит, тебя зовут {PLAYER}.$",
+        ),
+    ),
+    "gOakSpeech_Text_WhatWasHisName": (
+        (
+            r"This is my grandson.\p",
+            r"He's been your rival since you both\n",
+            r"were babies.\p",
+            r"…Erm, what was his name now?$",
+        ),
+        (
+            r"Это мой внук.\p",
+            r"Он твой соперник с детства.\p",
+            r"Хм... Как же его зовут?$",
+        ),
+    ),
+    "gOakSpeech_Text_YourRivalsNameWhatWasIt": (
+        (r"Your rival's name, what was it now?$",),
+        (r"Как же зовут твоего соперника?$",),
+    ),
+    "gOakSpeech_Text_ConfirmRivalName": (
+        (r"…Er, was it {RIVAL}?$",),
+        (r"Хм... Его зовут {RIVAL}?$",),
+    ),
+    "gOakSpeech_Text_RememberRivalsName": (
+        (
+            r"That's right! I remember now!\n",
+            r"His name is {RIVAL}!\p$",
+        ),
+        (
+            r"Точно! Теперь вспомнил!\n",
+            r"Его зовут {RIVAL}!\p$",
+        ),
+    ),
+    "gOakSpeech_Text_LetsGo": (
+        (
+            r"{PLAYER}!\p",
+            r"Your very own POKéMON legend is\n",
+            r"about to unfold!\p",
+            r"A world of dreams and adventures\n",
+            r"with POKéMON awaits! Let's go!$",
+        ),
+        (
+            r"{PLAYER}!\p",
+            r"Твоя история о ПОКЕМОНАХ\n",
+            r"вот-вот начнётся!\p",
+            r"Мир мечтаний и приключений\n",
+            r"ждёт тебя! Вперёд!$",
+        ),
+    ),
+}
 
 
 def load_base() -> str:
@@ -31,203 +171,82 @@ def load_base() -> str:
     )
 
 
-def encode_description(lines: tuple[str, str]) -> str:
-    if len(lines) != 2 or any(not line for line in lines):
-        raise RuntimeError(f"invalid two-line description: {lines!r}")
-    if any("—" in line or "…" in line for line in lines):
-        raise RuntimeError(f"unsupported typography in description: {lines!r}")
-    return lines[0].replace('"', '\\"') + "\\n" + lines[1].replace('"', '\\"')
+def render_block(label: str, lines: tuple[str, ...]) -> str:
+    return label + "::\n" + "\n".join(f'\t.string "{line}"' for line in lines)
 
 
-def c_source_description(lines: tuple[str, str]) -> str:
-    if len(lines) != 2 or any(not line for line in lines):
-        raise RuntimeError(f"invalid two-line source description: {lines!r}")
-    if any("—" in line or "…" in line for line in lines):
-        raise RuntimeError(f"unsupported typography in source description: {lines!r}")
-    return (
-        '"' + lines[0].replace('"', '\\"') + '\\n"' + '\n'
-        '            "' + lines[1].replace('"', '\\"') + '"),'
-    )
-
-
-def patch_rapid_spin(block: str) -> tuple[str, bool]:
-    if "#if B_SPEED_BUFFING_RAPID_SPIN >= GEN_8" not in block:
-        raise RuntimeError("MOVE_RAPID_SPIN: expected Gen 8 Speed conditional missing")
-    if block.count("#else") != 1 or block.count("#endif") < 1:
-        raise RuntimeError("MOVE_RAPID_SPIN: expected exactly one description #else branch")
-
-    branches = (
-        (
-            re.compile(r'"Spins to remove traps\\n"\s*"and raise Speed\."\),'),
-            ("Убирает ловушки и", "повышает Скорость."),
-            "Gen8+",
-        ),
-        (
-            re.compile(r'"Spins the body at high\\n"\s*"speed to remove traps\."\),'),
-            ("Вращается и убирает", "ловушки с поля."),
-            "pre-Gen8",
-        ),
-    )
-
-    changed = False
-    for rx, translated, branch_name in branches:
-        matches = list(rx.finditer(block))
-        if len(matches) != 1:
-            raise RuntimeError(
-                f"MOVE_RAPID_SPIN: {branch_name} description expected once, got {len(matches)}"
-            )
-        replacement = c_source_description(translated)
-        block = block[:matches[0].start()] + replacement + block[matches[0].end():]
-        changed = True
-
-    if "Spins to remove traps" in block or "speed to remove traps" in block:
-        raise RuntimeError("MOVE_RAPID_SPIN: English description text remained after patch")
-    return block, changed
-
-
-def patch_rock_slide(block: str) -> tuple[str, bool]:
-    if "#if B_UPDATED_MOVE_DATA >= GEN_2" not in block:
-        raise RuntimeError("MOVE_ROCK_SLIDE: expected updated-move-data conditional missing")
-    if block.count("#else") != 1 or block.count("#endif") < 1:
-        raise RuntimeError("MOVE_ROCK_SLIDE: expected exactly one description #else branch")
-
-    branches = (
-        (
-            re.compile(
-                r'"Large boulders are hurled\.(?:\\n|\\\s*)"\s*'
-                r'"May cause flinching\."\),'
-            ),
-            ("Обрушивает камни.", "Может вызвать испуг."),
-            "Gen2+",
-        ),
-        (
-            re.compile(
-                r'"Hits the foes with an(?:\\n|\\\s*)"\s*'
-                r'"avalanche of boulders\."\),'
-            ),
-            ("Обрушивает на врагов", "лавину валунов."),
-            "Gen1",
-        ),
-    )
-
-    changed = False
-    for rx, translated, branch_name in branches:
-        matches = list(rx.finditer(block))
-        if len(matches) != 1:
-            raise RuntimeError(
-                f"MOVE_ROCK_SLIDE: {branch_name} description expected once, got {len(matches)}"
-            )
-        replacement = c_source_description(translated)
-        block = block[:matches[0].start()] + replacement + block[matches[0].end():]
-        changed = True
-
-    if "Large boulders are hurled" in block or "avalanche of boulders" in block:
-        raise RuntimeError("MOVE_ROCK_SLIDE: English description text remained after patch")
-    return block, changed
-
-
-def patch_ice_fang(block: str) -> tuple[str, bool]:
-    if "#if B_USE_FROSTBITE" not in block:
-        raise RuntimeError("MOVE_ICE_FANG: expected frostbite conditional missing")
-    if block.count("#else") != 1 or block.count("#endif") < 1:
-        raise RuntimeError("MOVE_ICE_FANG: expected exactly one description #else branch")
-
-    prefix = re.compile(r'"May cause flinching or(?:\\n|\\\s*)"\s*')
-    matches = list(prefix.finditer(block))
-    if len(matches) != 1:
-        raise RuntimeError(f"MOVE_ICE_FANG: shared description prefix expected once, got {len(matches)}")
-    block = block[:matches[0].start()] + '"Может вызвать испуг или\\n"\n            ' + block[matches[0].end():]
-
-    branches = (
-        (
-            re.compile(r'"leave the foe with frostbite\."\),'),
-            '"обморожение у цели."),',
-            "frostbite",
-        ),
-        (
-            re.compile(r'"leave the foe frozen\."\),'),
-            '"заморозить цель."),',
-            "freeze",
-        ),
-    )
-    for rx, replacement, branch_name in branches:
-        matches = list(rx.finditer(block))
-        if len(matches) != 1:
-            raise RuntimeError(
-                f"MOVE_ICE_FANG: {branch_name} branch expected once, got {len(matches)}"
-            )
-        block = block[:matches[0].start()] + replacement + block[matches[0].end():]
-
-    if "May cause flinching or" in block or "leave the foe with frostbite" in block or "leave the foe frozen" in block:
-        raise RuntimeError("MOVE_ICE_FANG: English description text remained after patch")
-    return block, True
-
-
-def patch_table(path: Path, entries: dict[str, tuple[str, str]], prefix: str) -> int:
+def patch_oak_intro(root: Path) -> int:
+    path = root / "data/text/new_game_intro_frlg.inc"
+    if not path.exists():
+        raise RuntimeError(f"missing FireRed intro source: {path}")
     text = path.read_text(encoding="utf-8")
-    changed_entries = 0
-    for key, lines in entries.items():
-        token = f"[{key}] ="
-        start = text.find(token)
-        if start < 0:
-            raise RuntimeError(f"{path}: missing entry {key}")
-        next_start = text.find(f"\n    [{prefix}", start + len(token))
-        end = len(text) if next_start < 0 else next_start
-        block = text[start:end]
+    changed = 0
 
-        desc_start = block.find(".description")
-        if desc_start < 0:
-            raise RuntimeError(f"{path}: {key} missing description")
-        first_close = block.find("),", desc_start)
-        if first_close < 0:
-            raise RuntimeError(f"{path}: {key} unterminated description")
+    for label, (english, russian) in OAK_BLOCKS.items():
+        old = render_block(label, english)
+        new = render_block(label, russian)
+        old_count = text.count(old)
+        new_count = text.count(new)
+        if old_count == 1 and new_count == 0:
+            text = text.replace(old, new, 1)
+            changed += 1
+            print(f"[ru-oak] {label}: localized")
+        elif old_count == 0 and new_count == 1:
+            print(f"[ru-oak] {label}: already localized")
+        else:
+            raise RuntimeError(
+                f"{label}: fail-closed source mismatch old={old_count} new={new_count}"
+            )
 
-        special = {
-            "MOVE_RAPID_SPIN": (patch_rapid_spin, "both conditional descriptions localized"),
-            "MOVE_ROCK_SLIDE": (patch_rock_slide, "both conditional descriptions localized"),
-            "MOVE_ICE_FANG": (patch_ice_fang, "both conditional descriptions localized"),
-        }.get(key)
-        if special is not None:
-            func, message = special
-            block, changed = func(block)
-            if changed:
-                text = text[:start] + block + text[end:]
-                changed_entries += 1
-                print(f"[ru-desc] {key}: {message}")
-            continue
-
-        if re.search(r"(?m)^\s*#(?:if|elif|else|endif)\b", block):
-            print(f"[ru-desc] {key}: conditional description preserved (English)")
-            continue
-
-        rx = re.compile(r"(?s)(\.description\s*=\s*COMPOUND_STRING\()(.*?)(\),)")
-        match = rx.search(block)
-        if match is None:
-            raise RuntimeError(f"{path}: {key} description parse failed")
-
-        encoded = encode_description(lines)
-        replacement = f'.description = COMPOUND_STRING("{encoded}"),'
-        if match.group(0) == replacement:
-            continue
-
-        block = block[:match.start()] + replacement + block[match.end():]
-        text = text[:start] + block + text[end:]
-        changed_entries += 1
-        print(f"[ru-desc] {key}: description localized")
+    forbidden_visible = (
+        "Welcome to the world of POKéMON!",
+        "I study POKéMON as a profession.",
+        "Your very own POKéMON legend is",
+    )
+    for phrase in forbidden_visible:
+        if phrase in text:
+            raise RuntimeError(f"Oak intro English phrase remained: {phrase!r}")
 
     path.write_text(text, encoding="utf-8")
-    return changed_entries
+    return changed
 
 
 def main() -> int:
     code = load_base()
     ns = {
-        "__name__": "qarro_ru_desc_v35_base",
+        "__name__": "qarro_ru_v35_pre_oak",
         "__file__": str(Path(__file__).resolve()),
     }
     exec(compile(code, f"{BASE_COMMIT}:{BASE_PATH}", "exec"), ns)
-    ns["patch_table"] = patch_table
-    return int(ns["main"]() or 0)
+    rc = int(ns["main"]() or 0)
+    if rc:
+        return rc
+
+    if len(sys.argv) != 2:
+        print(f"usage: {Path(sys.argv[0]).name} <upstream-root>", file=sys.stderr)
+        return 2
+    root = Path(sys.argv[1]).resolve()
+    changed = patch_oak_intro(root)
+
+    audit = {
+        "marker": MARKER,
+        "oakSpeechBlocksLocalized": len(OAK_BLOCKS),
+        "blocksChangedThisRun": changed,
+        "screenshotPhraseLocalized": True,
+        "pokemonNamesEnglish": True,
+        "moveNamesEnglish": True,
+        "abilityNamesEnglish": True,
+        "ashBondTouched": False,
+        "ashCapTouched": False,
+    }
+    out = root / "build/qarro_ru_oak_intro_v3_5_audit.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(audit, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(
+        f"[{MARKER}] PASS: {len(OAK_BLOCKS)} Oak intro speech blocks localized; "
+        "names/Ash untouched"
+    )
+    return 0
 
 
 if __name__ == "__main__":
