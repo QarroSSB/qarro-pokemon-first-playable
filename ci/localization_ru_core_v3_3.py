@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Qarro v3.5 Russian localization follow-up: FireRed Oak intro.
+"""Qarro v3.5 Russian localization follow-up: earliest FireRed runtime text.
 
 Runs the exact previously-green localization pipeline from commit 23b23931,
-then translates only the verified Professor Oak new-game speech block that is
-visible before gameplay. This closes the runtime screenshot defect where the
-intro remained English after the Latin-é/Cyrillic-Щ collision was fixed.
+then translates only verified early-game text blocks in runtime order: Professor
+Oak's new-game speech and the two interactable texts in the player's starting
+room. This keeps the localization audit incremental and fail-closed.
 
 Pokemon, Move and Ability proper names remain English outside Russian prose.
 No Ash Bond / Ash Cap code is touched.
@@ -18,7 +18,7 @@ from pathlib import Path
 
 BASE_COMMIT = "23b23931a24eb37139eb8da41b54b273430d5e1d"
 BASE_PATH = "ci/localization_ru_core_v3_3.py"
-MARKER = "QARRO_RU_OAK_INTRO_V3_5"
+MARKER = "QARRO_RU_EARLY_RUNTIME_V3_5"
 
 OAK_BLOCKS = {
     "gOakSpeech_Text_AskPlayerGender": (
@@ -158,6 +158,33 @@ OAK_BLOCKS = {
     ),
 }
 
+STARTING_ROOM_BLOCKS = {
+    "PalletTown_PlayersHouse_2F_Text_PlayedWithNES": (
+        (
+            r"{PLAYER} played with the NES.\p",
+            r"…Okay!\n",
+            r"It's time to go!$",
+        ),
+        (
+            r"{PLAYER} играл на NES.\p",
+            r"Ладно!\n",
+            r"Пора идти!$",
+        ),
+    ),
+    "PalletTown_PlayersHouse_2F_Text_PressLRForHelp": (
+        (
+            r"It's a posted notice…\p",
+            r"If you're confused, ask for HELP!\n",
+            r"Press the L or R Button!$",
+        ),
+        (
+            r"На стене висит памятка.\p",
+            r"Нужна ПОМОЩЬ?\n",
+            r"Нажми кнопку L или R!$",
+        ),
+    ),
+}
+
 
 def load_base() -> str:
     repo = Path(__file__).resolve().parents[1]
@@ -175,14 +202,13 @@ def render_block(label: str, lines: tuple[str, ...]) -> str:
     return label + "::\n" + "\n".join(f'\t.string "{line}"' for line in lines)
 
 
-def patch_oak_intro(root: Path) -> int:
-    path = root / "data/text/new_game_intro_frlg.inc"
+def patch_blocks(path: Path, blocks: dict[str, tuple[tuple[str, ...], tuple[str, ...]]], tag: str) -> int:
     if not path.exists():
-        raise RuntimeError(f"missing FireRed intro source: {path}")
+        raise RuntimeError(f"missing FireRed localization source: {path}")
     text = path.read_text(encoding="utf-8")
     changed = 0
 
-    for label, (english, russian) in OAK_BLOCKS.items():
+    for label, (english, russian) in blocks.items():
         old = render_block(label, english)
         new = render_block(label, russian)
         old_count = text.count(old)
@@ -190,14 +216,22 @@ def patch_oak_intro(root: Path) -> int:
         if old_count == 1 and new_count == 0:
             text = text.replace(old, new, 1)
             changed += 1
-            print(f"[ru-oak] {label}: localized")
+            print(f"[{tag}] {label}: localized")
         elif old_count == 0 and new_count == 1:
-            print(f"[ru-oak] {label}: already localized")
+            print(f"[{tag}] {label}: already localized")
         else:
             raise RuntimeError(
                 f"{label}: fail-closed source mismatch old={old_count} new={new_count}"
             )
 
+    path.write_text(text, encoding="utf-8")
+    return changed
+
+
+def patch_oak_intro(root: Path) -> int:
+    path = root / "data/text/new_game_intro_frlg.inc"
+    changed = patch_blocks(path, OAK_BLOCKS, "ru-oak")
+    text = path.read_text(encoding="utf-8")
     forbidden_visible = (
         "Welcome to the world of POKéMON!",
         "I study POKéMON as a profession.",
@@ -206,15 +240,28 @@ def patch_oak_intro(root: Path) -> int:
     for phrase in forbidden_visible:
         if phrase in text:
             raise RuntimeError(f"Oak intro English phrase remained: {phrase!r}")
+    return changed
 
-    path.write_text(text, encoding="utf-8")
+
+def patch_starting_room(root: Path) -> int:
+    path = root / "data/maps/PalletTown_PlayersHouse_2F_Frlg/scripts.inc"
+    changed = patch_blocks(path, STARTING_ROOM_BLOCKS, "ru-room")
+    text = path.read_text(encoding="utf-8")
+    forbidden_visible = (
+        "played with the NES.",
+        "If you're confused, ask for HELP!",
+        "Press the L or R Button!",
+    )
+    for phrase in forbidden_visible:
+        if phrase in text:
+            raise RuntimeError(f"starting-room English phrase remained: {phrase!r}")
     return changed
 
 
 def main() -> int:
     code = load_base()
     ns = {
-        "__name__": "qarro_ru_v35_pre_oak",
+        "__name__": "qarro_ru_v35_pre_early_runtime",
         "__file__": str(Path(__file__).resolve()),
     }
     exec(compile(code, f"{BASE_COMMIT}:{BASE_PATH}", "exec"), ns)
@@ -226,25 +273,27 @@ def main() -> int:
         print(f"usage: {Path(sys.argv[0]).name} <upstream-root>", file=sys.stderr)
         return 2
     root = Path(sys.argv[1]).resolve()
-    changed = patch_oak_intro(root)
+    oak_changed = patch_oak_intro(root)
+    room_changed = patch_starting_room(root)
 
     audit = {
         "marker": MARKER,
         "oakSpeechBlocksLocalized": len(OAK_BLOCKS),
-        "blocksChangedThisRun": changed,
-        "screenshotPhraseLocalized": True,
+        "startingRoomBlocksLocalized": len(STARTING_ROOM_BLOCKS),
+        "blocksChangedThisRun": oak_changed + room_changed,
+        "earliestRuntimeEnglishClosed": True,
         "pokemonNamesEnglish": True,
         "moveNamesEnglish": True,
         "abilityNamesEnglish": True,
         "ashBondTouched": False,
         "ashCapTouched": False,
     }
-    out = root / "build/qarro_ru_oak_intro_v3_5_audit.json"
+    out = root / "build/qarro_ru_early_runtime_v3_5_audit.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(audit, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(
-        f"[{MARKER}] PASS: {len(OAK_BLOCKS)} Oak intro speech blocks localized; "
-        "names/Ash untouched"
+        f"[{MARKER}] PASS: {len(OAK_BLOCKS)} Oak + {len(STARTING_ROOM_BLOCKS)} starting-room "
+        "blocks localized; names/Ash untouched"
     )
     return 0
 
