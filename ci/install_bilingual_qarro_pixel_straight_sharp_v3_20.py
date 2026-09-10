@@ -5,8 +5,7 @@ Device-test refinement of the approved straight Qarro Pixel design:
 - no slant;
 - no bitmap resampling/scaling;
 - remove the FireRed-style 1px gray shadow from all target letter/digit glyphs;
-- keep the same variable-width advances as the shadowed straight build so
-  this test isolates clarity/sharpness instead of changing spacing at once;
+- recompute each variable-width advance from the real shadow-free raster;
 - retain dedicated Cyrillic readability forms.
 
 Pokemon / Move / Ability names remain supported in English. Native FireRed
@@ -137,7 +136,7 @@ def patch_font_no_shadow(base: dict, path: Path) -> tuple[str, dict[int, int]]:
             (x, y)
             for y in range(cell_h)
             for x in range(cell_w)
-            if cell.getpixel((x, y)) == fg
+            if cell.getpixel((x, y)) != bg
         ]
         if not pts:
             raise RuntimeError(f"empty rendered sharp glyph {ch}/0x{code:02X}")
@@ -146,9 +145,10 @@ def patch_font_no_shadow(base: dict, path: Path) -> tuple[str, dict[int, int]]:
         if min_x != 0:
             raise RuntimeError(f"{path.name}: left origin drift {ch}/0x{code:02X} min_x={min_x}")
 
-        # Keep the same apparent advance as the prior shadowed build:
-        # glyph body width + one blank pixel. Only visual shadow is removed.
-        rendered_widths[code] = min(cell_w, max(4, max_x + 2))
+        # FireRed's audit and renderer expect the advance to match the actual
+        # visible raster extent. Removing the shadow therefore naturally
+        # tightens most glyphs by one pixel without squeezing their shape.
+        rendered_widths[code] = min(cell_w, max(4, max_x + 1))
 
     for code, before in protected_before.items():
         if base["cell_pixels"](img, code, total) != before:
@@ -215,7 +215,7 @@ def main() -> int:
         "bitmapScaling": False,
         "letterShadow": False,
         "foregroundOnly": True,
-        "spacingPolicy": "same advance as v0.6 shadowed build",
+        "spacingPolicy": "advance equals real shadow-free raster extent",
         "variableWidthAdvances": True,
         "targetGlyphCells": len(glyphs),
         "cyrillicTeDistinctFromLatinT": glyphs["т"] != glyphs["t"],
@@ -233,7 +233,7 @@ def main() -> int:
     out.write_text(json.dumps(audit, ensure_ascii=False, indent=2), encoding="utf-8")
     print(
         "[QARRO_PIXEL_STRAIGHT_SHARP_V3_20] PASS: RU+EN+digits installed in all 9 "
-        "FireRed atlases; straight/no scaling; letter shadow OFF; spacing preserved; "
+        "FireRed atlases; straight/no scaling; letter shadow OFF; advances match raster; "
         "т/У distinct; Ash untouched"
     )
     return 0
