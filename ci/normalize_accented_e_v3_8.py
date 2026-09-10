@@ -7,8 +7,8 @@ used by the localization scripts remain valid during their own execution.
 
 Charmap/font tables are deliberately excluded; the legacy FireRed slot stays
 untouched but no authored game text should reference it after this pass.
-After normalization, run the read-only RU font/localization foundation audit
-and consolidated QoL/RU regression bundle gate. No Ash Bond / Ash Cap changes.
+After normalization, run the read-only RU font/localization foundation audit,
+consolidated QoL/RU regression bundle, and protected Ash feature guard.
 """
 from __future__ import annotations
 
@@ -96,6 +96,11 @@ def main() -> int:
     if not bundle_audit.is_file():
         raise RuntimeError(f"missing consolidated regression audit: {bundle_audit}")
     subprocess.run([sys.executable, str(bundle_audit), str(root)], check=True)
+
+    protected_audit = here / "audit_protected_features_v3_13.py"
+    if not protected_audit.is_file():
+        raise RuntimeError(f"missing protected-feature audit: {protected_audit}")
+    subprocess.run([sys.executable, str(protected_audit), str(root)], check=True)
     return 0
 
 
