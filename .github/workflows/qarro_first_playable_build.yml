@@ -2,7 +2,7 @@ name: Qarro FIRST PLAYABLE v3.5 quality-of-life + Russian foundation
 
 on:
   push:
-    branches: [main]
+    branches: [main, test/moniqa-unified-font-v2]
   workflow_dispatch:
 
 permissions:
@@ -108,6 +108,7 @@ jobs:
             qarro-repo/ci/kanto_wild_diversity_v3_4.py \
             qarro-repo/ci/qol_v3_5.py \
             qarro-repo/ci/install_cyrillic_v3_3.py \
+            qarro-repo/ci/install_moniqa_unified_font_v3_6.py \
             qarro-repo/ci/localization_ru_core_v3_3.py
 
       - name: Install FIRST PLAYABLE data and config
@@ -165,6 +166,13 @@ jobs:
           set -euo pipefail
           python3 qarro-repo/ci/install_cyrillic_v3_3.py upstream \
             2>&1 | tee qarro_ci_out_v3_5/logs/cyrillic_v3_3.log
+
+      - name: Install unified Moniqa English + Russian font test
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 qarro-repo/ci/install_moniqa_unified_font_v3_6.py upstream \
+            2>&1 | tee qarro_ci_out_v3_5/logs/moniqa_unified_font_v3_6.log
 
       - name: Apply v3.3 core Russian UI localization
         shell: bash
