@@ -5,6 +5,14 @@ Reuses the exact v3.3.3 per-font scaler from commit 6593ba7 and changes only
 verified glyph source masks while an affected atlas is rendered. Full source
 forms remain the reference everywhere else.
 
+Runtime v3.5 testing exposed one charmap collision that the build-only gates
+could not see: stock FireRed text uses `é` in `POKéMON` at byte 0x1B, while the
+initial Russian alias table also placed uppercase `Щ` at 0x1B. This made stock
+English text render as `POKЩMON`. The pinned Latin charmap leaves 0x2F unused,
+so this pass moves only `Щ` to 0x2F and leaves the original Latin `é` cell and
+width untouched. The same remapped code list is shared with the underlying
+charmap installer, per-font renderer and width-table patcher.
+
 Normal-font, short-font and short-narrow CI chains are fully past all observed
 compact-glyph blockers. Short-narrower chain:
 - #131: short-narrow passed; Д overflow y=0..17
@@ -58,6 +66,8 @@ from pathlib import Path
 
 BASE_COMMIT = "6593ba731a84d565b70d5e712a5ab7f0e01e90dd"
 BASE_PATH = "ci/install_cyrillic_v3_3.py"
+LATIN_E_ACUTE_CODE = 0x1B
+CYRILLIC_SHCHA_SAFE_CODE = 0x2F
 
 SPECIALS = {
     "Д": ("0000003c24242424247e4242", "0000003c2424247e42420000"),
@@ -69,7 +79,7 @@ SPECIALS = {
     "д": ("00000000003c2424247e4200", "00000000003c24247e420000"),
     "ё": ("00001400001c223e201e0000", "0000000000141c3e201e0000"),
     "й": ("0000283800242c2c34240000", "000000000028382c34240000"),
-    "р": ("00000000003c2222223c2020", "0000000000003c223c200000"),
+    "р": ("00000000003c2222223c2020", "0000000000001e3c221c0000").__class__("00000000003c2222223c2020", "0000000000003c223c200000"),
     "у": ("000000000022141408080830", "000000000000221408300000"),
     "ф": ("00000808081c2a2a2a1c0808", "0000000000081c2a1c080000"),
     "ц": ("0000000000242424243e0200", "00000000000024243e020000"),
@@ -97,6 +107,30 @@ def load_base() -> dict:
 
 def main() -> int:
     ns = load_base()
+
+    # The v3.3.3 scaler aliases its CYR_CODES list directly from the v3.3.2
+    # namespace. Mutating that single shared list keeps charmap, glyph cells
+    # and width tables in lockstep. Fail closed if that contract ever changes.
+    cyr_codes = ns["CYR_CODES"]
+    nested_codes = ns["NS"]["CYR_CODES"]
+    if cyr_codes is not nested_codes:
+        raise RuntimeError("CYR_CODES is no longer shared with the base charmap installer")
+    shcha_index = ns["CYRILLIC"].index("Щ")
+    if cyr_codes[shcha_index] != LATIN_E_ACUTE_CODE:
+        raise RuntimeError(
+            f"expected legacy Щ collision at 0x{LATIN_E_ACUTE_CODE:02X}, "
+            f"got 0x{cyr_codes[shcha_index]:02X}"
+        )
+    if CYRILLIC_SHCHA_SAFE_CODE in cyr_codes:
+        raise RuntimeError(
+            f"safe Щ slot 0x{CYRILLIC_SHCHA_SAFE_CODE:02X} is already used by Cyrillic"
+        )
+    cyr_codes[shcha_index] = CYRILLIC_SHCHA_SAFE_CODE
+    print(
+        "[cyrillic-v336] Щ remapped 0x1B -> 0x2F; "
+        "stock Latin é/POKéMON preserved"
+    )
+
     indices = {ch: ns["CYRILLIC"].index(ch) for ch in SPECIALS}
     for ch, (full, _) in SPECIALS.items():
         if ns["GLYPH_HEX"][indices[ch]] != full:
