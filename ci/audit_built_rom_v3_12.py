@@ -2,9 +2,9 @@
 """Post-build integrity gate for the Qarro FireRed artifact.
 
 Read-only: verifies the produced ROM is a plausible 32 MiB FireRed BPRE image,
-its recorded SHA-256 matches the actual bytes, and the three prerequisite
-regression reports that gated the build are present. No gameplay/source data
-is modified; Ash Bond and Ash Cap are not touched.
+its recorded SHA-256 matches the actual bytes, and all prerequisite regression
+reports that gated the build are present. No gameplay/source data is modified;
+Ash Bond and Ash Cap are not touched.
 """
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ SHA_NAME = ROM_NAME + ".sha256"
 REQUIRED_AUDITS = {
     "qarro_qol_regression_v3_10_audit.json": "QARRO_QOL_REGRESSION_V3_10",
     "qarro_regression_bundle_v3_11_audit.json": "QARRO_REGRESSION_BUNDLE_V3_11",
+    "qarro_protected_features_v3_13_audit.json": "QARRO_PROTECTED_FEATURES_V3_13",
 }
 RU_AUDIT = "qarro_ru_foundation_v3_9_audit.json"
 
