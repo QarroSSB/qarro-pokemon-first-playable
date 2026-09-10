@@ -118,3 +118,5 @@ jobs:
             runtime_smoke/**
             rom.sha256
             source_run_id.txt
+
+# Pixel-7 bootstrap marker: validate the latest green source-built ROM in mGBA.
