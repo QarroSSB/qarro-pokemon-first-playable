@@ -86,6 +86,23 @@ def main() -> int:
     }
     out = build / "qarro_regression_bundle_v3_11_audit.json"
     out.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    # The workflow artifact already uploads qarro_ci_out_v3_8/**. Mirror the
+    # read-only audit evidence there when running in CI so a GREEN ROM carries
+    # the exact QoL/RU regression proof that gated it. Outside CI this is a no-op.
+    ci_out = root.parent / "qarro_ci_out_v3_8"
+    if ci_out.is_dir():
+        for name in (
+            "qarro_qol_regression_v3_10_audit.json",
+            "qarro_ru_foundation_v3_9_audit.json",
+            "qarro_regression_bundle_v3_11_audit.json",
+        ):
+            src = build / name
+            if not src.is_file():
+                raise RuntimeError(f"missing audit evidence for artifact: {src}")
+            (ci_out / name).write_bytes(src.read_bytes())
+        print(f"[{MARKER}] preserved 3 regression audit reports in {ci_out}")
+
     print(f"[{MARKER}] PASS: QoL + RU foundation policies remain internally consistent")
     print(f"audit: {out}")
     return 0
