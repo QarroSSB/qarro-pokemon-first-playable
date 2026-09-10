@@ -29,7 +29,9 @@ X_STRETCH = {
     "latin_small_narrower.png": 1.48,
     "latin_short_narrower.png": 1.48,
 }
-READABILITY_WIDE = "AMWЖШЩЫЮ"
+# Only intrinsically broad glyphs belong in the per-glyph wide guard.  A is a
+# normal-width Latin capital in FireRed and is covered by the median guard.
+READABILITY_WIDE = "MWЖШЩЫЮ"
 NATURALLY_NARROW = set("Iil1")
 
 
