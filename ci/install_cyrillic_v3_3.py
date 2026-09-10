@@ -1,29 +1,18 @@
 #!/usr/bin/env python3
-"""Targeted narrow-font fixes for the v3.3.3 per-font Cyrillic scaler.
+"""Targeted compact Cyrillic masks for font atlases that clip in CI.
 
-Reuses the exact per-font scaler from commit 6593ba7. Only while rendering
-font atlases that have demonstrated clipping in CI, a small set of Cyrillic
-glyphs use compact source masks. Their full verified source forms remain the
-reference for all other atlases.
+Reuses the exact v3.3.3 per-font scaler from commit 6593ba7 and changes only
+verified glyph source masks while an affected atlas is rendered. Full source
+forms remain the reference everywhere else.
 
-CI history:
-- #50 Д overflow y=0..18
-- #51 compact Д still y=0..16
-- #52 Д passed; Ё y=-4..14
-- #53 Д/Ё passed; Й y=-4..16
-- #54 Д/Ё/Й passed; Ц y=0..18
-- #55 Д/Ё/Й/Ц passed; Щ y=0..18
-- #56 all five uppercase fixes passed; lowercase б y=-6..14
-- #57 first compact б improved to y=-3..11 but still clipped above the cell
-- #86 normal Д/Ё/Й/Ц passed; Щ y=0..18
-- #94 normal Щ passed; lowercase б y=-6..14
+Current normal-font CI chain:
+- #86: Щ overflow y=0..18
+- #94: Щ passed; б overflow y=-6..14
+- #95: б passed; д overflow y=0..17
 
-The compact б is anchored directly to the lowercase baseline with a four-row
-hook/bowl, avoiding top clipping while preserving the letter's identity. Normal
-Щ uses the already verified compact Щ mask, matching the successful targeted
-treatment used for normal Ц. Normal б now uses the same verified compact source
-mask that already passes the narrow atlases. All fail-closed checks remain
-active. English, every other Cyrillic glyph, Ash Bond and Ash Cap are untouched.
+The compact forms below already pass the smaller narrow atlases. Normal uses
+them only after its full form has been proven to clip. Fail-closed checks remain
+active. English, unrelated Cyrillic glyphs, Ash Bond and Ash Cap are untouched.
 """
 from __future__ import annotations
 
@@ -106,6 +95,7 @@ def main() -> int:
                 "Ц": SPECIALS["Ц"],
                 "Щ": SPECIALS["Щ"],
                 "б": SPECIALS["б"],
+                "д": SPECIALS["д"],
             }
         else:
             return original_patch_font(path)
@@ -116,13 +106,11 @@ def main() -> int:
             for idx in selected_indices
         }
         try:
-            for ch, (_, narrow) in selected.items():
+            for ch, (_, compact) in selected.items():
                 idx = indices[ch]
-                ns["GLYPH_HEX"][idx] = narrow
-                ns["SOURCE_BBOXES"][idx] = ns["source_bbox"](narrow)
-            print(
-                f"[cyrillic-v3340] {path.name}: targeted compact Cyrillic masks enabled"
-            )
+                ns["GLYPH_HEX"][idx] = compact
+                ns["SOURCE_BBOXES"][idx] = ns["source_bbox"](compact)
+            print(f"[cyrillic-v3340] {path.name}: targeted compact Cyrillic masks enabled")
             return original_patch_font(path)
         finally:
             for idx, (old_hex, old_bbox) in saved.items():
