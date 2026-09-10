@@ -82,7 +82,7 @@ def load_base() -> dict:
         "__name__": "qarro_cyrillic_v333_base",
         "__file__": str(Path(__file__).resolve()),
     }
-    exec(compile(code, f"{BASE_COMMIT}:{BASE_PATH}"), ns)
+    exec(compile(code, f"{BASE_COMMIT}:{BASE_PATH}", "exec"), ns)
     return ns
 
 
@@ -105,12 +105,67 @@ def main() -> int:
                 "Й": (SPECIALS["Й"][0], "0000000038262e3a32000000"),
                 "Ц": (SPECIALS["Ц"][0], "000000004444447e02000000"),
                 "Щ": (SPECIALS["Щ"][0], "000000005454547e02000000"),
-                "б": SPECIALS["б"], "д": SPECIALS["д"], "ё": SPECIALS["ё"],
-                "й": SPECIALS["й"], "р": SPECIALS["р"], "у": SPECIALS["у"],
-                "ф": SPECIALS["ф"], "ц": SPECIALS["ц"], "щ": SPECIALS["щ"],
+                "б": SPECIALS["б"],
+                "д": SPECIALS["д"],
+                "ё": SPECIALS["ё"],
+                "й": SPECIALS["й"],
+                "р": SPECIALS["р"],
+                "у": SPECIALS["у"],
+                "ф": SPECIALS["ф"],
+                "ц": SPECIALS["ц"],
+                "щ": SPECIALS["щ"],
             }
-        elif path.name in {"latin_normal.png", "latin_short.png", "latin_short_narrow.png"}:
-            selected = {ch: SPECIALS[ch] for ch in SPECIALS}
+        elif path.name == "latin_normal.png":
+            selected = {
+                "Д": SPECIALS["Д"],
+                "Ё": SPECIALS["Ё"],
+                "Й": SPECIALS["Й"],
+                "Ц": SPECIALS["Ц"],
+                "Щ": SPECIALS["Щ"],
+                "б": SPECIALS["б"],
+                "д": SPECIALS["д"],
+                "ё": SPECIALS["ё"],
+                "й": SPECIALS["й"],
+                "р": SPECIALS["р"],
+                "у": SPECIALS["у"],
+                "ф": SPECIALS["ф"],
+                "ц": SPECIALS["ц"],
+                "щ": SPECIALS["щ"],
+            }
+        elif path.name == "latin_short.png":
+            selected = {
+                "Д": SPECIALS["Д"],
+                "Ё": SPECIALS["Ё"],
+                "Й": SPECIALS["Й"],
+                "Ц": SPECIALS["Ц"],
+                "Щ": SPECIALS["Щ"],
+                "б": SPECIALS["б"],
+                "д": SPECIALS["д"],
+                "ё": SPECIALS["ё"],
+                "й": SPECIALS["й"],
+                "р": SPECIALS["р"],
+                "у": SPECIALS["у"],
+                "ф": SPECIALS["ф"],
+                "ц": SPECIALS["ц"],
+                "щ": SPECIALS["щ"],
+            }
+        elif path.name == "latin_short_narrow.png":
+            selected = {
+                "Д": SPECIALS["Д"],
+                "Ё": SPECIALS["Ё"],
+                "Й": SPECIALS["Й"],
+                "Ц": SPECIALS["Ц"],
+                "Щ": SPECIALS["Щ"],
+                "б": SPECIALS["б"],
+                "д": SPECIALS["д"],
+                "ё": SPECIALS["ё"],
+                "й": SPECIALS["й"],
+                "р": SPECIALS["р"],
+                "у": SPECIALS["у"],
+                "ф": SPECIALS["ф"],
+                "ц": SPECIALS["ц"],
+                "щ": SPECIALS["щ"],
+            }
         elif path.name == "latin_short_narrower.png":
             selected = {
                 "Д": (SPECIALS["Д"][0], "000000003c24247e42000000"),
@@ -118,19 +173,45 @@ def main() -> int:
                 "Й": (SPECIALS["Й"][0], "0000000038262e3a32000000"),
                 "Ц": (SPECIALS["Ц"][0], "000000004444447e02000000"),
                 "Щ": (SPECIALS["Щ"][0], "000000005454547e02000000"),
-                "б": SPECIALS["б"], "д": SPECIALS["д"], "ё": SPECIALS["ё"],
-                "й": SPECIALS["й"], "р": SPECIALS["р"], "у": SPECIALS["у"],
-                "ф": SPECIALS["ф"], "ц": SPECIALS["ц"], "щ": SPECIALS["щ"],
+                "б": SPECIALS["б"],
+                "д": SPECIALS["д"],
+                "ё": SPECIALS["ё"],
+                "й": SPECIALS["й"],
+                "р": SPECIALS["р"],
+                "у": SPECIALS["у"],
+                "ф": SPECIALS["ф"],
+                "ц": SPECIALS["ц"],
+                "щ": SPECIALS["щ"],
             }
         elif path.name == "latin_small.png":
-            selected = {ch: SPECIALS[ch] for ch in ("Ё", "Й", "б", "ё", "й", "р", "у", "ф")}
+            selected = {
+                "Ё": SPECIALS["Ё"],
+                "Й": SPECIALS["Й"],
+                "б": SPECIALS["б"],
+                "ё": SPECIALS["ё"],
+                "й": SPECIALS["й"],
+                "р": SPECIALS["р"],
+                "у": SPECIALS["у"],
+                "ф": SPECIALS["ф"],
+            }
         elif path.name == "latin_small_narrow.png":
-            selected = {ch: SPECIALS[ch] for ch in ("Ё", "Й", "б", "ё", "й", "р", "у")}
+            selected = {
+                "Ё": SPECIALS["Ё"],
+                "Й": SPECIALS["Й"],
+                "б": SPECIALS["б"],
+                "ё": SPECIALS["ё"],
+                "й": SPECIALS["й"],
+                "р": SPECIALS["р"],
+                "у": SPECIALS["у"],
+            }
         else:
             return original_patch_font(path)
 
         selected_indices = {indices[ch] for ch in selected}
-        saved = {idx: (ns["GLYPH_HEX"][idx], ns["SOURCE_BBOXES"][idx]) for idx in selected_indices}
+        saved = {
+            idx: (ns["GLYPH_HEX"][idx], ns["SOURCE_BBOXES"][idx])
+            for idx in selected_indices
+        }
         try:
             for ch, (_, compact) in selected.items():
                 idx = indices[ch]
