@@ -1,18 +1,13 @@
 #!/usr/bin/env python3
-"""Qarro v3.8 readable bilingual FireRed-style font wrapper.
+"""Qarro v3.9 bilingual Pixellari readability font wrapper.
 
-The Pixel-7 face was technically valid but proved too dense/condensed on a
-real phone screen.  For readability, return to the previously-green Cyrillic
-renderer from commit e5184e2 and keep FireRed's native English/digit glyphs.
+Runs the exact previously-green Cyrillic/charmap installer from commit e5184e2,
+then overlays the English, Russian and digit glyphs with a readability-first
+Pixellari Cyrillic raster derived from the user's supplied font archive.
 
-That renderer scales the custom Cyrillic alphabet separately for each of the
-nine native Latin atlas variants using the untouched FireRed A/a metrics and
-baseline, so Russian text follows the same UI proportions without replacing
-or deforming the original English face.
-
-User decision for accented e is handled separately *after* localization:
-literal é/É in game text is normalized to ordinary e/E.  The legacy glyph
-slot remains untouched and unused.
+The original TTF is not committed. Only raster masks are used by the follow-up
+pass. Literal é/É is still normalized to ordinary e/E after localization, so
+no special accented-e glyph is introduced.
 
 No Ash Bond / Ash Cap changes.
 """
@@ -24,35 +19,60 @@ from pathlib import Path
 
 BASE_COMMIT = "e5184e2d443f610ed07f85817bdfc6c9b3ba2bc4"
 BASE_PATH = "ci/install_cyrillic_v3_3.py"
+FOLLOWUP_PATH = "ci/install_bilingual_pixellari_v3_9.py"
 
 
-def load_base(repo: Path) -> dict:
+def load_from_git(repo: Path, commit: str, path: str, module_name: str) -> dict:
     subprocess.run(
-        ["git", "-C", str(repo), "fetch", "--quiet", "--depth=1", "origin", BASE_COMMIT],
+        ["git", "-C", str(repo), "fetch", "--quiet", "--depth=1", "origin", commit],
         check=True,
     )
     code = subprocess.check_output(
-        ["git", "-C", str(repo), "show", f"{BASE_COMMIT}:{BASE_PATH}"],
+        ["git", "-C", str(repo), "show", f"{commit}:{path}"],
         text=True,
     )
     ns = {
-        "__name__": "qarro_readable_frlg_cyrillic_v38",
+        "__name__": module_name,
         "__file__": str(Path(__file__).resolve()),
     }
-    exec(compile(code, f"{BASE_COMMIT}:{BASE_PATH}", "exec"), ns)
+    exec(compile(code, f"{commit}:{path}", "exec"), ns)
+    return ns
+
+
+def load_followup(repo: Path) -> dict:
+    path = repo / FOLLOWUP_PATH
+    if not path.exists():
+        raise RuntimeError(f"missing Pixellari font follow-up: {path}")
+    code = path.read_text(encoding="utf-8")
+    ns = {
+        "__name__": "qarro_bilingual_pixellari_v39",
+        "__file__": str(path.resolve()),
+    }
+    exec(compile(code, str(path), "exec"), ns)
     return ns
 
 
 def main() -> int:
     repo = Path(__file__).resolve().parents[1]
-    base = load_base(repo)
+
+    base = load_from_git(
+        repo,
+        BASE_COMMIT,
+        BASE_PATH,
+        "qarro_cyrillic_pre_pixellari_v39",
+    )
     rc = int(base["main"]() or 0)
     if rc:
         return rc
 
+    followup = load_followup(repo)
+    rc = int(followup["main"]() or 0)
+    if rc:
+        return rc
+
     print(
-        "[QARRO_FONT_V3_8] PASS: native FireRed English/digits preserved; "
-        "readable per-atlas Cyrillic installed; Pixel-7 disabled; Ash code untouched"
+        "[QARRO_FONT_V3_9] PASS: bilingual Pixellari English/Russian/digits "
+        "installed; ordinary e policy preserved; Ash code untouched"
     )
     return 0
 
