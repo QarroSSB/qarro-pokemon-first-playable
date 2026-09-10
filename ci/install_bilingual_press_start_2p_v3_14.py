@@ -5,10 +5,10 @@ Replaces visible English letters, Russian letters and digits in all nine
 FireRed Latin font atlases with compact, readability-first monochrome rasters
 derived from the user-supplied Press Start 2P font (SIL Open Font License 1.1).
 
-The TTF itself is not committed or redistributed by this installer. Two
-pixel-sized raster packs (7 px and 8 px) are embedded so the build is fully
-reproducible and does not depend on host font rendering. Punctuation and
-unrelated/control cells remain native FireRed.
+The TTF itself is not committed or redistributed by this installer. The CI
+fetches the public OFL copy only when needed and requires its SHA-256 to match
+the exact user-supplied TTF before rasterizing 7 px / 8 px variants. Punctuation
+and unrelated/control cells remain native FireRed.
 
 Pokemon, move and ability names can stay English while Russian UI/dialogue
 uses the same visual alphabet. Literal é/É normalization remains handled by
@@ -16,14 +16,16 @@ the existing post-localization pass. Ash Bond / Ash Cap are not touched.
 """
 from __future__ import annotations
 
-import base64
+import hashlib
+import io
+import os
 import json
 import re
 import sys
-import zlib
+import urllib.request
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 MARKER = "QARRO_BILINGUAL_PRESS_START_2P_V3_14"
 CELL_W = 16
@@ -82,17 +84,38 @@ VARIANT_PROFILE = {
     "latin_small_narrower.png": ("7", 10),
 }
 
-_GLYPH_PACKS_B64 = {
-    "7": 'eNqlWNm21UQQ/Zc890PSnXSS86aIIjgz6/IB8CrIpFz1oizWAnFABQXFCcQRAed5AoVf6PwRXV2dpHMOx7s7Z51e6+Zl36quYVftPpLckUyOJCvJRItkdzIpRbJzx/LSvj0HlpJJJZJDB1eWk8ljmRQqFUVGRyv+ePyoSO5EwCrzyOCDwGsQsKxEkQvlfvZDVoS8C/K5ELL0Bu3JapEVBF6LgDVbtB7TH60IeHc80OHugXCp0HTF2rmbC50SdB0C7a7YZsYn514PLlZJTt79OC/rEaN5JcJDSXUebwA9tqnJbFIK4dNUE/g+yGMR/JzD94M2tXIhqtsoO/ADaIiL24AfhOo/7avQ178L1UNRzcP940vq4Wi7NUU51wR+JM5uPUjRRtyyIs4Ia2NTdEHmBNsc1QRTQd4SBy7IZ8t2jma2QthadIcLLHPgbbhhNtmmi8DbkUjZnPDJgmA9CpJUoYXMyawFl57gdgywRYjVYW5tTrV0hCMJthMqCSbFqezsQixaW9ztbO4JnJ7YS0+ODrwEXpHZQnk3n4TSUTkGDSv3qYE1Pfd6rYfkM1vcPSamXDt7EGdzQfMmZP2nPSx3sCruHuBqNTwlofei/raTmGczQfch/uqZKbUfyqSNan8IdgCETQX1IF43YX0/gxSAmuX3Z0cUTu5o59AgmvPvV/b7yTJ4t5bPOf7PYWU23RLPI8ZCGue+fQG51oAQCbUCGQsInLN2GPRRyo63CfYikrTgXn23vwTRoOoZm/k6BVd3qftwOp8JnGH501NtJyM2DztiqnC+KGg2SbpmRdBwd8ghsUACgRIiyST9H+nqoAA3HkenUwutBlWKDsmYoSU6izO+ckuphK2g3OZEplJRkAu73rUFXEeth1yJmbb/hcDmzCKK0JzFYz0tCM27i8hJ8x64XtqQdfrBAc95YPl/o88KtEK2J6eT2Sqr3VJs3h+rKc1xMFWp30eyHvoBvp5aBvA8UPs93nyI10g+043mo4i1ul2N7XLta+Rj+NJDvAOfj1WYPBO86QugGB/kunP8k0WUprm4iJo3ny6iNc1nOBcVM9uP+Xy8VDVfjH7mMV+OE4zmq7hAy2FtX0LQbswEewMrRvP1IqrPXB6gq1VkX3ds2nj5M1dGXLxbHc3VWL3btqZDf4Ow6Czasah7lzDfIvZLmrSpp2CqGU7ad/jN+87sfP9+lITlpP0ATmp6f6l8zN2O6tA/Qt1RtBpG+Q/JXPgTuFF1rxuaI8fon8fpffMLaFU53i2GRPQrLsBUGObfQGHTTncH+n1Qk/N0VNpTfTDT/xj1VNCchWfbDNb8ieuVln0c7i/cVbto9rn4GxVj3C7dGPwnfn734Gug0azf8BzuOiSS0pmZ/S9ozw+/usX9hyvVwQJ8Y9xTgbkJisCp2dwcQ2TnoBEz7o7mOO6p6h1tXgY7MZjIzYnR2rh5ZX6xlauM4+bVcUq+eQ2M6ewIbl6PKJvg3aY5GftWwaOreQOhuNsP3OZNxGY/cH1C3oprjM7TU1C5dUOWeb85HdFOOqjStxGcH6yqH6nNO+CTNOfPt+HRW8DSy50=',
-    "8": 'eNqlWNly1UYQ/Rc960GjZXTlNwjZNyAha+XBTpyYhOAEAw5QVAWy73H2FbKvkAQStpDlF0Z/RHfPSJqR78VHumXJyFSd6ZlezumeY9G2aOFYtB4tlHG0Ir+XFteW9+3dvxwtTOLowOr6WrTwcDqJizyuKn5UWtqvR47H0XYErTMH9T4YfAMETmKVpHEmP/ylE8buQLCZigvlTNJD35li8I0ImM/JNrUznZYMvWkEVA57MwbMY83GVCGupuPSfzH8FgTenrSNkQvTrQ6ttwiTSoPHhuk2yLSOg4dinDL4dnDfFBvaMx2bY1axAxh9B7Jv52TncYbdCRpVyrpKJfZt/XUXukDCsVK0SBszu8DdUGqnXW66uhCf7RxUVLauXJbtGmqXd841Ikm2e5Bh1Y/WPbhxilQa5Mm94zJUCXjPoOLoefu+YZWlGBcTIU4YfD9U1UmXYvJyytE6mTj9Adw+cbDHxAx+EHFbITTI7JcEbnsI5TJFkEKzbZXHZUOFiwG88OE6CLcmhLbJphm4BHG35c9esB5FbLK1hrTF4GM4g7mdNsUh8GX0oJZNMrfXx6HYaEu0/ZR+IrCpZx+03Snv3hpeGeNfm097kT3TJhPOhJ5OPOmwhWAnMzqJnLCUSPRv+1j2eArddaPkVtsZug/adT5d3p6Gosu9R+W/DN0PQntOXsXzyc/9Z5CU8HstpwnPjkqlSlL/QODZGVslBSi7RmcNPF0jATYKB8HEm1oshxCTPvO7wj4MnS5gT4atQyTUI/1CyP45cKce0zPsCBJC/3QdGRzFGLPsCN7Re4IOBknn14wKW3RRoeHMp1RkivcRrEw0IVBoWlnKMFXTcS4sRGi/D8kRNLmKYBSdQgnj00q5HLsAGyhLvWGnrMFpSPvEbaElKuSEsKf2q2cCES85mdq9ylYBEW/pbFeDOk6XmrSJTMY48+5c46fZgB2e9adP8948s6t5H2xY2WuxNweaDxxwcj2Z5EFQJYn3pvKmRRGrSvTSfDh+ijUnoDRnrXYdjQ/+aEjTm0uznKcNEcoKHw9IGt0vUfMJ3jHzjGKHMyXDmkubT0H7yZQ1ZIHP8LFWNb1K266Yz9G7gM0p0B7hi3lnXPPlXFcK5tQ8I645PYCywkfgX40fkc3Xc1w7mW/mmVPNtwNdHiqE+Q6BT7iv8jsP+lPEyXw/z6RpfgjQky1GzfaRGEq3ZX4cdfqmFTU/jZq1u5lbFvkZYt8Zi1j2tbH4BdkNOd9Go3tdKH8dwmEq3ImSS0xzZtQYbWvgLKj5zFm6CYX0wAL/DZKPspuX5Aj2u7CB+B1t05wT+KZNGDFtSfiPsRcQ5hxqPJPrrSRst8x5fO5rfgvuT2Te8HoGAf0VZOzM8S0PhMLvEy6Mu76oN+AeYTPYXBwyI+mwO7iEb7jw6fEyOFyJoIu9Vk2vDG4IQvzfqOmukRTcVWw6y6d1AP/Ax6089Rfov/jAHPbb/427ujD/o1NoT+jr55HJN6xRVzj1CXyvWbfV+iRYpD1tr18YP6PXL85Ov3JrYa9fGnerUL8MOXeqmNevDEkhT8brV8fcnjj5rl+DyHC2bNevI9Y92XYBemPAaRu5tjJdv4lAO5m2UlG/NYS0Ey9930aAjTQ7WbaSXL+DXq43MbVVevwaFgMF6w==',
-}
-GLYPH_PACKS = {
-    size: json.loads(zlib.decompress(base64.b64decode(payload)).decode("utf-8"))
-    for size, payload in _GLYPH_PACKS_B64.items()
-}
-for size, pack in GLYPH_PACKS.items():
-    if set(pack) != set(CHAR_TO_CODE):
-        raise RuntimeError(f"embedded Press Start 2P {size}px raster pack does not match target set")
+PRESS_START_2P_URL = "https://raw.githubusercontent.com/google/fonts/main/ofl/pressstart2p/PressStart2P-Regular.ttf"
+PRESS_START_2P_SHA256 = "8d0248e41694fdd875dbcde859ee1bae5982ecfdc6c7e5e451b48950d29ba95a"
+
+_FONT_BYTES: bytes | None = None
+
+def load_font_bytes() -> bytes:
+    """Load the exact user-supplied Press Start 2P bytes or an identical pinned public copy."""
+    global _FONT_BYTES
+    if _FONT_BYTES is not None:
+        return _FONT_BYTES
+
+    local = os.environ.get("QARRO_PRESS_START_2P_TTF")
+    if local:
+        data = Path(local).read_bytes()
+        source = local
+    else:
+        req = urllib.request.Request(
+            PRESS_START_2P_URL,
+            headers={"User-Agent": "Qarro-FIRST-PLAYABLE-font-installer/3.14"},
+        )
+        with urllib.request.urlopen(req, timeout=30) as response:
+            data = response.read()
+        source = PRESS_START_2P_URL
+
+    digest = hashlib.sha256(data).hexdigest()
+    if digest != PRESS_START_2P_SHA256:
+        raise RuntimeError(
+            f"Press Start 2P SHA256 mismatch from {source}: {digest} != {PRESS_START_2P_SHA256}"
+        )
+    _FONT_BYTES = data
+    print(f"[press-start-2p-v314] verified TTF sha256={digest} source={source}")
+    return data
 
 
 def cell_box(code: int, total_cells: int) -> tuple[int, int, int, int]:
@@ -108,17 +131,21 @@ def cell_pixels(img: Image.Image, code: int, total_cells: int) -> bytes:
 
 
 def source_mask(size: str, ch: str) -> tuple[Image.Image, int]:
-    g = GLYPH_PACKS[size][ch]
-    w, h = int(g["w"]), int(g["h"])
-    m = Image.new("L", (w, h), 0)
-    for y, row in enumerate(g["rows"]):
-        row = int(row)
-        for x in range(w):
-            if row & (1 << x):
-                m.putpixel((x, y), 255)
-    if m.getbbox() is None:
-        raise RuntimeError(f"empty embedded glyph {size}px {ch!r}")
-    return m, int(g["baseline"])
+    font = ImageFont.truetype(io.BytesIO(load_font_bytes()), size=int(size))
+    canvas = Image.new("L", (32, 32), 0)
+    draw = ImageDraw.Draw(canvas)
+    draw.text((0, 16), ch, font=font, fill=255, anchor="ls")
+    canvas = canvas.point(lambda p: 255 if p >= 128 else 0)
+    bbox = canvas.getbbox()
+    if bbox is None:
+        raise RuntimeError(f"empty Press Start 2P glyph {size}px {ch!r}")
+    mask = canvas.crop(bbox)
+    baseline = 16 - bbox[1]
+    if mask.width > CELL_W - 1 or mask.height > CELL_H - 1:
+        raise RuntimeError(
+            f"Press Start 2P glyph too large for FireRed cell: {size}px {ch!r} {mask.size}"
+        )
+    return mask, baseline
 
 
 def patch_font(path: Path) -> tuple[str, dict[int, int]]:
@@ -150,6 +177,7 @@ def patch_font(path: Path) -> tuple[str, dict[int, int]]:
             for x in range(x0, x1):
                 img.putpixel((x, y), FONT_BG)
 
+        # +1 is the FireRed-style shadow offset.
         if mask.width + 1 > CELL_W:
             raise RuntimeError(
                 f"{path.name}: horizontal overflow {ch}/0x{code:02X} width={mask.width + 1}"
@@ -180,6 +208,8 @@ def patch_font(path: Path) -> tuple[str, dict[int, int]]:
         if min_x != 0:
             raise RuntimeError(f"{path.name}: left origin drift {ch}/0x{code:02X} min_x={min_x}")
 
+        # Variable advances keep the characteristic glyph shape while avoiding
+        # the excessive width of the original monospaced desktop font.
         rendered_widths[code] = min(CELL_W, max(4, max_x + 2))
 
     for code, before in protected_before.items():
