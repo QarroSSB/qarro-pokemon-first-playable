@@ -2,7 +2,7 @@
 """Qarro v3.5 quality-of-life pass.
 
 Current confirmed QoL scope for FireRed:
-- verify the pinned whiteout path does not deduct player money;
+- disable the pinned trainer-loss money deduction at its actual battle path;
 - return an ordinary Bag Poké Ball when a wild Pokémon breaks out;
 - grant the starting supplies exactly once in Oak's initial post-Pokédex scene.
 
@@ -28,32 +28,69 @@ def read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def verify_no_money_loss(root: Path) -> dict:
-    """Fail closed if the pinned whiteout path starts deducting money again."""
-    path = root / "src/overworld.c"
-    text = read(path)
+def patch_no_money_loss(root: Path) -> dict:
+    """Disable only the pinned player-money deduction in Cmd_getmoneyreward."""
+    # DoWhiteOut itself must remain structurally native; the actual money loss is
+    # performed by the battle command before the overworld whiteout transition.
+    overworld_path = root / "src/overworld.c"
+    overworld = read(overworld_path)
     start_token = "void DoWhiteOut(void)\n{"
     end_token = "void Overworld_ResetStateAfterFly(void)"
     try:
-        start = text.index(start_token)
-        end = text.index(end_token, start)
+        ow_start = overworld.index(start_token)
+        ow_end = overworld.index(end_token, ow_start)
     except ValueError as exc:
         die("DoWhiteOut anchors did not match pinned source")
         raise exc
-
-    body = text[start:end]
-    forbidden = ("SetMoney(", "RemoveMoney(")
-    found = [token for token in forbidden if token in body]
-    if found:
-        die(f"whiteout money deduction unexpectedly present: {found}")
-    if "RunScriptImmediately(EventScript_WhiteOut);" not in body:
+    ow_body = overworld[ow_start:ow_end]
+    if "RunScriptImmediately(EventScript_WhiteOut);" not in ow_body:
         die("DoWhiteOut structure changed from pinned source")
 
-    print(f"[{MARKER}] no-money-loss on defeat verified in pinned DoWhiteOut")
+    path = root / "src/battle_script_commands.c"
+    text = read(path)
+    fn_token = "static void Cmd_getmoneyreward(void)\n{"
+    try:
+        start = text.index(fn_token)
+        end = text.index("\nstatic void ", start + len(fn_token))
+    except ValueError as exc:
+        die("Cmd_getmoneyreward anchors did not match pinned source")
+        raise exc
+
+    body = text[start:end]
+    native = "        RemoveMoney(&gSaveBlock1Ptr->money, money);"
+    patched_line = "        // Qarro v3.5: defeat does not remove player money."
+
+    if patched_line in body:
+        print(f"[{MARKER}] no-money-loss patch already present")
+    else:
+        if body.count(native) != 1:
+            die(f"expected one pinned loss deduction in Cmd_getmoneyreward, found {body.count(native)}")
+        new_body = body.replace(native, patched_line, 1)
+        text = text[:start] + new_body + text[end:]
+        path.write_text(text, encoding="utf-8")
+        print(f"[{MARKER}] no-money-loss patch installed at Cmd_getmoneyreward loss branch")
+
+    patched = read(path)
+    try:
+        start = patched.index(fn_token)
+        end = patched.index("\nstatic void ", start + len(fn_token))
+    except ValueError as exc:
+        die("Cmd_getmoneyreward anchors drifted after patch")
+        raise exc
+    body = patched[start:end]
+    if native in body or "RemoveMoney(" in body:
+        die("player-money deduction still present in Cmd_getmoneyreward")
+    if body.count(patched_line) != 1:
+        die(f"expected exactly one no-money-loss marker, found {body.count(patched_line)}")
+    if "AddMoney(" not in body:
+        die("trainer-win reward path unexpectedly changed")
+
     return {
-        "verified": True,
-        "source": "src/overworld.c::DoWhiteOut",
+        "enabled": True,
+        "source": "src/battle_script_commands.c::Cmd_getmoneyreward loss branch",
         "moneyDeductionCalls": 0,
+        "trainerWinRewardPreserved": True,
+        "whiteoutFlowPreserved": True,
     }
 
 
@@ -95,7 +132,7 @@ def patch_failed_catch_ball_refund(root: Path) -> dict:
 
     return {
         "enabled": True,
-        "source": "src/battle_script_commands.c::Cmd_handleballthrow failure path",
+        "source": "src/battle_script_commands.c::SetBallThrowShakes failure path",
         "refundsOnEscape": True,
         "successfulCatchStillConsumesBall": True,
         "safariBehaviorPreserved": True,
@@ -199,7 +236,7 @@ def main() -> int:
         return 2
 
     root = Path(sys.argv[1]).resolve()
-    no_money_loss = verify_no_money_loss(root)
+    no_money_loss = patch_no_money_loss(root)
     failed_catch_ball = patch_failed_catch_ball_refund(root)
     supplies = patch_starting_supplies(root)
 
@@ -215,7 +252,7 @@ def main() -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(audit, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(
-        f"[{MARKER}] PASS: no-money-loss verified; failed-catch Ball refund installed; "
+        f"[{MARKER}] PASS: no-money-loss installed; failed-catch Ball refund installed; "
         "post-Pokedex starter supplies installed; Ash code untouched"
     )
     return 0
