@@ -16,13 +16,14 @@ CI history:
 - #56 all five uppercase fixes passed; lowercase б y=-6..14
 - #57 first compact б improved to y=-3..11 but still clipped above the cell
 - #86 normal Д/Ё/Й/Ц passed; Щ y=0..18
+- #94 normal Щ passed; lowercase б y=-6..14
 
-The second narrow б is anchored directly to the lowercase baseline with a
-four-row compact hook/bowl, avoiding top clipping while preserving the letter's
-identity at narrow UI scale. Normal Щ now uses the already verified compact Щ
-mask, matching the successful targeted treatment used for normal Ц. All
-fail-closed checks remain active. English, every other Cyrillic glyph, Ash Bond
-and Ash Cap are untouched.
+The compact б is anchored directly to the lowercase baseline with a four-row
+hook/bowl, avoiding top clipping while preserving the letter's identity. Normal
+Щ uses the already verified compact Щ mask, matching the successful targeted
+treatment used for normal Ц. Normal б now uses the same verified compact source
+mask that already passes the narrow atlases. All fail-closed checks remain
+active. English, every other Cyrillic glyph, Ash Bond and Ash Cap are untouched.
 """
 from __future__ import annotations
 
@@ -104,6 +105,7 @@ def main() -> int:
                 "Й": SPECIALS["Й"],
                 "Ц": SPECIALS["Ц"],
                 "Щ": SPECIALS["Щ"],
+                "б": SPECIALS["б"],
             }
         else:
             return original_patch_font(path)
