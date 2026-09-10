@@ -3,8 +3,9 @@
 
 Runs the exact previously-green localization pipeline from commit 23b23931,
 then translates only verified early-game text blocks in runtime order: Professor
-Oak's new-game speech, the player's starting room, and the downstairs home
-interaction text. This keeps the localization audit incremental and fail-closed.
+Oak's new-game speech, the player's starting room, the downstairs home, and the
+early Pallet Town outdoor interactions. This keeps the localization audit
+incremental and fail-closed.
 
 Pokemon, Move and Ability proper names remain English outside Russian prose.
 No Ash Bond / Ash Cap code is touched.
@@ -274,6 +275,144 @@ HOUSE_1F_BLOCKS = {
     ),
 }
 
+PALLET_TOWN_EARLY_BLOCKS = {
+    "PalletTown_Text_OakDontGoOut": (
+        (
+            r"OAK: Hey! Wait!\n",
+            r"Don't go out!$",
+        ),
+        (
+            r"ОУК: Эй! Стой!\n",
+            r"Не выходи!$",
+        ),
+    ),
+    "PalletTown_Text_OakGrassUnsafeNeedMon": (
+        (
+            r"OAK: It's unsafe!\n",
+            r"Wild POKéMON live in tall grass!\p",
+            r"You need your own POKéMON for\n",
+            r"your protection.\p",
+            r"I know!\n",
+            r"Here, come with me!$",
+        ),
+        (
+            r"ОУК: Там опасно!\n",
+            r"В высокой траве живут\n",
+            r"дикие ПОКЕМОНЫ!\p",
+            r"Тебе нужен свой ПОКЕМОН,\n",
+            r"чтобы защитить себя.\p",
+            r"Знаю!\n",
+            r"Идём со мной!$",
+        ),
+    ),
+    "PalletTown_Text_RaisingMonsToo": (
+        (
+            r"I'm raising POKéMON, too.\p",
+            r"When they get strong, they can\n",
+            r"protect me.$",
+        ),
+        (
+            r"Я тоже выращиваю ПОКЕМОНОВ.\p",
+            r"Когда они станут сильнее,\n",
+            r"то смогут защитить меня.$",
+        ),
+    ),
+    "PalletTown_Text_CanStoreItemsAndMonsInPC": (
+        (
+            r"Technology is incredible!\p",
+            r"You can now store and recall items\n",
+            r"and POKéMON as data via PC.$",
+        ),
+        (
+            r"Технологии удивительны!\p",
+            r"Теперь предметы и ПОКЕМОНОВ\n",
+            r"можно хранить в ПК как данные.$",
+        ),
+    ),
+    "PalletTown_Text_OakPokemonResearchLab": (
+        (r"OAK POKéMON RESEARCH LAB$",),
+        (r"ЛАБОРАТОРИЯ ПРОФ. ОУКА$",),
+    ),
+    "PalletTown_Text_PlayersHouse": (
+        (r"{PLAYER}'s house$",),
+        (r"Дом {PLAYER}$",),
+    ),
+    "PalletTown_Text_RivalsHouse": (
+        (r"{RIVAL}'s house$",),
+        (r"Дом {RIVAL}$",),
+    ),
+    "PalletTown_Text_TownSign": (
+        (
+            r"PALLET TOWN\n",
+            r"Shades of your journey await!$",
+        ),
+        (
+            r"ПАЛЛЕТ-ТАУН\n",
+            r"Отсюда начинается твой путь!$",
+        ),
+    ),
+    "PalletTown_Text_HmmIsThatRight": (
+        (
+            r"Hmm…\n",
+            r"Is that right…$",
+        ),
+        (
+            r"Хм...\n",
+            r"Вот как...$",
+        ),
+    ),
+    "PalletTown_Text_OhLookLook": (
+        (
+            r"Oh!\n",
+            r"Look, look!$",
+        ),
+        (
+            r"О!\n",
+            r"Смотри, смотри!$",
+        ),
+    ),
+    "PalletTown_Text_ReadItReadIt": (
+        (r"Read it, read it!$",),
+        (r"Прочти, прочти!$",),
+    ),
+    "PalletTown_Text_PressStartToOpenMenu": (
+        (
+            r"TRAINER TIPS\p",
+            r"Press START to open the MENU!$",
+        ),
+        (
+            r"СОВЕТЫ ТРЕНЕРА\p",
+            r"Нажми START, чтобы открыть МЕНЮ!$",
+        ),
+    ),
+    "PalletTown_Text_SignsAreUsefulArentThey": (
+        (r"Signs are useful, aren't they?$",),
+        (r"Знаки полезны, правда?$",),
+    ),
+    "PalletTown_Text_LookCopiedTrainerTipsSign": (
+        (
+            r"Look, look!\p",
+            r"I copied what it said on one of\n",
+            r"those TRAINER TIPS signs!$",
+        ),
+        (
+            r"Смотри, смотри!\p",
+            r"Я переписала один из\n",
+            r"СОВЕТОВ ТРЕНЕРА!$",
+        ),
+    ),
+    "PalletTown_Text_PressStartToOpenMenuCopy": (
+        (
+            r"TRAINER TIPS!\p",
+            r"Press START to open the MENU!$",
+        ),
+        (
+            r"СОВЕТЫ ТРЕНЕРА!\p",
+            r"Нажми START, чтобы открыть МЕНЮ!$",
+        ),
+    ),
+}
+
 
 def load_base() -> str:
     repo = Path(__file__).resolve().parents[1]
@@ -364,6 +503,23 @@ def patch_house_1f(root: Path) -> int:
     return changed
 
 
+def patch_pallet_town_early(root: Path) -> int:
+    path = root / "data/maps/PalletTown_Frlg/scripts.inc"
+    changed = patch_blocks(path, PALLET_TOWN_EARLY_BLOCKS, "ru-pallet")
+    text = path.read_text(encoding="utf-8")
+    forbidden_visible = (
+        "OAK: Hey! Wait!",
+        "Wild POKéMON live in tall grass!",
+        "Technology is incredible!",
+        "OAK POKéMON RESEARCH LAB",
+        "Press START to open the MENU!",
+    )
+    for phrase in forbidden_visible:
+        if phrase in text:
+            raise RuntimeError(f"early Pallet Town English phrase remained: {phrase!r}")
+    return changed
+
+
 def main() -> int:
     code = load_base()
     ns = {
@@ -382,13 +538,15 @@ def main() -> int:
     oak_changed = patch_oak_intro(root)
     room_changed = patch_starting_room(root)
     house_1f_changed = patch_house_1f(root)
+    pallet_changed = patch_pallet_town_early(root)
 
     audit = {
         "marker": MARKER,
         "oakSpeechBlocksLocalized": len(OAK_BLOCKS),
         "startingRoomBlocksLocalized": len(STARTING_ROOM_BLOCKS),
         "playerHouse1FBlocksLocalized": len(HOUSE_1F_BLOCKS),
-        "blocksChangedThisRun": oak_changed + room_changed + house_1f_changed,
+        "earlyPalletTownBlocksLocalized": len(PALLET_TOWN_EARLY_BLOCKS),
+        "blocksChangedThisRun": oak_changed + room_changed + house_1f_changed + pallet_changed,
         "earliestRuntimeEnglishClosed": True,
         "pokemonNamesEnglish": True,
         "moveNamesEnglish": True,
@@ -401,7 +559,8 @@ def main() -> int:
     out.write_text(json.dumps(audit, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(
         f"[{MARKER}] PASS: {len(OAK_BLOCKS)} Oak + {len(STARTING_ROOM_BLOCKS)} starting-room + "
-        f"{len(HOUSE_1F_BLOCKS)} house-1F blocks localized; names/Ash untouched"
+        f"{len(HOUSE_1F_BLOCKS)} house-1F + {len(PALLET_TOWN_EARLY_BLOCKS)} early-Pallet blocks localized; "
+        "names/Ash untouched"
     )
     return 0
 
