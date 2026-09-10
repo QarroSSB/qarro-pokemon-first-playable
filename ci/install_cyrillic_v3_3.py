@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Qarro v3.15 custom bilingual Qarro Pixel font wrapper.
+"""Qarro v3.16 custom bilingual Qarro Pixel Italic font wrapper.
 
 Runs the exact previously-green Cyrillic/charmap installer from commit e5184e2,
-then overlays English, Russian and digit glyphs with the original Qarro Pixel
-GBA bitmap font designed specifically for this ROM.
+then overlays English, Russian and digit glyphs with Qarro Pixel Italic v0.4,
+a custom GBA bitmap font with a subtle forward lean and dedicated Cyrillic
+readability forms.
 
 Literal é/É is still normalized to ordinary e/E after localization.
 No Ash Bond / Ash Cap changes.
@@ -16,7 +17,7 @@ from pathlib import Path
 
 BASE_COMMIT = "e5184e2d443f610ed07f85817bdfc6c9b3ba2bc4"
 BASE_PATH = "ci/install_cyrillic_v3_3.py"
-FOLLOWUP_PATH = "ci/install_bilingual_qarro_pixel_v3_15.py"
+FOLLOWUP_PATH = "ci/install_bilingual_qarro_pixel_italic_v3_16.py"
 
 
 def load_from_git(repo: Path, commit: str, path: str, module_name: str) -> dict:
@@ -39,10 +40,10 @@ def load_from_git(repo: Path, commit: str, path: str, module_name: str) -> dict:
 def load_followup(repo: Path) -> dict:
     path = repo / FOLLOWUP_PATH
     if not path.exists():
-        raise RuntimeError(f"missing Qarro Pixel font follow-up: {path}")
+        raise RuntimeError(f"missing Qarro Pixel Italic font follow-up: {path}")
     code = path.read_text(encoding="utf-8")
     ns = {
-        "__name__": "qarro_bilingual_pixel_v315",
+        "__name__": "qarro_bilingual_pixel_italic_v316",
         "__file__": str(path.resolve()),
     }
     exec(compile(code, str(path), "exec"), ns)
@@ -56,7 +57,7 @@ def main() -> int:
         repo,
         BASE_COMMIT,
         BASE_PATH,
-        "qarro_cyrillic_pre_pixel_v315",
+        "qarro_cyrillic_pre_pixel_italic_v316",
     )
     rc = int(base["main"]() or 0)
     if rc:
@@ -68,8 +69,8 @@ def main() -> int:
         return rc
 
     print(
-        "[QARRO_FONT_V3_15] PASS: original Qarro Pixel English/Russian/digits "
-        "installed; ordinary e policy preserved; Ash code untouched"
+        "[QARRO_FONT_V3_16] PASS: Qarro Pixel Italic v0.4 English/Russian/digits "
+        "installed; Cyrillic т/У distinct; ordinary e policy preserved; Ash untouched"
     )
     return 0
 
