@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 """Normalize literal accented e in game text after localization.
 
-User choice: do not use a dedicated é glyph.  Convert source text é/É to e/E
+User choice: do not use a dedicated é glyph. Convert source text é/É to e/E
 only after all localization passes have completed, so exact English anchors
 used by the localization scripts remain valid during their own execution.
 
 Charmap/font tables are deliberately excluded; the legacy FireRed slot stays
 untouched but no authored game text should reference it after this pass.
+After normalization, run the read-only RU font/localization foundation audit.
 No Ash Bond / Ash Cap changes.
 """
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -83,6 +85,11 @@ def main() -> int:
         f"[{MARKER}] PASS: normalized {replaced} accented-e literals in "
         f"{len(changed_files)} authored source files; charmap/font/Ash untouched"
     )
+
+    ru_audit = Path(__file__).resolve().with_name("audit_ru_foundation_v3_9.py")
+    if not ru_audit.is_file():
+        raise RuntimeError(f"missing RU foundation audit: {ru_audit}")
+    subprocess.run([sys.executable, str(ru_audit), str(root)], check=True)
     return 0
 
 
