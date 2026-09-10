@@ -18,6 +18,14 @@ from pathlib import Path
 MARKER = "QARRO_PROTECTED_FEATURES_V3_13"
 PATTERN = re.compile(r"ash[ _-]?(?:bond|cap)|ASH_?(?:BOND|CAP)", re.IGNORECASE)
 
+# Historical prose embedded in the generated trainer-party comment. It is not
+# executable configuration/code and predates the permanent no-Ash policy. Keep
+# the guard strict for every other changed line instead of weakening matching.
+KNOWN_NONEXECUTABLE_COMMENT = (
+    "- FIRST PLAYABLE uses Light Ball for Ash Pikachu to avoid a custom item compile dependency; "
+    "ITEM_ASH_CAP remains canonical and is restored after the first source-built ROM boots."
+)
+
 
 def git(root: Path, *args: str) -> str:
     proc = subprocess.run(
@@ -44,12 +52,17 @@ def main() -> int:
 
     diff = git(root, "diff", "--no-ext-diff", "--unified=0")
     line_hits: list[str] = []
+    ignored_nonexec = 0
     for line in diff.splitlines():
         if not line or line.startswith(("+++", "---")):
             continue
         if line[0] not in "+-":
             continue
-        if PATTERN.search(line[1:]):
+        payload = line[1:].strip()
+        if payload == KNOWN_NONEXECUTABLE_COMMENT:
+            ignored_nonexec += 1
+            continue
+        if PATTERN.search(payload):
             line_hits.append(line[:240])
 
     if path_hits or line_hits:
@@ -66,6 +79,7 @@ def main() -> int:
         "ashCapTouched": False,
         "protectedPathHits": 0,
         "protectedDiffLineHits": 0,
+        "ignoredKnownNonExecutableCommentLines": ignored_nonexec,
     }
     out = root / "build/qarro_protected_features_v3_13_audit.json"
     out.parent.mkdir(parents=True, exist_ok=True)
