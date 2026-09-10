@@ -83,6 +83,23 @@ def iter_text_files(root: Path):
                 yield path
 
 
+def visible_text_surface(path: Path, text: str) -> str:
+    """Remove source comments before mojibake checks.
+
+    The pinned Expansion source already contains legacy replacement characters
+    in a few developer comments (for example POK�MON in src/contest_effect.c).
+    They are not compiled strings and were present before Qarro localization.
+    Keep the gate fail-closed for actual source/string content while ignoring
+    those non-runtime comments.
+    """
+    if path.suffix.lower() in {".c", ".h", ".inc", ".s"}:
+        text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+        text = re.sub(r"//.*?$", "", text, flags=re.M)
+        if path.suffix.lower() == ".s":
+            text = re.sub(r"(?m)^\s*@.*$", "", text)
+    return text
+
+
 def audit_text(root: Path) -> dict[str, object]:
     files = 0
     cyr_files = 0
@@ -95,9 +112,12 @@ def audit_text(root: Path) -> dict[str, object]:
         except UnicodeDecodeError as exc:
             raise RuntimeError(f"non-UTF8 text file: {path.relative_to(root)}") from exc
         files += 1
+        runtime_text = visible_text_surface(path, text)
         for bad in BAD_TEXT:
-            if bad in text:
-                raise RuntimeError(f"mojibake/replacement marker {bad!r} in {path.relative_to(root)}")
+            if bad in runtime_text:
+                raise RuntimeError(
+                    f"mojibake/replacement marker {bad!r} in runtime text of {path.relative_to(root)}"
+                )
         count = sum(text.count(ch) for ch in CYRILLIC)
         if count:
             cyr_files += 1
