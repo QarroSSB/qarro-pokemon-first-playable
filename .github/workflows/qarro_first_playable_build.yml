@@ -229,6 +229,13 @@ jobs:
             sha256sum qarro_ci_out_v3_8/Qarro_FIRST_PLAYABLE_v3_8.gba > qarro_ci_out_v3_8/Qarro_FIRST_PLAYABLE_v3_8.gba.sha256
           fi
 
+      - name: Verify built FireRed ROM integrity and regression evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 qarro-repo/ci/audit_built_rom_v3_12.py qarro_ci_out_v3_8 \
+            2>&1 | tee qarro_ci_out_v3_8/logs/built_rom_v3_12.log
+
       - name: Upload ROM or exact first failure diagnostics
         if: always()
         uses: actions/upload-artifact@v4
