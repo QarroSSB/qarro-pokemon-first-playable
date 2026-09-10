@@ -5,10 +5,10 @@ Replaces visible English letters, Russian letters and digits in all nine
 FireRed Latin font atlases with compact, readability-first monochrome rasters
 derived from the user-supplied Press Start 2P font (SIL Open Font License 1.1).
 
-The TTF itself is not committed or redistributed by this installer. The CI
-fetches the public OFL copy only when needed and requires its SHA-256 to match
-the exact user-supplied TTF before rasterizing 7 px / 8 px variants. Punctuation
-and unrelated/control cells remain native FireRed.
+The TTF itself is not committed or redistributed by this installer. Exact
+7 px / 8 px raster masks generated from the user-supplied TTF are stored as
+compact glyph data and verified by SHA-256 before use. Punctuation and
+unrelated/control cells remain native FireRed.
 
 Pokemon, move and ability names can stay English while Russian UI/dialogue
 uses the same visual alphabet. Literal é/É normalization remains handled by
@@ -16,16 +16,12 @@ the existing post-localization pass. Ash Bond / Ash Cap are not touched.
 """
 from __future__ import annotations
 
-import hashlib
-import io
-import os
 import json
 import re
 import sys
-import urllib.request
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 
 MARKER = "QARRO_BILINGUAL_PRESS_START_2P_V3_14"
 CELL_W = 16
@@ -84,38 +80,34 @@ VARIANT_PROFILE = {
     "latin_small_narrower.png": ("7", 10),
 }
 
-PRESS_START_2P_URL = "https://raw.githubusercontent.com/google/fonts/main/ofl/pressstart2p/PressStart2P-Regular.ttf"
-PRESS_START_2P_SHA256 = "8d0248e41694fdd875dbcde859ee1bae5982ecfdc6c7e5e451b48950d29ba95a"
+GLYPH_DATA_FILE = "press_start_2p_glyphs_v3_14.json"
+GLYPH_DATA_SHA256 = "8e476e84956a1170b4c144b624590eae84792246a48ac58f58ea8355086a5f38"
 
-_FONT_BYTES: bytes | None = None
+_GLYPH_PACKS: dict[str, dict[str, str]] | None = None
 
-def load_font_bytes() -> bytes:
-    """Load the exact user-supplied Press Start 2P bytes or an identical pinned public copy."""
-    global _FONT_BYTES
-    if _FONT_BYTES is not None:
-        return _FONT_BYTES
-
-    local = os.environ.get("QARRO_PRESS_START_2P_TTF")
-    if local:
-        data = Path(local).read_bytes()
-        source = local
-    else:
-        req = urllib.request.Request(
-            PRESS_START_2P_URL,
-            headers={"User-Agent": "Qarro-FIRST-PLAYABLE-font-installer/3.14"},
-        )
-        with urllib.request.urlopen(req, timeout=30) as response:
-            data = response.read()
-        source = PRESS_START_2P_URL
-
-    digest = hashlib.sha256(data).hexdigest()
-    if digest != PRESS_START_2P_SHA256:
+def load_glyph_packs() -> dict[str, dict[str, str]]:
+    """Load exact 7/8px rasters generated from the user's supplied TTF."""
+    global _GLYPH_PACKS
+    if _GLYPH_PACKS is not None:
+        return _GLYPH_PACKS
+    path = Path(__file__).resolve().with_name(GLYPH_DATA_FILE)
+    data = path.read_bytes()
+    digest = __import__("hashlib").sha256(data).hexdigest()
+    if digest != GLYPH_DATA_SHA256:
         raise RuntimeError(
-            f"Press Start 2P SHA256 mismatch from {source}: {digest} != {PRESS_START_2P_SHA256}"
+            f"Press Start 2P glyph-data SHA256 mismatch: {digest} != {GLYPH_DATA_SHA256}"
         )
-    _FONT_BYTES = data
-    print(f"[press-start-2p-v314] verified TTF sha256={digest} source={source}")
-    return data
+    packs = json.loads(data.decode("utf-8"))
+    if set(packs) != {"7", "8"}:
+        raise RuntimeError(f"unexpected Press Start 2P raster sizes: {sorted(packs)}")
+    for size, pack in packs.items():
+        if set(pack) != set(CHAR_TO_CODE):
+            raise RuntimeError(
+                f"Press Start 2P {size}px raster character set does not match target set"
+            )
+    _GLYPH_PACKS = packs
+    print(f"[press-start-2p-v314] verified exact user raster sha256={digest}")
+    return packs
 
 
 def cell_box(code: int, total_cells: int) -> tuple[int, int, int, int]:
@@ -131,16 +123,19 @@ def cell_pixels(img: Image.Image, code: int, total_cells: int) -> bytes:
 
 
 def source_mask(size: str, ch: str) -> tuple[Image.Image, int]:
-    font = ImageFont.truetype(io.BytesIO(load_font_bytes()), size=int(size))
-    canvas = Image.new("L", (32, 32), 0)
-    draw = ImageDraw.Draw(canvas)
-    draw.text((0, 16), ch, font=font, fill=255, anchor="ls")
-    canvas = canvas.point(lambda p: 255 if p >= 128 else 0)
-    bbox = canvas.getbbox()
-    if bbox is None:
+    spec = load_glyph_packs()[size][ch]
+    w_text, h_text, baseline_text, row_hex = spec.split(",", 3)
+    w, h, baseline = int(w_text), int(h_text), int(baseline_text)
+    rows = [int(v, 16) for v in row_hex.split(".")]
+    if len(rows) != h:
+        raise RuntimeError(f"bad Press Start 2P raster row count: {size}px {ch!r}")
+    mask = Image.new("L", (w, h), 0)
+    for y, row in enumerate(rows):
+        for x in range(w):
+            if row & (1 << x):
+                mask.putpixel((x, y), 255)
+    if mask.getbbox() is None:
         raise RuntimeError(f"empty Press Start 2P glyph {size}px {ch!r}")
-    mask = canvas.crop(bbox)
-    baseline = 16 - bbox[1]
     if mask.width > CELL_W - 1 or mask.height > CELL_H - 1:
         raise RuntimeError(
             f"Press Start 2P glyph too large for FireRed cell: {size}px {ch!r} {mask.size}"
@@ -177,7 +172,6 @@ def patch_font(path: Path) -> tuple[str, dict[int, int]]:
             for x in range(x0, x1):
                 img.putpixel((x, y), FONT_BG)
 
-        # +1 is the FireRed-style shadow offset.
         if mask.width + 1 > CELL_W:
             raise RuntimeError(
                 f"{path.name}: horizontal overflow {ch}/0x{code:02X} width={mask.width + 1}"
@@ -208,8 +202,6 @@ def patch_font(path: Path) -> tuple[str, dict[int, int]]:
         if min_x != 0:
             raise RuntimeError(f"{path.name}: left origin drift {ch}/0x{code:02X} min_x={min_x}")
 
-        # Variable advances keep the characteristic glyph shape while avoiding
-        # the excessive width of the original monospaced desktop font.
         rendered_widths[code] = min(CELL_W, max(4, max_x + 2))
 
     for code, before in protected_before.items():
@@ -300,7 +292,9 @@ def main() -> int:
         "marker": MARKER,
         "font": "Press Start 2P compact GBA raster",
         "sourceLicense": "SIL Open Font License 1.1",
-        "embeddedRasterSizes": [7, 8],
+        "rasterSizes": [7, 8],
+        "rasterSource": "exact user-supplied PressStart2P-Regular.ttf",
+        "rasterDataSha256": GLYPH_DATA_SHA256,
         "english": True,
         "russian": True,
         "digits": True,
