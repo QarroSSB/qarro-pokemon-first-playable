@@ -100,11 +100,8 @@ def patch_failed_catch_ball_refund(root: Path) -> dict:
         die("failed-catch Cmd_handleballthrow anchor did not match pinned source")
 
     patched = read(path)
-    refund = "AddBagItem(gLastUsedItem, 1);"
-    if patched.count(refund) != 1:
-        die(f"expected exactly one failed-catch refund call, found {patched.count(refund)}")
-    if patched.count("if (!(gBattleTypeFlags & BATTLE_TYPE_SAFARI))") != 1:
-        die("expected exactly one Safari exclusion around failed-catch refund")
+    if patched.count(new) != 1:
+        die(f"expected exactly one complete failed-catch refund block, found {patched.count(new)}")
 
     return {
         "enabled": True,
