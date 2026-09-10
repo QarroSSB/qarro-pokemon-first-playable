@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
-"""Qarro v3.9 bilingual Pixellari readability font wrapper.
+"""Qarro v3.14 bilingual Press Start 2P readability font wrapper.
 
 Runs the exact previously-green Cyrillic/charmap installer from commit e5184e2,
-then overlays the English, Russian and digit glyphs with a readability-first
-Pixellari Cyrillic raster derived from the user's supplied font archive.
+then overlays English, Russian and digit glyphs with the compact Press Start 2P
+GBA raster generated from the user-supplied OFL font.
 
-The original TTF is not committed. Only raster masks are used by the follow-up
-pass. Literal é/É is still normalized to ordinary e/E after localization, so
-no special accented-e glyph is introduced.
-
-No Ash Bond / Ash Cap changes.
+The original TTF is not committed. Literal é/É is still normalized to ordinary
+e/E after localization. No Ash Bond / Ash Cap changes.
 """
 from __future__ import annotations
 
@@ -19,7 +16,7 @@ from pathlib import Path
 
 BASE_COMMIT = "e5184e2d443f610ed07f85817bdfc6c9b3ba2bc4"
 BASE_PATH = "ci/install_cyrillic_v3_3.py"
-FOLLOWUP_PATH = "ci/install_bilingual_pixellari_v3_9.py"
+FOLLOWUP_PATH = "ci/install_bilingual_press_start_2p_v3_14.py"
 
 
 def load_from_git(repo: Path, commit: str, path: str, module_name: str) -> dict:
@@ -42,10 +39,10 @@ def load_from_git(repo: Path, commit: str, path: str, module_name: str) -> dict:
 def load_followup(repo: Path) -> dict:
     path = repo / FOLLOWUP_PATH
     if not path.exists():
-        raise RuntimeError(f"missing Pixellari font follow-up: {path}")
+        raise RuntimeError(f"missing Press Start 2P font follow-up: {path}")
     code = path.read_text(encoding="utf-8")
     ns = {
-        "__name__": "qarro_bilingual_pixellari_v39",
+        "__name__": "qarro_bilingual_press_start_2p_v314",
         "__file__": str(path.resolve()),
     }
     exec(compile(code, str(path), "exec"), ns)
@@ -59,7 +56,7 @@ def main() -> int:
         repo,
         BASE_COMMIT,
         BASE_PATH,
-        "qarro_cyrillic_pre_pixellari_v39",
+        "qarro_cyrillic_pre_press_start_v314",
     )
     rc = int(base["main"]() or 0)
     if rc:
@@ -71,7 +68,7 @@ def main() -> int:
         return rc
 
     print(
-        "[QARRO_FONT_V3_9] PASS: bilingual Pixellari English/Russian/digits "
+        "[QARRO_FONT_V3_14] PASS: bilingual Press Start 2P English/Russian/digits "
         "installed; ordinary e policy preserved; Ash code untouched"
     )
     return 0
