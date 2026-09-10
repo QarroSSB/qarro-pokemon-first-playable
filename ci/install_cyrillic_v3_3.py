@@ -21,6 +21,7 @@ compact-glyph blockers. Short-narrower chain:
 - #142: у passed; ф overflow y=-8..18
 - #143: ф passed; ц overflow y=0..16
 - #144: ц passed; щ overflow y=0..16
+- #145: short-narrower passed; small Ё overflow y=-2..12
 
 The compact forms below already pass the smaller narrow atlases. Additional
 atlases use them only after CI proves the full glyph clips. Fail-closed checks
@@ -167,6 +168,10 @@ def main() -> int:
                 "ф": SPECIALS["ф"],
                 "ц": SPECIALS["ц"],
                 "щ": SPECIALS["щ"],
+            }
+        elif path.name == "latin_small.png":
+            selected = {
+                "Ё": SPECIALS["Ё"],
             }
         else:
             return original_patch_font(path)
