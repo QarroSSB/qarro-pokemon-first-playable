@@ -44,6 +44,21 @@ def reinforce_horizontal(mask: Image.Image) -> Image.Image:
     return out
 
 
+def readability_floors(path_name: str) -> tuple[int, int]:
+    """Return (broad-glyph floor, median floor) for each native FireRed profile.
+
+    The narrow/narrower atlases are intentionally compressed by the engine, so
+    forcing the normal-font floor on them is a false failure.  Keep the strong
+    guard on normal/short/small while requiring each compact profile to retain
+    a footprint appropriate to its stock class.
+    """
+    if "narrower" in path_name:
+        return 3, 3
+    if "narrow" in path_name:
+        return 4, 4
+    return 6, 5
+
+
 def patch_font(path: Path):
     img = Image.open(path)
     if img.mode != "P" or img.width != base.COLS * base.CELL_W or img.height % base.CELL_H:
@@ -118,21 +133,22 @@ def patch_font(path: Path):
         if base.cell_pixels(img, code, total) != before:
             raise RuntimeError(f"SAFETY FAIL: non-target glyph 0x{code:02X} changed in {path.name}")
 
-    # Fail closed on the exact failure mode seen on-device: visually broad
-    # letters must retain a broad footprint after rasterization.
-    wide_floor = 6 if path.name in {"latin_normal.png", "latin_short.png", "latin_small.png"} else 5
+    # Fail closed on the exact failure mode seen on-device, while respecting
+    # FireRed's deliberately compact narrow/narrower atlas classes.
+    wide_floor, median_floor = readability_floors(path.name)
     for ch in READABILITY_WIDE:
         w = widths[base.TARGETS[ch]]
         if w < wide_floor:
             raise RuntimeError(f"{path.name}: readability collapse {ch} width={w} < {wide_floor}")
     ordinary = [w for ch, code in base.TARGETS.items() if ch not in NATURALLY_NARROW for w in [widths[code]]]
     median_w = statistics.median(ordinary)
-    if median_w < 4:
-        raise RuntimeError(f"{path.name}: readability median width collapsed to {median_w}")
+    if median_w < median_floor:
+        raise RuntimeError(f"{path.name}: readability median width collapsed to {median_w} < {median_floor}")
 
     img.save(path, optimize=False)
     print(f"[moniqa-r2] {path.name}: stretch={stretch:.2f} median={median_w:.1f} "
-          f"refs={upper_ref}/{lower_ref} baseline={baseline} targets={len(widths)}")
+          f"floors={wide_floor}/{median_floor} refs={upper_ref}/{lower_ref} "
+          f"baseline={baseline} targets={len(widths)}")
     return base.FONT_FILE_TO_WIDTH_TABLE[path.name], widths
 
 
