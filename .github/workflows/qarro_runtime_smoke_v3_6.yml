@@ -4,6 +4,10 @@ on:
   workflow_run:
     workflows: ["Qarro FIRST PLAYABLE v3.5 quality-of-life + Russian foundation"]
     types: [completed]
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/qarro_runtime_smoke_v3_6.yml"
 
 permissions:
   actions: read
@@ -11,7 +15,7 @@ permissions:
 
 jobs:
   mgba-boot-smoke:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -24,19 +28,33 @@ jobs:
           command -v mgba
           mgba --version
 
-      - name: Download triggering ROM artifact
+      - name: Resolve and download ROM artifact
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-          RUN_ID: ${{ github.event.workflow_run.id }}
+          EVENT_NAME: ${{ github.event_name }}
+          TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
         shell: bash
         run: |
           set -euo pipefail
-          artifact_id="$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" \
+          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
+            run_id="$TRIGGER_RUN_ID"
+          else
+            run_id="$(gh api "repos/$REPO/actions/workflows/qarro_first_playable_build.yml/runs?branch=main&status=success&per_page=1" \
+              --jq '.workflow_runs[0].id')"
+          fi
+          if [[ -z "$run_id" || "$run_id" == "null" ]]; then
+            echo "Could not resolve a successful Qarro build run" >&2
+            exit 1
+          fi
+          echo "Testing build run $run_id"
+          printf '%s\n' "$run_id" > source_run_id.txt
+
+          artifact_id="$(gh api "repos/$REPO/actions/runs/$run_id/artifacts" \
             --jq '.artifacts[] | select(.name | startswith("Qarro-FIRST-PLAYABLE-v3.5-")) | .id' \
             | head -n 1)"
           if [[ -z "$artifact_id" ]]; then
-            echo "No Qarro FIRST PLAYABLE ROM artifact found for run $RUN_ID" >&2
+            echo "No Qarro FIRST PLAYABLE ROM artifact found for run $run_id" >&2
             exit 1
           fi
           gh api -H 'Accept: application/vnd.github+json' \
@@ -93,9 +111,10 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Qarro-runtime-smoke-v3.6-${{ github.event.workflow_run.run_number }}
+          name: Qarro-runtime-smoke-v3.6-${{ github.run_number }}
           retention-days: 30
           if-no-files-found: warn
           path: |
             runtime_smoke/**
             rom.sha256
+            source_run_id.txt
