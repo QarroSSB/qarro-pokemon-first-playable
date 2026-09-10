@@ -12,6 +12,7 @@ Ash Bond and Ash Cap are untouched.
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -255,6 +256,11 @@ def main() -> int:
         f"[{MARKER}] PASS: no-money-loss installed; failed-catch Ball refund installed; "
         "post-Pokedex starter supplies installed; Ash code untouched"
     )
+
+    regression = Path(__file__).resolve().with_name("audit_qol_regressions_v3_10.py")
+    if not regression.is_file():
+        die(f"missing QoL regression audit: {regression}")
+    subprocess.run([sys.executable, str(regression), str(root)], check=True)
     return 0
 
 
