@@ -101,6 +101,17 @@ def main() -> int:
     if not protected_audit.is_file():
         raise RuntimeError(f"missing protected-feature audit: {protected_audit}")
     subprocess.run([sys.executable, str(protected_audit), str(root)], check=True)
+
+    # Preserve the exact protected-feature proof alongside the GREEN ROM.
+    # The consolidated bundle is copied earlier, but this report is generated
+    # only after that bundle completes, so mirror it here once it exists.
+    protected_report = root / "build/qarro_protected_features_v3_13_audit.json"
+    if not protected_report.is_file():
+        raise RuntimeError(f"protected-feature audit did not produce evidence: {protected_report}")
+    ci_out = root.parent / "qarro_ci_out_v3_8"
+    if ci_out.is_dir():
+        (ci_out / protected_report.name).write_bytes(protected_report.read_bytes())
+        print(f"[{MARKER}] preserved protected-feature audit in {ci_out}")
     return 0
 
 
