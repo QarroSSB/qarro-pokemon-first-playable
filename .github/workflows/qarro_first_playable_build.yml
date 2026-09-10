@@ -108,7 +108,8 @@ jobs:
             qarro-repo/ci/kanto_wild_diversity_v3_4.py \
             qarro-repo/ci/qol_v3_5.py \
             qarro-repo/ci/install_cyrillic_v3_3.py \
-            qarro-repo/ci/localization_ru_core_v3_3.py
+            qarro-repo/ci/localization_ru_core_v3_3.py \
+            qarro-repo/ci/localize_oaks_lab_starter_v3_5.py
 
       - name: Install FIRST PLAYABLE data and config
         shell: bash
@@ -172,6 +173,8 @@ jobs:
           set -euo pipefail
           python3 qarro-repo/ci/localization_ru_core_v3_3.py upstream \
             2>&1 | tee qarro_ci_out_v3_5/logs/localization_ru_core_v3_3.log
+          python3 qarro-repo/ci/localize_oaks_lab_starter_v3_5.py upstream \
+            2>&1 | tee qarro_ci_out_v3_5/logs/localization_oaks_lab_starter_v3_5.log
 
       - name: Real ARM make firered
         shell: bash
@@ -210,6 +213,7 @@ jobs:
           if [[ -f upstream/build/qarro_runtime_v3_3_audit.json ]]; then cp upstream/build/qarro_runtime_v3_3_audit.json qarro_ci_out_v3_5/; fi
           if [[ -f upstream/build/qarro_kanto_wild_v3_4_audit.json ]]; then cp upstream/build/qarro_kanto_wild_v3_4_audit.json qarro_ci_out_v3_5/; fi
           if [[ -f upstream/build/qarro_qol_v3_5_audit.json ]]; then cp upstream/build/qarro_qol_v3_5_audit.json qarro_ci_out_v3_5/; fi
+          if [[ -f upstream/build/qarro_ru_oak_lab_starter_v3_5_audit.json ]]; then cp upstream/build/qarro_ru_oak_lab_starter_v3_5_audit.json qarro_ci_out_v3_5/; fi
           for f in pokefirered.map pokefirered.sym; do [[ -f "upstream/$f" ]] && cp "upstream/$f" qarro_ci_out_v3_5/; done
           if [[ -f upstream/pokefirered.gba ]]; then
             cp upstream/pokefirered.gba qarro_ci_out_v3_5/Qarro_FIRST_PLAYABLE_v3_5.gba
