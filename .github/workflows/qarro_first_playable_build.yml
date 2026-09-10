@@ -1,4 +1,4 @@
-name: Qarro FIRST PLAYABLE v3.4 Kanto diversity + Russian foundation
+name: Qarro FIRST PLAYABLE v3.5 quality-of-life + Russian foundation
 
 on:
   push:
@@ -106,6 +106,7 @@ jobs:
             qarro-repo/ci/balance_kanto_v3_2.py \
             qarro-repo/ci/runtime_content_v3_3.py \
             qarro-repo/ci/kanto_wild_diversity_v3_4.py \
+            qarro-repo/ci/qol_v3_5.py \
             qarro-repo/ci/install_cyrillic_v3_3.py \
             qarro-repo/ci/localization_ru_core_v3_3.py
 
@@ -113,9 +114,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p qarro_ci_out_v3_4/logs
+          mkdir -p qarro_ci_out_v3_5/logs
           python3 kit/Source_Migration/v3_0/tools/install_first_playable_v3_0.py upstream \
-            2>&1 | tee qarro_ci_out_v3_4/logs/install_preflight.log
+            2>&1 | tee qarro_ci_out_v3_5/logs/install_preflight.log
 
       - name: Fix pinned Gen V compiler directive layouts
         shell: bash
@@ -128,50 +129,57 @@ jobs:
         run: |
           set -euo pipefail
           python3 qarro-repo/ci/content_pass_v3_1.py upstream \
-            2>&1 | tee qarro_ci_out_v3_4/logs/content_pass_v3_1.log
+            2>&1 | tee qarro_ci_out_v3_5/logs/content_pass_v3_1.log
 
       - name: Apply v3.2 low-grind Kanto gym balance and caps
         shell: bash
         run: |
           set -euo pipefail
           python3 qarro-repo/ci/balance_kanto_v3_2.py upstream \
-            2>&1 | tee qarro_ci_out_v3_4/logs/balance_kanto_v3_2.log
+            2>&1 | tee qarro_ci_out_v3_5/logs/balance_kanto_v3_2.log
 
       - name: Apply v3.3 runtime item and early encounter corrections
         shell: bash
         run: |
           set -euo pipefail
           python3 qarro-repo/ci/runtime_content_v3_3.py upstream \
-            2>&1 | tee qarro_ci_out_v3_4/logs/runtime_content_v3_3.log
+            2>&1 | tee qarro_ci_out_v3_5/logs/runtime_content_v3_3.log
 
       - name: Apply v3.4 full Kanto FireRed land diversity
         shell: bash
         run: |
           set -euo pipefail
           python3 qarro-repo/ci/kanto_wild_diversity_v3_4.py upstream \
-            2>&1 | tee qarro_ci_out_v3_4/logs/kanto_wild_diversity_v3_4.log
+            2>&1 | tee qarro_ci_out_v3_5/logs/kanto_wild_diversity_v3_4.log
+
+      - name: Apply v3.5 starting supplies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 qarro-repo/ci/qol_v3_5.py upstream \
+            2>&1 | tee qarro_ci_out_v3_5/logs/qol_v3_5.log
 
       - name: Install v3.3 Cyrillic font and charmap
         shell: bash
         run: |
           set -euo pipefail
           python3 qarro-repo/ci/install_cyrillic_v3_3.py upstream \
-            2>&1 | tee qarro_ci_out_v3_4/logs/cyrillic_v3_3.log
+            2>&1 | tee qarro_ci_out_v3_5/logs/cyrillic_v3_3.log
 
       - name: Apply v3.3 core Russian UI localization
         shell: bash
         run: |
           set -euo pipefail
           python3 qarro-repo/ci/localization_ru_core_v3_3.py upstream \
-            2>&1 | tee qarro_ci_out_v3_4/logs/localization_ru_core_v3_3.log
+            2>&1 | tee qarro_ci_out_v3_5/logs/localization_ru_core_v3_3.log
 
       - name: Real ARM make firered
         shell: bash
         run: |
           set -o pipefail
-          mkdir -p qarro_ci_out_v3_4/logs
-          make -C upstream clean 2>&1 | tee qarro_ci_out_v3_4/logs/make_clean.log
-          make -C upstream -j4 -O firered 2>&1 | tee qarro_ci_out_v3_4/logs/make_firered.log
+          mkdir -p qarro_ci_out_v3_5/logs
+          make -C upstream clean 2>&1 | tee qarro_ci_out_v3_5/logs/make_clean.log
+          make -C upstream -j4 -O firered 2>&1 | tee qarro_ci_out_v3_5/logs/make_firered.log
           rc=${PIPESTATUS[0]}
           exit "$rc"
 
@@ -183,10 +191,10 @@ jobs:
             echo "### make firered failure diagnostics"
             echo
             echo '```text'
-            grep -nEi 'error:|fatal|undefined reference|no rule to make target|not found|failed' qarro_ci_out_v3_4/logs/make_firered.log | tail -n 80 || true
+            grep -nEi 'error:|fatal|undefined reference|no rule to make target|not found|failed' qarro_ci_out_v3_5/logs/make_firered.log | tail -n 80 || true
             echo
             echo '--- tail ---'
-            tail -n 160 qarro_ci_out_v3_4/logs/make_firered.log || true
+            tail -n 160 qarro_ci_out_v3_5/logs/make_firered.log || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -194,24 +202,25 @@ jobs:
         if: always()
         shell: bash
         run: |
-          mkdir -p qarro_ci_out_v3_4
-          git -C upstream status --short > qarro_ci_out_v3_4/git_status_v3_4.txt || true
-          git -C upstream diff --no-ext-diff > qarro_ci_out_v3_4/qarro_applied_diff_v3_4.patch || true
-          if [[ -f upstream/src/data/trainers_frlg.h ]]; then cp upstream/src/data/trainers_frlg.h qarro_ci_out_v3_4/trainers_frlg.generated.h; fi
-          if [[ -f upstream/build/qarro_content_v3_1_audit.json ]]; then cp upstream/build/qarro_content_v3_1_audit.json qarro_ci_out_v3_4/; fi
-          if [[ -f upstream/build/qarro_runtime_v3_3_audit.json ]]; then cp upstream/build/qarro_runtime_v3_3_audit.json qarro_ci_out_v3_4/; fi
-          if [[ -f upstream/build/qarro_kanto_wild_v3_4_audit.json ]]; then cp upstream/build/qarro_kanto_wild_v3_4_audit.json qarro_ci_out_v3_4/; fi
-          for f in pokefirered.map pokefirered.sym; do [[ -f "upstream/$f" ]] && cp "upstream/$f" qarro_ci_out_v3_4/; done
+          mkdir -p qarro_ci_out_v3_5
+          git -C upstream status --short > qarro_ci_out_v3_5/git_status_v3_5.txt || true
+          git -C upstream diff --no-ext-diff > qarro_ci_out_v3_5/qarro_applied_diff_v3_5.patch || true
+          if [[ -f upstream/src/data/trainers_frlg.h ]]; then cp upstream/src/data/trainers_frlg.h qarro_ci_out_v3_5/trainers_frlg.generated.h; fi
+          if [[ -f upstream/build/qarro_content_v3_1_audit.json ]]; then cp upstream/build/qarro_content_v3_1_audit.json qarro_ci_out_v3_5/; fi
+          if [[ -f upstream/build/qarro_runtime_v3_3_audit.json ]]; then cp upstream/build/qarro_runtime_v3_3_audit.json qarro_ci_out_v3_5/; fi
+          if [[ -f upstream/build/qarro_kanto_wild_v3_4_audit.json ]]; then cp upstream/build/qarro_kanto_wild_v3_4_audit.json qarro_ci_out_v3_5/; fi
+          if [[ -f upstream/build/qarro_qol_v3_5_audit.json ]]; then cp upstream/build/qarro_qol_v3_5_audit.json qarro_ci_out_v3_5/; fi
+          for f in pokefirered.map pokefirered.sym; do [[ -f "upstream/$f" ]] && cp "upstream/$f" qarro_ci_out_v3_5/; done
           if [[ -f upstream/pokefirered.gba ]]; then
-            cp upstream/pokefirered.gba qarro_ci_out_v3_4/Qarro_FIRST_PLAYABLE_v3_4.gba
-            sha256sum qarro_ci_out_v3_4/Qarro_FIRST_PLAYABLE_v3_4.gba > qarro_ci_out_v3_4/Qarro_FIRST_PLAYABLE_v3_4.gba.sha256
+            cp upstream/pokefirered.gba qarro_ci_out_v3_5/Qarro_FIRST_PLAYABLE_v3_5.gba
+            sha256sum qarro_ci_out_v3_5/Qarro_FIRST_PLAYABLE_v3_5.gba > qarro_ci_out_v3_5/Qarro_FIRST_PLAYABLE_v3_5.gba.sha256
           fi
 
       - name: Upload ROM or exact first failure diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Qarro-FIRST-PLAYABLE-v3.4-${{ github.run_number }}
+          name: Qarro-FIRST-PLAYABLE-v3.5-${{ github.run_number }}
           if-no-files-found: warn
           retention-days: 30
-          path: qarro_ci_out_v3_4/**
+          path: qarro_ci_out_v3_5/**
