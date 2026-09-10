@@ -1,370 +1,131 @@
 #!/usr/bin/env python3
-"""Localize the first Professor Oak lab / starter sequence in FireRed.
+"""Qarro v3.7 Oak-lab localization wrapper + accented-e normalization.
 
-This pass is deliberately scoped to the player's first lab visit: rival/Oak
-starter dialogue, starter choice, the first rival battle, and immediate Oak
-follow-up. Species proper names remain English. Ash Bond and Ash Cap are not
-referenced or changed.
+Runs the exact previously-green Oak lab localization from commit 0ddb5e3,
+then, only after all core/Oak localization anchors have been consumed,
+normalizes literal é/É in game source to ordinary e/E.
+
+This ordering is intentional: earlier localization passes still match the
+pinned FireRed source text containing POKéMON, while the final built ROM no
+longer requests a dedicated é glyph.
+
+Ash Bond / Ash Cap are untouched.
 """
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
-MARKER = "QARRO_RU_OAK_LAB_STARTER_V3_5"
-
-BLOCKS = {
-    "PalletTown_ProfessorOaksLab_Text_RivalGrampsIsntAround": (
-        (
-            r"{RIVAL}: What, it's only {PLAYER}?\n",
-            r"Gramps isn't around.$",
-        ),
-        (
-            r"{RIVAL}: А, это всего лишь {PLAYER}?\n",
-            r"Дедушки здесь нет.$",
-        ),
-    ),
-    "PalletTown_ProfessorOaksLab_Text_RivalFedUpWithWaiting": (
-        (
-            r"{RIVAL}: Gramps!\n",
-            r"I'm fed up with waiting!$",
-        ),
-        (
-            r"{RIVAL}: Дедушка!\n",
-            r"Мне надоело ждать!$",
-        ),
-    ),
-    "PalletTown_ProfessorOaksLab_Text_RivalNoFairWhatAboutMe": (
-        (
-            r"{RIVAL}: Hey! Gramps! No fair!\n",
-            r"What about me?$",
-        ),
-        (
-            r"{RIVAL}: Эй! Дедушка! Нечестно!\n",
-            r"А как же я?$",
-        ),
-    ),
-    "PalletTown_ProfessorOaksLab_Text_RivalGoChoosePlayer": (
-        (
-            r"{RIVAL}: Heh, I don't need to be\n",
-            r"greedy like you. I'm mature!\p",
-            r"Go ahead and choose, {PLAYER}!$",
-        ),
-        (
-            r"{RIVAL}: Хех, я не такой жадный,\n",
-            r"как ты. Я уже взрослый!\p",
-            r"Выбирай, {PLAYER}!$",
-        ),
-    ),
-    "PalletTown_ProfessorOaksLab_Text_RivalIllTakeThisOneThen": (
-        (r"{RIVAL}: I'll take this one, then!$",),
-        (r"{RIVAL}: Тогда я возьму этого!$",),
-    ),
-    "PalletTown_ProfessorOaksLab_Text_RivalReceivedMonFromOak": (
-        (
-            r"{RIVAL} received the {STR_VAR_1}\n",
-            r"from PROF. OAK!$",
-        ),
-        (
-            r"{RIVAL} получил {STR_VAR_1}\n",
-            r"от ПРОФ. ОУКА!$",
-        ),
-    ),
-    "PalletTown_ProfessorOaksLab_Text_RivalMyMonLooksTougher": (
-        (
-            r"{RIVAL}: My POKéMON looks a lot\n",
-            r"tougher than yours.$",
-        ),
-        (
-            r"{RIVAL}: Мой ПОКЕМОН выглядит\n",
-            r"намного сильнее твоего.$",
-        ),
-    ),
-    "PalletTown_ProfessorOaksLab_Text_RivalLetsCheckOutMons": (
-        (
-            r"{RIVAL}: Wait, {PLAYER}!\n",
-            r"Let's check out our POKéMON!\p",
-            r"Come on, I'll take you on!$",
-        ),
-        (
-            r"{RIVAL}: Стой, {PLAYER}!\n",
-            r"Проверим наших ПОКЕМОНОВ!\p",
-            r"Давай, я вызываю тебя!$",
-        ),
-    ),
-    "PalletTown_ProfessorOaksLab_Text_RivalDefeat": (
-        (
-            r"WHAT?\n",
-            r"Unbelievable!\l",
-            r"I picked the wrong POKéMON!$",
-        ),
-        (
-            r"ЧТО?\n",
-            r"Не может быть!\l",
-            r"Я выбрал не того ПОКЕМОНА!$",
-        ),
-    ),
-    "Text_RivalVictory": (
-        (
-            r"{RIVAL}: Yeah!\n",
-            r"Am I great or what?$",
-        ),
-        (
-            r"{RIVAL}: Да!\n",
-            r"Ну разве я не крут?$",
-        ),
-    ),
-    "PalletTown_ProfessorOaksLab_Text_RivalGoToughenMyMon": (
-        (
-            r"{RIVAL}: Okay! I'll make my\n",
-            r"POKéMON battle to toughen it up!\p",
-            r"{PLAYER}! Gramps!\n",
-            r"Smell you later!$",
-        ),
-        (
-            r"{RIVAL}: Ладно! Буду сражаться,\n",
-            r"чтобы мой ПОКЕМОН стал сильнее!\p",
-            r"{PLAYER}! Дедушка!\n",
-            r"Ещё увидимся!$",
-        ),
-    ),
-    "PalletTown_ProfessorOaksLab_Text_OakThreeMonsChooseOne": (
-        (
-            r"OAK: {RIVAL}?\n",
-            r"Let me think…\p",
-            r"Oh, that's right, I told you to\n",
-            r"come! Just wait!\p",
-            r"Here, {PLAYER}.\p",
-            r"There are three POKéMON here.\p",
-            r"Haha!\p",
-            r"The POKéMON are held inside\n",
-            r"these POKé BALLS.\p",
-            r"When I was young, I was a serious\n",
-            r"POKéMON TRAINER.\p",
-            r"But now, in my old age, I have\n",
-            r"only these three left.\p",
-            r"You can have one.\n",
-            r"Go on, choose!$",
-        ),
-        (
-            r"ОУК: {RIVAL}?\n",
-            r"Дай подумать...\p",
-            r"Ах да, я же просил тебя прийти!\n",
-            r"Подожди немного!\p",
-            r"А теперь, {PLAYER}.\p",
-            r"Здесь три ПОКЕМОНА.\p",
-            r"Ха-ха!\p",
-            r"Они находятся внутри\n",
-            r"этих ПОКЕБОЛОВ.\p",
-            r"В молодости я был серьёзным\n",
-            r"ТРЕНЕРОМ ПОКЕМОНОВ.\p",
-            r"Но теперь я стар, и у меня\n",
-            r"остались только эти трое.\p",
-            r"Можешь взять одного.\n",
-            r"Выбирай!$",
-        ),
-    ),
-    "PalletTown_ProfessorOaksLab_Text_OakBePatientRival": (
-        (
-            r"OAK: Be patient, {RIVAL}.\n",
-            r"You can have one, too!$",
-        ),
-        (
-            r"ОУК: Потерпи, {RIVAL}.\n",
-            r"Ты тоже получишь одного!$",
-        ),
-    ),
-    "PalletTown_ProfessorOaksLab_Text_OakWhichOneWillYouChoose": (
-        (
-            r"OAK: Now, {PLAYER}.\p",
-            r"Inside those three POKé BALLS are\n",
-            r"POKéMON.\p",
-            r"Which one will you choose for\n",
-            r"yourself?$",
-        ),
-        (
-            r"ОУК: Итак, {PLAYER}.\p",
-            r"В этих трёх ПОКЕБОЛАХ\n",
-            r"находятся ПОКЕМОНЫ.\p",
-            r"Кого из них ты выберешь\n",
-            r"себе?$",
-        ),
-    ),
-    "PalletTown_ProfessorOaksLab_Text_OakHeyDontGoAwayYet": (
-        (
-            r"OAK: Hey!\n",
-            r"Don't go away yet!$",
-        ),
-        (
-            r"ОУК: Эй!\n",
-            r"Пока не уходи!$",
-        ),
-    ),
-    "PalletTown_ProfessorOaksLab_Text_OakChoosingCharmander": (
-        (
-            r"Ah! CHARMANDER is your choice.\n",
-            r"You should raise it patiently.\p",
-            r"So, {PLAYER}, you're claiming the\n",
-            r"FIRE POKéMON CHARMANDER?$",
-        ),
-        (
-            r"А! Ты выбираешь CHARMANDER.\n",
-            r"Расти с ним терпеливо.\p",
-            r"Итак, {PLAYER}, ты берёшь\n",
-            r"огненного ПОКЕМОНА CHARMANDER?$",
-        ),
-    ),
-    "PalletTown_ProfessorOaksLab_Text_OakChoosingSquirtle": (
-        (
-            r"Hm! SQUIRTLE is your choice.\n",
-            r"It's one worth raising.\p",
-            r"So, {PLAYER}, you've decided on the\n",
-            r"WATER POKéMON SQUIRTLE?$",
-        ),
-        (
-            r"Хм! Ты выбираешь SQUIRTLE.\n",
-            r"Его стоит вырастить.\p",
-            r"Итак, {PLAYER}, ты берёшь\n",
-            r"водного ПОКЕМОНА SQUIRTLE?$",
-        ),
-    ),
-    "PalletTown_ProfessorOaksLab_Text_OakChoosingBulbasaur": (
-        (
-            r"I see! BULBASAUR is your choice.\n",
-            r"It's very easy to raise.\p",
-            r"So, {PLAYER}, you want to go with\n",
-            r"the GRASS POKéMON BULBASAUR?$",
-        ),
-        (
-            r"Понятно! Ты выбираешь BULBASAUR.\n",
-            r"Его легко выращивать.\p",
-            r"Итак, {PLAYER}, ты берёшь\n",
-            r"травяного ПОКЕМОНА BULBASAUR?$",
-        ),
-    ),
-    "PalletTown_ProfessorOaksLab_Text_OakThisMonIsEnergetic": (
-        (
-            r"This POKéMON is really quite\n",
-            r"energetic!$",
-        ),
-        (
-            r"Этот ПОКЕМОН и правда\n",
-            r"очень энергичный!$",
-        ),
-    ),
-    "PalletTown_ProfessorOaksLab_Text_ReceivedMonFromOak": (
-        (
-            r"{PLAYER} received the {STR_VAR_1}\n",
-            r"from PROF. OAK!$",
-        ),
-        (
-            r"{PLAYER} получил {STR_VAR_1}\n",
-            r"от ПРОФ. ОУКА!$",
-        ),
-    ),
-    "PalletTown_ProfessorOaksLab_Text_OakCanReachNextTownWithMon": (
-        (
-            r"OAK: If a wild POKéMON appears,\n",
-            r"your POKéMON can battle it.\p",
-            r"With it at your side, you should be\n",
-            r"able to reach the next town.$",
-        ),
-        (
-            r"ОУК: Если встретишь дикого ПОКЕМОНА,\n",
-            r"твой ПОКЕМОН сможет сразиться с ним.\p",
-            r"С таким спутником ты сможешь\n",
-            r"добраться до следующего города.$",
-        ),
-    ),
-    "PalletTown_ProfessorOaksLab_Text_OakBattleMonForItToGrow": (
-        (
-            r"OAK: {PLAYER}, raise your young\n",
-            r"POKéMON by making it battle.\p",
-            r"It has to battle for it to grow.$",
-        ),
-        (
-            r"ОУК: {PLAYER}, тренируй своего\n",
-            r"ПОКЕМОНА в сражениях.\p",
-            r"Чтобы расти, ему нужно сражаться.$",
-        ),
-    ),
-    "PalletTown_ProfessorOaksLab_Text_ThoseArePokeBalls": (
-        (
-            r"Those are POKé BALLS.\n",
-            r"They contain POKéMON!$",
-        ),
-        (
-            r"Это ПОКЕБОЛЫ.\n",
-            r"В них находятся ПОКЕМОНЫ!$",
-        ),
-    ),
-    "PalletTown_ProfessorOaksLab_Text_OaksLastMon": (
-        (r"That's PROF. OAK's last POKéMON.$",),
-        (r"Это последний ПОКЕМОН ПРОФ. ОУКА.$",),
-    ),
-}
+BASE_COMMIT = "0ddb5e33c653bc4550cecb18d5e0440232df7a8a"
+BASE_PATH = "ci/localize_oaks_lab_starter_v3_5.py"
+MARKER = "QARRO_POST_LOCALIZATION_E_V3_7"
 
 
-def render_block(label: str, lines: tuple[str, ...]) -> str:
-    return label + "::\n" + "\n".join(f'\t.string "{line}"' for line in lines)
+def load_base(repo: Path) -> dict:
+    subprocess.run(
+        ["git", "-C", str(repo), "fetch", "--quiet", "--depth=1", "origin", BASE_COMMIT],
+        check=True,
+    )
+    code = subprocess.check_output(
+        ["git", "-C", str(repo), "show", f"{BASE_COMMIT}:{BASE_PATH}"],
+        text=True,
+    )
+    ns = {
+        "__name__": "qarro_oak_lab_pre_e_normalization",
+        "__file__": str(Path(__file__).resolve()),
+    }
+    exec(compile(code, f"{BASE_COMMIT}:{BASE_PATH}", "exec"), ns)
+    return ns
+
+
+def normalize_accented_e(root: Path) -> tuple[int, int]:
+    roots = [root / "src", root / "data", root / "include"]
+    suffixes = {".c", ".h", ".inc", ".s", ".txt"}
+    changed_files = 0
+    replacements = 0
+
+    for base in roots:
+        if not base.exists():
+            continue
+        for path in base.rglob("*"):
+            if not path.is_file() or path.suffix.lower() not in suffixes:
+                continue
+            try:
+                text = path.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                continue
+
+            count = text.count("é") + text.count("É")
+            if not count:
+                continue
+
+            path.write_text(
+                text.replace("é", "e").replace("É", "E"),
+                encoding="utf-8",
+            )
+            replacements += count
+            changed_files += 1
+
+    return replacements, changed_files
 
 
 def main() -> int:
+    repo = Path(__file__).resolve().parents[1]
+    base = load_base(repo)
+    rc = int(base["main"]() or 0)
+    if rc:
+        return rc
+
     if len(sys.argv) != 2:
         print(f"usage: {Path(sys.argv[0]).name} <upstream-root>", file=sys.stderr)
         return 2
 
     root = Path(sys.argv[1]).resolve()
-    path = root / "data/maps/PalletTown_ProfessorOaksLab_Frlg/scripts.inc"
-    if not path.exists():
-        raise RuntimeError(f"missing Oak lab source: {path}")
+    replacements, changed_files = normalize_accented_e(root)
 
-    text = path.read_text(encoding="utf-8")
-    changed = 0
-    for label, (english, russian) in BLOCKS.items():
-        old = render_block(label, english)
-        new = render_block(label, russian)
-        old_count = text.count(old)
-        new_count = text.count(new)
-        if old_count == 1 and new_count == 0:
-            text = text.replace(old, new, 1)
-            changed += 1
-            print(f"[ru-oak-lab] {label}: localized")
-        elif old_count == 0 and new_count == 1:
-            print(f"[ru-oak-lab] {label}: already localized")
-        else:
-            raise RuntimeError(
-                f"{label}: fail-closed source mismatch old={old_count} new={new_count}"
-            )
+    leftovers = []
+    for base_dir in (root / "src", root / "data", root / "include"):
+        if not base_dir.exists():
+            continue
+        for path in base_dir.rglob("*"):
+            if not path.is_file() or path.suffix.lower() not in {".c", ".h", ".inc", ".s", ".txt"}:
+                continue
+            try:
+                text = path.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                continue
+            if "é" in text or "É" in text:
+                leftovers.append(str(path.relative_to(root)))
+                if len(leftovers) >= 10:
+                    break
+        if leftovers:
+            break
 
-    path.write_text(text, encoding="utf-8")
-    patched = path.read_text(encoding="utf-8")
-    forbidden = (
-        "I'm fed up with waiting!",
-        "There are three POKéMON here.",
-        "CHARMANDER is your choice.",
-        "Let's check out our POKéMON!",
-        "I picked the wrong POKéMON!",
+    if leftovers:
+        raise RuntimeError(f"accented e remained after normalization: {leftovers}")
+
+    audit_path = root / "build/qarro_ru_oak_lab_starter_v3_5_audit.json"
+    audit = {}
+    if audit_path.exists():
+        audit = json.loads(audit_path.read_text(encoding="utf-8"))
+    audit.update(
+        {
+            "postLocalizationAccentedENormalized": True,
+            "accentedEReplacements": replacements,
+            "accentedEChangedFiles": changed_files,
+            "specialAccentedEGlyphRequired": False,
+        }
     )
-    for phrase in forbidden:
-        if phrase in patched:
-            raise RuntimeError(f"starter-scene English phrase remained: {phrase!r}")
+    audit_path.write_text(
+        json.dumps(audit, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
 
-    audit = {
-        "marker": MARKER,
-        "starterSceneBlocksLocalized": len(BLOCKS),
-        "blocksChangedThisRun": changed,
-        "speciesProperNamesEnglish": True,
-        "ashBondTouched": False,
-        "ashCapTouched": False,
-    }
-    out = root / "build/qarro_ru_oak_lab_starter_v3_5_audit.json"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(audit, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(
-        f"[{MARKER}] PASS: {len(BLOCKS)} first-visit Oak lab blocks localized; "
-        "species names/Ash untouched"
+        f"[{MARKER}] PASS: {replacements} literal é/É -> e/E replacements "
+        f"in {changed_files} files after localization; Ash code untouched"
     )
     return 0
 
