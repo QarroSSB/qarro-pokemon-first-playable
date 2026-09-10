@@ -65,14 +65,15 @@ FONT_FILE_TO_WIDTH_TABLE = {
 }
 EXPECTED_WIDTH_ARRAYS = set(FONT_FILE_TO_WIDTH_TABLE.values())
 
-# Use true pixel-size rasters rather than squeezing one bitmap horizontally.
-# Normal/short text gets the clearer 8 px source. Narrow/small contexts use
-# the native 7 px raster so long Russian strings stay practical on 240x160.
+# Real-device feedback: the shape/readability is right, but the font is
+# slightly too large throughout the UI. Use the exact native 7 px raster in
+# all nine FireRed Latin atlases and tighten the variable-width advance by
+# one pixel. This reduces the footprint everywhere without distorting glyphs.
 VARIANT_PROFILE = {
-    "latin_normal.png": ("8", 11),
+    "latin_normal.png": ("7", 11),
     "latin_narrow.png": ("7", 11),
     "latin_narrower.png": ("7", 11),
-    "latin_short.png": ("8", 10),
+    "latin_short.png": ("7", 10),
     "latin_short_narrow.png": ("7", 10),
     "latin_short_narrower.png": ("7", 10),
     "latin_small.png": ("7", 10),
@@ -172,6 +173,7 @@ def patch_font(path: Path) -> tuple[str, dict[int, int]]:
             for x in range(x0, x1):
                 img.putpixel((x, y), FONT_BG)
 
+        # +1 is the FireRed-style shadow offset.
         if mask.width + 1 > CELL_W:
             raise RuntimeError(
                 f"{path.name}: horizontal overflow {ch}/0x{code:02X} width={mask.width + 1}"
@@ -202,7 +204,9 @@ def patch_font(path: Path) -> tuple[str, dict[int, int]]:
         if min_x != 0:
             raise RuntimeError(f"{path.name}: left origin drift {ch}/0x{code:02X} min_x={min_x}")
 
-        rendered_widths[code] = min(CELL_W, max(4, max_x + 2))
+        # Variable advances keep the characteristic glyph shape while avoiding
+        # the excessive width of the original monospaced desktop font.
+        rendered_widths[code] = min(CELL_W, max(4, max_x + 1))
 
     for code, before in protected_before.items():
         if cell_pixels(img, code, total) != before:
@@ -292,7 +296,7 @@ def main() -> int:
         "marker": MARKER,
         "font": "Press Start 2P compact GBA raster",
         "sourceLicense": "SIL Open Font License 1.1",
-        "rasterSizes": [7, 8],
+        "rasterSizes": [7],
         "rasterSource": "exact user-supplied PressStart2P-Regular.ttf",
         "rasterDataSha256": GLYPH_DATA_SHA256,
         "english": True,
@@ -305,6 +309,7 @@ def main() -> int:
         "shchaCode": "0x2F",
         "targetGlyphCells": len(TARGET_CODES),
         "variableWidthAdvances": True,
+        "globalSizeAdjustment": "all 9 atlases use 7px source; advance padding reduced by 1px",
         "ashBondTouched": False,
         "ashCapTouched": False,
     }
