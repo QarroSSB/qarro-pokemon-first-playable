@@ -8,6 +8,7 @@ forms remain the reference everywhere else.
 Normal-font, short-font and short-narrow CI chains are fully past all observed
 compact-glyph blockers. Short-narrower chain:
 - #131: short-narrow passed; Д overflow y=0..17
+- #132: Д passed; Ё overflow y=-4..13
 
 The compact forms below already pass the smaller narrow atlases. Additional
 atlases use them only after CI proves the full glyph clips. Fail-closed checks
@@ -141,6 +142,7 @@ def main() -> int:
         elif path.name == "latin_short_narrower.png":
             selected = {
                 "Д": (SPECIALS["Д"][0], "000000003c24247e42000000"),
+                "Ё": (SPECIALS["Ё"][0], "0000000000143e203e000000"),
             }
         else:
             return original_patch_font(path)
