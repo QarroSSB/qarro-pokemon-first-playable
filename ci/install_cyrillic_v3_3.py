@@ -6,8 +6,9 @@ verified glyph source masks while an affected atlas is rendered. Full source
 forms remain the reference everywhere else.
 
 Normal-font and short-font CI chains are fully past all observed compact-glyph
-blockers. Run #117 advanced to latin_short_narrow.png and exposed Д overflow
-y=0..17.
+blockers. Short-narrow chain:
+- #117: Д overflow y=0..17
+- #118: Д passed; Ё overflow y=-4..13
 
 The compact forms below already pass the smaller narrow atlases. Additional
 atlases use them only after CI proves the full glyph clips. Fail-closed checks
@@ -124,6 +125,7 @@ def main() -> int:
         elif path.name == "latin_short_narrow.png":
             selected = {
                 "Д": SPECIALS["Д"],
+                "Ё": SPECIALS["Ё"],
             }
         else:
             return original_patch_font(path)
