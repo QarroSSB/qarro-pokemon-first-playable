@@ -10,7 +10,7 @@ monochrome glyph masks are embedded here.
 
 User decision for accented e:
 - do NOT create/use a special é glyph;
-- normalize game-source literal é/É to ordinary e/E;
+- a post-localization pass normalizes literal é/É to ordinary e/E;
 - leave FireRed's legacy 0x1B charmap slot untouched and unused.
 
 This pass runs after the proven Cyrillic/charmap installer, keeps Щ at 0x2F,
@@ -320,33 +320,6 @@ def patch_width_tables(path: Path, widths_by_table: dict[str, dict[int, int]]) -
     )
 
 
-def normalize_accented_e(root: Path) -> int:
-    roots = [root / "src", root / "data", root / "include"]
-    suffixes = {".c", ".h", ".inc", ".s", ".txt"}
-    changed = 0
-    replacements = 0
-    for base in roots:
-        if not base.exists():
-            continue
-        for path in base.rglob("*"):
-            if not path.is_file() or path.suffix.lower() not in suffixes:
-                continue
-            try:
-                text = path.read_text(encoding="utf-8")
-            except UnicodeDecodeError:
-                continue
-            n = text.count("é") + text.count("É")
-            if not n:
-                continue
-            path.write_text(text.replace("é", "e").replace("É", "E"), encoding="utf-8")
-            changed += 1
-            replacements += n
-    print(
-        f"[pixel7-v37] accented-e normalization: {replacements} replacements in {changed} files"
-    )
-    return replacements
-
-
 def verify_charmap(root: Path) -> None:
     text = (root / "charmap.txt").read_text(encoding="utf-8")
     if "'Щ' = 2F" not in text:
@@ -362,8 +335,6 @@ def main() -> int:
 
     root = Path(sys.argv[1]).resolve()
     verify_charmap(root)
-    normalized = normalize_accented_e(root)
-
     font_dir = root / "graphics/fonts"
     paths = sorted(font_dir.glob("latin_*.png"))
     if len(paths) != 9:
@@ -384,7 +355,7 @@ def main() -> int:
         "russian": True,
         "digits": True,
         "specialAccentedE": False,
-        "accentedEReplacements": normalized,
+        "accentedENormalization": "deferred until after localization",
         "legacyAccentedESlotTouched": False,
         "shchaCode": "0x2F",
         "targetGlyphCells": len(TARGET_CODES),
@@ -397,7 +368,7 @@ def main() -> int:
 
     print(
         f"[{MARKER}] PASS: Cyrillic Pixel-7 installed for English + Russian + digits; "
-        "literal é normalized to e; legacy 0x1B and Ash code untouched"
+        "special é glyph excluded; post-localization normalization pending; legacy 0x1B and Ash code untouched"
     )
     return 0
 
