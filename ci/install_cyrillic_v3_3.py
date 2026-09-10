@@ -2,8 +2,9 @@
 """Targeted narrow-font fixes for the v3.3.3 per-font Cyrillic scaler.
 
 Reuses the exact per-font scaler from commit 6593ba7. Only while rendering
-latin_narrow.png, a small set of Cyrillic glyphs use compact source masks.
-Their full source forms remain unchanged in all other eight font atlases.
+font atlases that have demonstrated clipping in CI, a small set of Cyrillic
+glyphs use compact source masks. Their full verified source forms remain the
+reference for all other atlases.
 
 CI history:
 - #50 Д overflow y=0..18
@@ -14,11 +15,14 @@ CI history:
 - #55 Д/Ё/Й/Ц passed; Щ y=0..18
 - #56 all five uppercase fixes passed; lowercase б y=-6..14
 - #57 first compact б improved to y=-3..11 but still clipped above the cell
+- #86 normal Д/Ё/Й/Ц passed; Щ y=0..18
 
 The second narrow б is anchored directly to the lowercase baseline with a
 four-row compact hook/bowl, avoiding top clipping while preserving the letter's
-identity at narrow UI scale. All fail-closed checks remain active. English,
-every other Cyrillic glyph, Ash Bond and Ash Cap are untouched.
+identity at narrow UI scale. Normal Щ now uses the already verified compact Щ
+mask, matching the successful targeted treatment used for normal Ц. All
+fail-closed checks remain active. English, every other Cyrillic glyph, Ash Bond
+and Ash Cap are untouched.
 """
 from __future__ import annotations
 
@@ -99,6 +103,7 @@ def main() -> int:
                 "Ё": SPECIALS["Ё"],
                 "Й": SPECIALS["Й"],
                 "Ц": SPECIALS["Ц"],
+                "Щ": SPECIALS["Щ"],
             }
         else:
             return original_patch_font(path)
