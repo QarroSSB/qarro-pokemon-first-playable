@@ -5,8 +5,10 @@ Reuses the exact v3.3.3 per-font scaler from commit 6593ba7 and changes only
 verified glyph source masks while an affected atlas is rendered. Full source
 forms remain the reference everywhere else.
 
-Normal-font CI chain is now fully past all observed compact-glyph blockers.
-Run #103 advanced to latin_short.png and exposed Д overflow y=0..17.
+Normal-font CI chain is fully past all observed compact-glyph blockers.
+Short-font chain:
+- #103: Д overflow y=0..17
+- #104: Д passed; Ё overflow y=-4..13
 
 The compact forms below already pass the smaller narrow atlases. Additional
 atlases use them only after CI proves the full glyph clips. Fail-closed checks
@@ -106,6 +108,7 @@ def main() -> int:
         elif path.name == "latin_short.png":
             selected = {
                 "Д": SPECIALS["Д"],
+                "Ё": SPECIALS["Ё"],
             }
         else:
             return original_patch_font(path)
