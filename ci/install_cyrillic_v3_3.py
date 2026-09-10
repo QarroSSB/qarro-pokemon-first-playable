@@ -11,6 +11,7 @@ Current normal-font CI chain:
 - #95: б passed; д overflow y=0..17
 - #96: д passed; ё overflow y=-8..14
 - #97: ё passed; й overflow y=-8..14
+- #98: й passed; р overflow y=0..20
 
 The compact forms below already pass the smaller narrow atlases. Normal uses
 them only after its full form has been proven to clip. Fail-closed checks remain
@@ -100,6 +101,7 @@ def main() -> int:
                 "д": SPECIALS["д"],
                 "ё": SPECIALS["ё"],
                 "й": SPECIALS["й"],
+                "р": SPECIALS["р"],
             }
         else:
             return original_patch_font(path)
