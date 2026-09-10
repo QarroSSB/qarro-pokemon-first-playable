@@ -4,8 +4,7 @@
 Current confirmed QoL scope for FireRed:
 - verify the pinned whiteout path does not deduct player money;
 - return an ordinary Bag Poké Ball when a wild Pokémon breaks out;
-- keep the existing temporary starting-supplies implementation intact until
-  its final post-Pokédex timing is handled as the next dedicated backlog step.
+- grant the starting supplies exactly once in Oak's initial post-Pokédex scene.
 
 The patch is intentionally narrow. Safari Ball counters, successful captures,
 Ash Bond and Ash Cap are untouched.
@@ -75,20 +74,11 @@ def patch_failed_catch_ball_refund(root: Path) -> dict:
     // Safari uses its own counter and must retain the native behavior.
     if (!(gBattleTypeFlags & BATTLE_TYPE_SAFARI))
     {
-        if (!AddBagItem(gLastUsedItem, 1))
-            die("failed to return used Poke Ball after escaped capture");
+        AddBagItem(gLastUsedItem, 1);
     }
 
     if (IsCriticalCapture())
 """
-
-    # C cannot call this Python helper; keep the failure path simple and
-    # deterministic by replacing the temporary guard with a plain AddBagItem.
-    new = new.replace(
-        "        if (!AddBagItem(gLastUsedItem, 1))\n"
-        "            die(\"failed to return used Poke Ball after escaped capture\");\n",
-        "        AddBagItem(gLastUsedItem, 1);\n",
-    )
 
     if new in text:
         print(f"[{MARKER}] failed-catch Ball refund already present")
@@ -113,13 +103,11 @@ def patch_failed_catch_ball_refund(root: Path) -> dict:
 
 
 def patch_starting_supplies(root: Path) -> dict:
-    path = root / "src/new_game.c"
-    text = read(path)
+    """Move the temporary new-game kit to Oak's one-time initial Pokédex scene."""
+    new_game_path = root / "src/new_game.c"
+    new_game = read(new_game_path)
 
-    old = """    ClearBag();
-    NewGameInitPCItems();
-"""
-    new = """    ClearBag();
+    temporary = """    ClearBag();
 #if IS_FRLG
     // Qarro v3.5: practical starting supplies with minimal early grind.
     AddBagItem(ITEM_POKE_BALL, 20);
@@ -129,37 +117,79 @@ def patch_starting_supplies(root: Path) -> dict:
 #endif
     NewGameInitPCItems();
 """
+    native = """    ClearBag();
+    NewGameInitPCItems();
+"""
 
-    if new in text:
-        print(f"[{MARKER}] starting supplies already present")
-    elif old in text:
-        text = text.replace(old, new, 1)
-        path.write_text(text, encoding="utf-8")
-        print(f"[{MARKER}] starting supplies installed")
-    else:
+    if temporary in new_game:
+        new_game = new_game.replace(temporary, native, 1)
+        new_game_path.write_text(new_game, encoding="utf-8")
+        print(f"[{MARKER}] temporary new-game supplies removed")
+    elif native not in new_game:
         die("NewGameInitData ClearBag/NewGameInitPCItems anchor did not match pinned source")
 
-    patched = read(path)
-    required = {
-        "ITEM_POKE_BALL": 20,
-        "ITEM_POTION": 10,
-        "ITEM_ANTIDOTE": 5,
-        "ITEM_PARALYZE_HEAL": 5,
-    }
-    for item, qty in required.items():
-        needle = f"AddBagItem({item}, {qty});"
-        if patched.count(needle) != 1:
-            die(f"expected exactly one {needle!r}")
+    new_game = read(new_game_path)
+    for needle in (
+        "AddBagItem(ITEM_POKE_BALL, 20);",
+        "AddBagItem(ITEM_POTION, 10);",
+        "AddBagItem(ITEM_ANTIDOTE, 5);",
+        "AddBagItem(ITEM_PARALYZE_HEAL, 5);",
+    ):
+        if needle in new_game:
+            die(f"temporary starting-supply hook still present in new_game.c: {needle}")
+
+    oak_path = root / "data/maps/PalletTown_ProfessorOaksLab_Frlg/scripts.inc"
+    oak = read(oak_path)
+    old = """\tgiveitem_msg PalletTown_ProfessorOaksLab_Text_ReceivedFivePokeBalls, ITEM_POKE_BALL, 5
+\tmsgbox PalletTown_ProfessorOaksLab_Text_OakExplainCatching
+"""
+    new = """\tgiveitem_msg PalletTown_ProfessorOaksLab_Text_ReceivedFivePokeBalls, ITEM_POKE_BALL, 5
+\t@ Qarro v3.5: complete the one-time post-Pokedex starter kit here.
+\t@ Oak's native five Balls + fifteen below = exactly twenty total Balls.
+\tgiveitem ITEM_POKE_BALL, 15
+\tgiveitem ITEM_POTION, 10
+\tgiveitem ITEM_ANTIDOTE, 5
+\tgiveitem ITEM_PARALYZE_HEAL, 5
+\tmsgbox PalletTown_ProfessorOaksLab_Text_OakExplainCatching
+"""
+
+    if new in oak:
+        print(f"[{MARKER}] post-Pokedex starting supplies already present")
+    elif old in oak:
+        oak = oak.replace(old, new, 1)
+        oak_path.write_text(oak, encoding="utf-8")
+        print(f"[{MARKER}] post-Pokedex starting supplies installed")
+    else:
+        die("Oak initial Pokédex/Poké Ball grant anchor did not match pinned source")
+
+    patched = read(oak_path)
+    if patched.count(new) != 1:
+        die(f"expected exactly one complete post-Pokedex starter-kit block, found {patched.count(new)}")
+
+    dex_flag = "\tsetflag FLAG_SYS_POKEDEX_GET\n"
+    scene_done = "\tsetvar VAR_MAP_SCENE_PALLET_TOWN_PROFESSOR_OAKS_LAB, 6\n"
+    block_pos = patched.index(new)
+    try:
+        dex_pos = patched.rindex(dex_flag, 0, block_pos)
+        scene_pos = patched.index(scene_done, block_pos)
+    except ValueError as exc:
+        die("post-Pokedex one-time scene guards changed from pinned source")
+        raise exc
+    if not dex_pos < block_pos < scene_pos:
+        die("starter kit is not inside the initial post-Pokedex one-time scene")
 
     return {
         "enabledFor": "FireRed",
-        "timing": "temporary-new-game; post-Pokedex move remains backlog",
+        "timing": "one-time post-Pokedex Oak grant",
+        "source": "data/maps/PalletTown_ProfessorOaksLab_Frlg/scripts.inc",
         "items": {
             "PokeBall": 20,
             "Potion": 10,
             "Antidote": 5,
             "ParalyzeHeal": 5,
         },
+        "nativePokeBalls": 5,
+        "supplementalPokeBalls": 15,
     }
 
 
@@ -186,7 +216,7 @@ def main() -> int:
     out.write_text(json.dumps(audit, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(
         f"[{MARKER}] PASS: no-money-loss verified; failed-catch Ball refund installed; "
-        "starting supplies retained; Ash code untouched"
+        "post-Pokedex starter supplies installed; Ash code untouched"
     )
     return 0
 
