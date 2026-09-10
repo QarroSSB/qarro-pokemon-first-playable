@@ -135,9 +135,11 @@ def resized_binary(mask: Image.Image, w: int, h: int) -> Image.Image:
     shrinking = w < mask.width or h < mask.height
     resample = Image.Resampling.BOX if shrinking else Image.Resampling.NEAREST
     out = mask.resize((w, h), resample)
+    # Preserve this extra-light face when shrinking to tiny GBA variants.
     threshold = 24 if shrinking else 64
     out = out.point(lambda p: 255 if p >= threshold else 0)
     if out.getbbox() is None:
+        # Deterministic fallback: nearest keeps at least one source stroke.
         out = mask.resize((w, h), Image.Resampling.NEAREST).point(lambda p: 255 if p else 0)
     return out
 
@@ -176,6 +178,7 @@ def patch_font(path: Path, refs: dict[str, dict[str, tuple[int, int, int, int]]]
     normal_lower = refs["latin_normal.png"]["lower"]
 
     def fg_dims(box):
+        # Reference includes native one-pixel down/right shadow.
         return max(1, box[2] - box[0]), max(1, box[3] - box[1])
 
     up_w, up_h = fg_dims(upper_ref)
@@ -186,9 +189,11 @@ def patch_font(path: Path, refs: dict[str, dict[str, tuple[int, int, int, int]]]
     lo_aspect_factor = (lo_w / lo_h) / (nlo_w / nlo_h)
 
     src_A = GLYPHS["A"]
-    src_a = GLYPHS["a"]
     sy_up = up_h / int(src_A["h"])
-    sy_lo = lo_h / int(src_a["h"])
+    # Preserve Moniqa's real x-height instead of stretching lowercase to the
+    # stock FireRed `a` cell height. This keeps English/Russian lowercase
+    # visibly smaller than capitals and avoids oversized descenders.
+    sy_lo = sy_up
     sx_up = sy_up * up_aspect_factor
     sx_lo = sy_lo * lo_aspect_factor
     baseline_up = upper_ref[3] - 1
@@ -201,6 +206,8 @@ def patch_font(path: Path, refs: dict[str, dict[str, tuple[int, int, int, int]]]
         sx = sx_lo if lower else sx_up
         sy = sy_lo if lower else sy_up
         target_baseline = baseline_lo if lower else baseline_up
+
+        # Digits and é use uppercase body scale; Russian/English lowercase use lowercase.
         if ch in DIGITS or ch == "é":
             sx, sy, target_baseline = sx_up, sy_up, baseline_up
 
@@ -208,15 +215,13 @@ def patch_font(path: Path, refs: dict[str, dict[str, tuple[int, int, int, int]]]
         dh = max(1, int(round(src.height * sy)))
         scaled_baseline = int(round(src_baseline * sy))
 
-        for _ in range(12):
-            top = target_baseline - scaled_baseline
-            if dw + 1 <= CELL_W and top >= 0 and top + dh + 1 <= CELL_H:
-                break
-            dw = max(1, int(round(dw * 0.92)))
-            dh = max(1, int(round(dh * 0.92)))
-            scaled_baseline = max(0, int(round(scaled_baseline * 0.92)))
-        else:
-            raise RuntimeError(f"{path.name}: cannot fit {ch}/0x{code:02X}")
+        # Reserve one pixel for the FireRed shadow. If an accent or descender
+        # is taller than the 15-pixel drawable body, shrink proportionally.
+        if dw + 1 > CELL_W or dh + 1 > CELL_H:
+            fit = min((CELL_W - 1) / dw, (CELL_H - 1) / dh)
+            dw = max(1, int(round(dw * fit)))
+            dh = max(1, int(round(dh * fit)))
+            scaled_baseline = max(0, int(round(scaled_baseline * fit)))
 
         mask = resized_binary(src, dw, dh)
         x0, y0, x1, y1 = cell_box(code, total)
@@ -224,7 +229,13 @@ def patch_font(path: Path, refs: dict[str, dict[str, tuple[int, int, int, int]]]
             for xx in range(x0, x1):
                 img.putpixel((xx, yy), FONT_BG)
 
-        top = target_baseline - scaled_baseline
+        desired_top = target_baseline - scaled_baseline
+        max_top = CELL_H - mask.height - 1
+        if max_top < 0:
+            raise RuntimeError(f"{path.name}: rendered glyph too tall {ch}/0x{code:02X}")
+        # Clamp only the vertical origin; this preserves shape while allowing
+        # tall Cyrillic forms such as ф/Щ and accented Ё/й to fit cleanly.
+        top = min(max(desired_top, 0), max_top)
         for shadow_pass, color in ((True, FONT_SHADOW), (False, FONT_FG)):
             off = 1 if shadow_pass else 0
             for yy in range(mask.height):
