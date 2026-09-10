@@ -3,8 +3,8 @@
 
 Runs the exact previously-green localization pipeline from commit 23b23931,
 then translates only verified early-game text blocks in runtime order: Professor
-Oak's new-game speech and the two interactable texts in the player's starting
-room. This keeps the localization audit incremental and fail-closed.
+Oak's new-game speech, the player's starting room, and the downstairs home
+interaction text. This keeps the localization audit incremental and fail-closed.
 
 Pokemon, Move and Ability proper names remain English outside Russian prose.
 No Ash Bond / Ash Cap code is touched.
@@ -185,6 +185,95 @@ STARTING_ROOM_BLOCKS = {
     ),
 }
 
+HOUSE_1F_BLOCKS = {
+    "PalletTown_PlayersHouse_1F_Text_AllBoysLeaveOakLookingForYou": (
+        (
+            r"MOM: …Right.\n",
+            r"All boys leave home someday.\l",
+            r"It said so on TV.\p",
+            r"Oh, yes. PROF. OAK, next door, was\n",
+            r"looking for you.$",
+        ),
+        (
+            r"МАМА: ...Вот как.\n",
+            r"Все мальчики однажды уходят из дома.\l",
+            r"Так говорили по ТВ.\p",
+            r"Ах да. ПРОФ. ОУК по соседству\n",
+            r"искал тебя.$",
+        ),
+    ),
+    "PalletTown_PlayersHouse_1F_Text_AllGirlsLeaveOakLookingForYou": (
+        (
+            r"MOM: …Right.\n",
+            r"All girls dream of traveling.\l",
+            r"It said so on TV.\p",
+            r"Oh, yes. PROF. OAK, next door, was\n",
+            r"looking for you.$",
+        ),
+        (
+            r"МАМА: ...Вот как.\n",
+            r"Все девочки мечтают путешествовать.\l",
+            r"Так говорили по ТВ.\p",
+            r"Ах да. ПРОФ. ОУК по соседству\n",
+            r"искал тебя.$",
+        ),
+    ),
+    "PalletTown_PlayersHouse_1F_Text_YouShouldTakeQuickRest": (
+        (
+            r"MOM: {PLAYER}!\n",
+            r"You should take a quick rest.$",
+        ),
+        (
+            r"МАМА: {PLAYER}!\n",
+            r"Тебе стоит немного отдохнуть.$",
+        ),
+    ),
+    "PalletTown_PlayersHouse_1F_Text_LookingGreatTakeCare": (
+        (
+            r"MOM: Oh, good! You and your\n",
+            r"POKéMON are looking great.\l",
+            r"Take care now!$",
+        ),
+        (
+            r"МАМА: Отлично! Ты и твои\n",
+            r"ПОКЕМОНЫ прекрасно выглядите.\l",
+            r"Береги себя!$",
+        ),
+    ),
+    "PalletTown_PlayersHouse_1F_Text_MovieOnTVFourBoysOnRailroad": (
+        (
+            r"There's a movie on TV.\n",
+            r"Four boys are walking on railroad\l",
+            r"tracks.\p",
+            r"…I better go, too.$",
+        ),
+        (
+            r"По телевизору идёт фильм.\n",
+            r"Четверо мальчиков идут вдоль\l",
+            r"железной дороги.\p",
+            r"...Мне тоже пора.$",
+        ),
+    ),
+    "PalletTown_PlayersHouse_1F_Text_MovieOnTVGirlOnBrickRoad": (
+        (
+            r"There's a movie on TV.\n",
+            r"A girl with her hair in pigtails is\l",
+            r"walking up a brick road.\p",
+            r"…I better go, too.$",
+        ),
+        (
+            r"По телевизору идёт фильм.\n",
+            r"Девочка с косичками идёт\l",
+            r"по кирпичной дороге.\p",
+            r"...Мне тоже пора.$",
+        ),
+    ),
+    "PalletTown_PlayersHouse_1F_Text_OopsWrongSide": (
+        (r"Oops, wrong side…$",),
+        (r"Ой, не с той стороны...$",),
+    ),
+}
+
 
 def load_base() -> str:
     repo = Path(__file__).resolve().parents[1]
@@ -258,6 +347,23 @@ def patch_starting_room(root: Path) -> int:
     return changed
 
 
+def patch_house_1f(root: Path) -> int:
+    path = root / "data/maps/PalletTown_PlayersHouse_1F_Frlg/scripts.inc"
+    changed = patch_blocks(path, HOUSE_1F_BLOCKS, "ru-house1f")
+    text = path.read_text(encoding="utf-8")
+    forbidden_visible = (
+        "All boys leave home someday.",
+        "All girls dream of traveling.",
+        "You should take a quick rest.",
+        "There's a movie on TV.",
+        "Oops, wrong side",
+    )
+    for phrase in forbidden_visible:
+        if phrase in text:
+            raise RuntimeError(f"player-house 1F English phrase remained: {phrase!r}")
+    return changed
+
+
 def main() -> int:
     code = load_base()
     ns = {
@@ -275,12 +381,14 @@ def main() -> int:
     root = Path(sys.argv[1]).resolve()
     oak_changed = patch_oak_intro(root)
     room_changed = patch_starting_room(root)
+    house_1f_changed = patch_house_1f(root)
 
     audit = {
         "marker": MARKER,
         "oakSpeechBlocksLocalized": len(OAK_BLOCKS),
         "startingRoomBlocksLocalized": len(STARTING_ROOM_BLOCKS),
-        "blocksChangedThisRun": oak_changed + room_changed,
+        "playerHouse1FBlocksLocalized": len(HOUSE_1F_BLOCKS),
+        "blocksChangedThisRun": oak_changed + room_changed + house_1f_changed,
         "earliestRuntimeEnglishClosed": True,
         "pokemonNamesEnglish": True,
         "moveNamesEnglish": True,
@@ -292,8 +400,8 @@ def main() -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(audit, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(
-        f"[{MARKER}] PASS: {len(OAK_BLOCKS)} Oak + {len(STARTING_ROOM_BLOCKS)} starting-room "
-        "blocks localized; names/Ash untouched"
+        f"[{MARKER}] PASS: {len(OAK_BLOCKS)} Oak + {len(STARTING_ROOM_BLOCKS)} starting-room + "
+        f"{len(HOUSE_1F_BLOCKS)} house-1F blocks localized; names/Ash untouched"
     )
     return 0
 
