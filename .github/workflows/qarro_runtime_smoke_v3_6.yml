@@ -1,0 +1,101 @@
+name: Qarro runtime smoke v3.6
+
+on:
+  workflow_run:
+    workflows: ["Qarro FIRST PLAYABLE v3.5 quality-of-life + Russian foundation"]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  mgba-boot-smoke:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Install mGBA SDL runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends mgba-sdl xvfb unzip
+          command -v mgba
+          mgba --version
+
+      - name: Download triggering ROM artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_id="$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" \
+            --jq '.artifacts[] | select(.name | startswith("Qarro-FIRST-PLAYABLE-v3.5-")) | .id' \
+            | head -n 1)"
+          if [[ -z "$artifact_id" ]]; then
+            echo "No Qarro FIRST PLAYABLE ROM artifact found for run $RUN_ID" >&2
+            exit 1
+          fi
+          gh api -H 'Accept: application/vnd.github+json' \
+            "repos/$REPO/actions/artifacts/$artifact_id/zip" > artifact.zip
+          mkdir -p artifact
+          unzip -q artifact.zip -d artifact
+          rom="$(find artifact -type f -name '*.gba' -print -quit)"
+          if [[ -z "$rom" ]]; then
+            echo "Artifact has no .gba ROM" >&2
+            exit 1
+          fi
+          size="$(stat -c '%s' "$rom")"
+          if [[ "$size" -ne 33554432 ]]; then
+            echo "Unexpected ROM size: $size" >&2
+            exit 1
+          fi
+          printf '%s\n' "$rom" > rom_path.txt
+          sha256sum "$rom" | tee rom.sha256
+
+      - name: Boot ROM in mGBA for 8 seconds
+        shell: bash
+        run: |
+          set -euo pipefail
+          rom="$(cat rom_path.txt)"
+          mkdir -p runtime_smoke
+          set +e
+          start="$(date +%s)"
+          timeout 8s xvfb-run -a mgba -1 -l 127 "$rom" \
+            > runtime_smoke/mgba_boot.log 2>&1
+          rc=$?
+          elapsed=$(( $(date +%s) - start ))
+          set -e
+
+          cat runtime_smoke/mgba_boot.log || true
+          echo "mGBA exit=$rc elapsed=${elapsed}s"
+
+          # A healthy interactive emulator should still be running when our
+          # deterministic timeout fires. Any earlier exit is treated as a boot failure.
+          if [[ "$rc" -ne 124 ]]; then
+            echo "mGBA exited before the 8-second smoke window (rc=$rc)" >&2
+            exit 1
+          fi
+          if [[ "$elapsed" -lt 7 ]]; then
+            echo "mGBA did not remain alive for the requested smoke interval" >&2
+            exit 1
+          fi
+          if grep -Eiq 'fatal|segmentation fault|assertion failed|failed to load|could not load|invalid rom|unrecognized rom' runtime_smoke/mgba_boot.log; then
+            echo "mGBA log contains a fatal/load failure" >&2
+            exit 1
+          fi
+          echo "QARRO_RUNTIME_SMOKE_V3_6 PASS: ROM stayed alive in mGBA for 8 seconds"
+
+      - name: Upload runtime smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Qarro-runtime-smoke-v3.6-${{ github.event.workflow_run.run_number }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            runtime_smoke/**
+            rom.sha256
