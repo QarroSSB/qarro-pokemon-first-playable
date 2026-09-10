@@ -94,19 +94,31 @@ def audit_starter_kit(root: Path) -> dict:
         "ITEM_PARALYZE_HEAL": ("\tgiveitem ITEM_PARALYZE_HEAL, 5\n", 5),
     }
     native_five = "\tgiveitem_msg PalletTown_ProfessorOaksLab_Text_ReceivedFivePokeBalls, ITEM_POKE_BALL, 5\n"
+    kit_marker = "\t@ Qarro v3.5: complete the one-time post-Pokedex starter kit here.\n"
+    exact_kit = (
+        native_five
+        + kit_marker
+        + "\t@ Oak's native five Balls + fifteen below = exactly twenty total Balls.\n"
+        + grants["ITEM_POKE_BALL"][0]
+        + grants["ITEM_POTION"][0]
+        + grants["ITEM_ANTIDOTE"][0]
+        + grants["ITEM_PARALYZE_HEAL"][0]
+    )
     dex_flag = "\tsetflag FLAG_SYS_POKEDEX_GET\n"
     scene_done = "\tsetvar VAR_MAP_SCENE_PALLET_TOWN_PROFESSOR_OAKS_LAB, 6\n"
 
     for item, (line, _) in grants.items():
         if oak.count(line) != 1:
             raise RuntimeError(f"expected one post-Pokedex starter grant for {item}, found {oak.count(line)}")
-    if oak.count(native_five) != 1:
-        raise RuntimeError(f"expected one native five-Poke-Ball grant, found {oak.count(native_five)}")
+    if oak.count(kit_marker) != 1:
+        raise RuntimeError(f"expected one Qarro starter-kit marker, found {oak.count(kit_marker)}")
+    if oak.count(exact_kit) != 1:
+        raise RuntimeError("Qarro starter kit is not attached to exactly one native five-Poke-Ball grant")
 
-    block_pos = min(oak.index(line) for line, _ in grants.values())
+    block_pos = oak.index(exact_kit)
+    native_pos = block_pos
     try:
         dex_pos = oak.rindex(dex_flag, 0, block_pos)
-        native_pos = oak.rindex(native_five, 0, block_pos + len(native_five))
         scene_pos = oak.index(scene_done, block_pos)
     except ValueError as exc:
         raise RuntimeError("Oak one-time post-Pokedex scene anchors changed") from exc
