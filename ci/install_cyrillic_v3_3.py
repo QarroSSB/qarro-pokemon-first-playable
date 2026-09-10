@@ -9,6 +9,7 @@ Normal-font CI chain is fully past all observed compact-glyph blockers.
 Short-font chain:
 - #103: Д overflow y=0..17
 - #104: Д passed; Ё overflow y=-4..13
+- #105: Ё passed; Й overflow y=-4..15
 
 The compact forms below already pass the smaller narrow atlases. Additional
 atlases use them only after CI proves the full glyph clips. Fail-closed checks
@@ -109,6 +110,7 @@ def main() -> int:
             selected = {
                 "Д": SPECIALS["Д"],
                 "Ё": SPECIALS["Ё"],
+                "Й": SPECIALS["Й"],
             }
         else:
             return original_patch_font(path)
