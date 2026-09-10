@@ -221,7 +221,7 @@ def main() -> int:
                 "ё": SPECIALS["ё"],
                 "й": SPECIALS["й"],
                 "р": SPECIALS["р"],
-                "у": SPECIALS["у"],
+                "у": (SPECIALS["у"][0], "000000000000221430000000"),
             }
         else:
             return original_patch_font(path)
