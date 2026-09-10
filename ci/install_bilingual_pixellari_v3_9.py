@@ -66,9 +66,6 @@ FONT_FILE_TO_WIDTH_TABLE = {
 }
 EXPECTED_WIDTH_ARRAYS = set(FONT_FILE_TO_WIDTH_TABLE.values())
 
-# Horizontal scale, vertical scale, target baseline. Normal dialogue uses the
-# full readability-oriented Pixellari raster; constrained UI variants are
-# reduced only as much as their role requires.
 VARIANT_PROFILE = {
     "latin_normal.png": (1.00, 1.00, 11),
     "latin_narrow.png": (0.85, 1.00, 11),
@@ -81,28 +78,8 @@ VARIANT_PROFILE = {
     "latin_small_narrower.png": (0.66, 0.85, 10),
 }
 
-_GLYPH_PACK_B85 = """c-rmSNLh@h4D1>=E{@HaqSPIN+r4+o46N@6v?O2F5<n_tl!ps%^_?9MI95*rqo$j03Jbh<F}
-3{@)xKFFG6ePCy0NTv%+-Ms*DKV~C1xX4*1teA4~kK2h!~?qJlG72=mOB3Lo)N<ByB$wvz63d&lDUG5OXA!0#n#u<7tuWmr|3
-k!y^Jv7J0MI}c6RDNE;ChFZ=$P?G`n*%+BL;0Agu$?<_qXJkJ9I(6#S<5JIWSEPfV_t_e1N=k(r8i-f1PyfPB1<PY7lO`w2
-zG6^sqQ-{2v*%_ea>1We4{N-7nC_(d3HHdo!yWmJQ!WFf^l7s}7Sb;C3jA6$X`Q4qR~Dj2^wZ+;`qW&^nDx&qQ0!;+Pa6lX
-5Y{u=WJ^^mE5eL-W}5v4;qKI$=TDxHft+6rX1B?{v#r?USg~a7C1$1Oe`ql6dco;W0KiE2Q}H5-s$4^Q)z0<$M#4A8YGH3$p
-<wZtb#VpV3aT&JkD+s6=xSr_zjNVb(v5NTnAC!2FPv5&^t;fVg}GT8vI-!X+S94#c1ax`Q2rjK;AW;x<^4oQE<Q_B%=4HJhG
-C=qN2+>3Q+1_9AvpFA-ffuCM<1Fr1@x&e79>Kk1CO^X)6e*qW}NX4Pskkg=PdbX%NFGo;C|reIv9hOr&c13wa85_XmJKfP)gL
-bH!QxdwHp$g>qdsR0N6tLWdTyTR9UymAoD7jW!70Bs5z4|Ef{#1tr@2<!OBX&_Avpa+a<1>1^*G1r#xqheSE1q}nL84_JtmZ
-@;)@K0x_WzIhd7=NN#wv*tB@|3lB~{?HkCNn@<l1T7*z+wXAzIs*8IK)*<N-PtOQ_n8wj$yqq+usYS1*;CoOnAR~DT#MSy&
-p@aT4L=bK<f8s<d{@rbWIw8Z$eIE9TY1v%V_+~R1xbNO@PP;0n>xNWuK{x@+knsXIlXEG=P!?V^TAbN0?OluCl4A@+5kL{ahR
-lj~x&dCAQBJgaYXf&2Gd=JbSb#F&@&;AJa1H7C97xW*?ILJ_B#gK`Y;+?2n_9@Jguc(;%76<<ej%+5XH;f$4v#1g>9k#9nMGV
-J4LJ4P8n91DW=eO9f{T%t~%^ozzc}+j4GvQD7+#1R9BxR5`v39c~|SpORt%~X5!sp+WX7u`lH4$T|vQwF!6!1v(*{M3S^b>f
-3wRNR+d{5Oai8^ITN<WBp=$jc8S{`6!U{dmQHD%h-%i{XjTnR-|BOo@43+YcfGYz6Kza+Q!(^x!4lP1BKa~m4A~k>v})>}d
-wMlDs5wJu$$j8W1H2Y@FP2i0om?|`%p6a_5It6pgT8rgISeO?7)M;=`-u@4HoCnsnIE&j3UUG-}B1un`KlCr5$?R8`K8bmj8V
-%a0%=>1q<`BrZ6o{{NJFXw5k2pWcfwW9~tA&`~?1?gdM#0pZ;k6i@e@UJs<KCRvy|^08~Z3l&Uz=`zT=BITo!B@f1Dq%)Tc<
-#{Pu6+Se#s%6D3R+9O6!mJH_<vkmJ!8P=X1eIdJ`@N7iaLpMyHUevZDP$hhkK+gH>3c|kI0?Acm1sAXO1}Mg3!i9anxpEBZs
-qV)%P_~6jgR$<2+XV06LIzyAp#^wsWN<R*1Y`)fkIU27nPiYRBdu>Oq+q8C^Jh<&bn8BOb4+`gsvC}M;B7>2#Skq)&7!s}#O
-uB5Q!?!^^jmGVCR45a!uRO2{E@^ezkFWt8sZ&?X8XkwY4=ft6nYfoP2<Wl>^i?JzT;aRxrQ)w=^6X*oJ#Q#65j1lT1nxx<gb
-xW8GC`NuS6VI?v6H%R58Q34aV&-RUfo>wp^>nDt+O5Dss-f)`@cy(=P9@Yb}<0Y=9)wI5t!G=P)T<JFP-Di`4z`E@bDuLL
-F%3QF%_B0-}EHC#VQf-;*JM4Y(9xQ#p#b@2o@e#mv}4O&j!t6nV#fOP|Pr|F8wP%w4`9h=aKcAKw?%+^ft1)N6{+^a^{1A
-w?Fw""".replace("\n", "")
-GLYPHS = json.loads(zlib.decompress(base64.b85decode(_GLYPH_PACK_B85)).decode("utf-8"))
+_GLYPH_PACK_B64 = 'eNqtWVe33DQQ/i9+1oMlW1r7vgGh994ODwlcSCAFcoEL5OQcEnon9N4h9N5D+QvyP2JG1tqWRyN7dzmWzvruud+MZjQzmk97LDsr2zqW7WZbRmT7s61KZEeP7O5kWzcXuTCF0BJH96LlLSLbt3dn++CBw9vw38dFdjaD7zCF7MDwTvDn8PoR4B98zQl2z5RundZ9rsfrsW6vuNNPoefNhRLk+RNIxKoFDlkS8AWMxZ2VoekEf6HHFyP8ovM0PguCu4hZtKqEVOEohCHwi7lN1kLWQkqxgAc+4I9CE/QlnMeCRUc26VIPrEZAWWuh0M2ovNbjSeRc5uUsRnJqgOdFO3H1uGeqcLOuiZTLV4pWGu1X8IHTxguq10zUXcmYMFZeYwRJRbfwqlXyPBJ5V/N4fIwSZYUjbvs1PHocfzgI/tqpvJnw/XWz8VC3IvqvT0Sii0aIxOGUFTiFbsINzC5KgOgSnVgJSEn4hL8iIXjjDLx/CPYmxgSltagNJAAoNahdgiAB3xIJe4MANr32sg9gGCP3G0DuS1QACPkhWlK9tyb1ogxabFHrbVzRA1yJG51YNerdTuuVrOLbmSptsDb3BY8ovINz03ipuP6Ro1Dv/rSbpRyKIdoPeLQi6HxYpgnuTo8rHU7mvZ+UyKPpHTmg7uJOmLZ5aEtja0CkOB1kl14kl34oyInBDoOaWo6zmvj7MBcgSV8j8si8VIrE1t3MHpM0IgYj+p5VIkxR7Ud5i9Ui6mZE7TCoAgMLTK6YeL6XyaMiyCNaZu9j9A1NVCZWqO6fgYQIp47ZZSJpfDAoCcZqin+Ac2zdnkg48IUG4YNclQviyI1x4iH8IW5vsB+Cg8DQ1gxheaILJiPSCEsGj42k6Z5IT6gSXZSr68sTbBFDF1NosNmLifbvJVOmWr2ts6Gn8SIoXk/SjpR2w+X+8iCUbOlA+CLRwrn2rbWfbcKqpHpIiwn99VQDvCw7DN6+uCHXtacmmtgiSTftSxtyZfvyJHdkDir7SlBfBoesgaIARaIOBzZ1HBuyr65Pm+2JAFv3MZCLCXiN8Nc8HA0IqRh4rCyQPmC1y90nTvyukrQTtq8n7x2GmRxnBPYNnhQiL8QzPF90/NB9S4W8GQgZbAuYkDsBs2TJHIW9tRHLtm9z5ACdgW7NFZkxm975n1i3fXfDyw773oaM276/ioDYCj6YIWAZ8BT9IR+jhe6zXUfX/tGGlNl+PMP9LWeHEcv1TzjGiMllKOfF7yJV+9MNSa/9LEwymWb/rnc37aCyTq/ilJKyaPs55xTS6A1mhEzbL8JSODCrhHduQtJC72uq5aRyv+TSV/tYURpmXnZTxjbtKy+lHoduBce0n2UJE6K3mxHubr9OELvpE/cb7tpLuSpq3Fnhd7uGEKISvmUM0VCQe8fqwMmqjCTzd1OlAAM4VUu+5zlf4e6dMH+i1yf2h9SJjVQv3XjZH5O0raOrEQpmf+L5QcESPvszt+sBLe62nwr4Zd27l+YU16W6EzkFd676NYi4gWJZuNICuwxDugM5YvhviXW7BKzcJ123/Z2nnh2Ril8m2D/4xjwXabyz+U9eNcSG6zp0VPGZYJvNMD2hlvcjEld/MdC2BHNdvIP+nSTpgxCj0H/Wvnex//KJENwrUK3Nw/ydTc99JHdn05xY8/6zOckvuePYFPXIZhcKzaMcVVkybHe7PDwcfesQ6x6ax9a+GGken2GID5joZVfzxGSglRz0ydn3QbQ9cAKeWqXPcGxP4aSCnuYKmu8HYEfyyk1DT57mGQbtWdLgFzMpaao2z3IRGPxOGjH/OaY8tPQOSG/0pyYHfZ671JU+6GCxXc8a0/0Cf13pLynimX78P3KuO1o='
+GLYPHS = json.loads(zlib.decompress(base64.b64decode(_GLYPH_PACK_B64)).decode("utf-8"))
 if set(GLYPHS) != set(CHAR_TO_CODE):
     raise RuntimeError("embedded Pixellari raster pack does not match target set")
 
