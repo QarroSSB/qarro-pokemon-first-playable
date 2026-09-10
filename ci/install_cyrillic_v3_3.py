@@ -1,286 +1,73 @@
 #!/usr/bin/env python3
-"""Targeted compact Cyrillic masks for font atlases that clip in CI.
+"""Qarro v3.6 font pipeline wrapper.
 
-Reuses the exact v3.3.3 per-font scaler from commit 6593ba7 and changes only
-verified glyph source masks while an affected atlas is rendered. Full source
-forms remain the reference everywhere else.
+Runs the exact previously-green Cyrillic/charmap installer from commit e5184e2,
+then applies the bilingual Moniqa bitmap face for English, Russian, digits and
+FireRed's accented é. This keeps the proven Cyrillic mapping/remap logic intact
+while replacing the visible Latin/Cyrillic letterforms with one consistent face.
 
-Runtime v3.5 testing exposed one charmap collision that the build-only gates
-could not see: stock FireRed text uses `é` in `POKéMON` at byte 0x1B, while the
-initial Russian alias table also placed uppercase `Щ` at 0x1B. This made stock
-English text render as `POKЩMON`. The pinned Latin charmap leaves 0x2F unused,
-so this pass moves only `Щ` to 0x2F and leaves the original Latin `é` cell and
-width untouched. The same remapped code list is shared with the underlying
-charmap installer, per-font renderer and width-table patcher.
-
-Normal-font, short-font and short-narrow CI chains are fully past all observed
-compact-glyph blockers. Short-narrower chain:
-- #131: short-narrow passed; Д overflow y=0..17
-- #132: Д passed; Ё overflow y=-4..13
-- #133: Ё passed; Й overflow y=-4..15
-- #134: Й passed; Ц overflow y=0..17
-- #135: Ц passed; Щ overflow y=0..17
-- #136: Щ passed; б overflow y=-5..13
-- #137: б passed; д overflow y=0..16
-- #138: д passed; ё overflow y=-8..13
-- #139: ё passed; й overflow y=-8..13
-- #140: й passed; р overflow y=0..18
-- #141: р passed; у overflow y=0..18
-- #142: у passed; ф overflow y=-8..18
-- #143: ф passed; ц overflow y=0..16
-- #144: ц passed; щ overflow y=0..16
-- #145: short-narrower passed; small Ё overflow y=-2..12
-- #146: small Ё passed; Й overflow y=-2..14
-- #147: small Й passed; б overflow y=-3..12
-- #148: small б passed; ё overflow y=-6..12
-- #149: small ё passed; й overflow y=-6..12
-- #150: small й passed; р overflow y=1..16
-- #151: small р passed; у overflow y=1..16
-- #152: small у passed; ф overflow y=-6..16
-- #153: small font passed; small-narrow Ё overflow y=-2..12
-- #154: small-narrow Ё passed; Й overflow y=-2..14
-- #155: small-narrow Й passed; б overflow y=-3..12
-- #156: small-narrow б passed; ё overflow y=-6..12
-- #157: small-narrow ё passed; й overflow y=-6..12
-- #158: small-narrow й passed; р overflow y=1..16
-- #159: small-narrow р passed; у overflow y=1..16
-- #161: small-narrow у passed; ф overflow y=-6..16
-- #162: small-narrow passed; small-narrower Ё overflow y=-2..12
-- #163: small-narrower Ё passed; Й overflow y=-2..14
-- #164: small-narrower Й passed; б overflow y=-3..12
-- #165: small-narrower б passed; ё overflow y=-6..12
-- #166: small-narrower ё passed; й overflow y=-6..12
-- #167: small-narrower й passed; р overflow y=1..16
-- #168: small-narrower р passed; у overflow y=1..16
-- #170: tightened у passed; ф overflow y=-6..16
-
-The compact forms below already pass the smaller narrow atlases. Additional
-atlases use them only after CI proves the full glyph clips. Fail-closed checks
-remain active. English, unrelated Cyrillic glyphs, Ash Bond and Ash Cap are
+The original user-supplied Moniqa font files are not committed or modified;
+only rasterized glyph masks live in the follow-up pass. Ash Bond / Ash Cap are
 untouched.
 """
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
 
-BASE_COMMIT = "6593ba731a84d565b70d5e712a5ab7f0e01e90dd"
+BASE_COMMIT = "e5184e2d443f610ed07f85817bdfc6c9b3ba2bc4"
 BASE_PATH = "ci/install_cyrillic_v3_3.py"
-LATIN_E_ACUTE_CODE = 0x1B
-CYRILLIC_SHCHA_SAFE_CODE = 0x2F
-
-SPECIALS = {
-    "Д": ("0000003c24242424247e4242", "0000003c2424247e42420000"),
-    "Ё": ("0014003e20203e20203e0000", "000000143e20203e203e0000"),
-    "Й": ("0028380026262e2a3a323200", "00000038262e2a3a32320000"),
-    "Ц": ("0000004444444444447e0202", "00000044444444447e020000"),
-    "Щ": ("0000005454545454547e0202", "00000054545454547e020000"),
-    "б": ("0000001e303c2222221c0000", "0000000000001e3c221c0000"),
-    "д": ("00000000003c2424247e4200", "00000000003c24247e420000"),
-    "ё": ("00001400001c223e201e0000", "0000000000141c3e201e0000"),
-    "й": ("0000283800242c2c34240000", "000000000028382c34240000"),
-    "р": ("00000000003c2222223c2020", "0000000000003c223c200000"),
-    "у": ("000000000022141408080830", "000000000000221408300000"),
-    "ф": ("00000808081c2a2a2a1c0808", "0000000000081c2a1c080000"),
-    "ц": ("0000000000242424243e0200", "00000000000024243e020000"),
-    "щ": ("0000000000545454547e0200", "00000000000054547e020000"),
-}
+FOLLOWUP_PATH = "ci/install_bilingual_moniqa_v3_6.py"
 
 
-def load_base() -> dict:
-    repo = Path(__file__).resolve().parents[1]
+def load_from_git(repo: Path, commit: str, path: str, module_name: str) -> dict:
     subprocess.run(
-        ["git", "-C", str(repo), "fetch", "--quiet", "--depth=1", "origin", BASE_COMMIT],
+        ["git", "-C", str(repo), "fetch", "--quiet", "--depth=1", "origin", commit],
         check=True,
     )
     code = subprocess.check_output(
-        ["git", "-C", str(repo), "show", f"{BASE_COMMIT}:{BASE_PATH}"],
+        ["git", "-C", str(repo), "show", f"{commit}:{path}"],
         text=True,
     )
     ns = {
-        "__name__": "qarro_cyrillic_v333_base",
+        "__name__": module_name,
         "__file__": str(Path(__file__).resolve()),
     }
-    exec(compile(code, f"{BASE_COMMIT}:{BASE_PATH}", "exec"), ns)
+    exec(compile(code, f"{commit}:{path}", "exec"), ns)
+    return ns
+
+
+def load_followup(repo: Path) -> dict:
+    path = repo / FOLLOWUP_PATH
+    if not path.exists():
+        raise RuntimeError(f"missing bilingual font follow-up: {path}")
+    code = path.read_text(encoding="utf-8")
+    ns = {
+        "__name__": "qarro_bilingual_moniqa_v36",
+        "__file__": str(path.resolve()),
+    }
+    exec(compile(code, str(path), "exec"), ns)
     return ns
 
 
 def main() -> int:
-    ns = load_base()
+    repo = Path(__file__).resolve().parents[1]
+    base = load_from_git(repo, BASE_COMMIT, BASE_PATH, "qarro_cyrillic_pre_moniqa")
+    rc = int(base["main"]() or 0)
+    if rc:
+        return rc
 
-    # The v3.3.3 scaler aliases its CYR_CODES list directly from the v3.3.2
-    # namespace. Mutating that single shared list keeps charmap, glyph cells
-    # and width tables in lockstep. Fail closed if that contract ever changes.
-    cyr_codes = ns["CYR_CODES"]
-    nested_codes = ns["NS"]["CYR_CODES"]
-    if cyr_codes is not nested_codes:
-        raise RuntimeError("CYR_CODES is no longer shared with the base charmap installer")
-    shcha_index = ns["CYRILLIC"].index("Щ")
-    if cyr_codes[shcha_index] != LATIN_E_ACUTE_CODE:
-        raise RuntimeError(
-            f"expected legacy Щ collision at 0x{LATIN_E_ACUTE_CODE:02X}, "
-            f"got 0x{cyr_codes[shcha_index]:02X}"
-        )
-    if CYRILLIC_SHCHA_SAFE_CODE in cyr_codes:
-        raise RuntimeError(
-            f"safe Щ slot 0x{CYRILLIC_SHCHA_SAFE_CODE:02X} is already used by Cyrillic"
-        )
-    cyr_codes[shcha_index] = CYRILLIC_SHCHA_SAFE_CODE
+    followup = load_followup(repo)
+    rc = int(followup["main"]() or 0)
+    if rc:
+        return rc
+
     print(
-        "[cyrillic-v336] Щ remapped 0x1B -> 0x2F; "
-        "stock Latin é/POKéMON preserved"
+        "[QARRO_FONT_V3_6] PASS: proven Cyrillic mapping + bilingual Moniqa "
+        "English/Russian raster face installed; Ash code untouched"
     )
-
-    indices = {ch: ns["CYRILLIC"].index(ch) for ch in SPECIALS}
-    for ch, (full, _) in SPECIALS.items():
-        if ns["GLYPH_HEX"][indices[ch]] != full:
-            raise RuntimeError(f"{ch} changed from verified v3.3.3 source")
-
-    original_patch_font = ns["patch_font"]
-
-    def patch_font_narrow_specials(path):
-        if path.name == "latin_narrow.png":
-            selected = SPECIALS
-        elif path.name == "latin_narrower.png":
-            selected = {
-                "Д": (SPECIALS["Д"][0], "000000003c24247e42000000"),
-                "Ё": (SPECIALS["Ё"][0], "0000000000143e203e000000"),
-                "Й": (SPECIALS["Й"][0], "0000000038262e3a32000000"),
-                "Ц": (SPECIALS["Ц"][0], "000000004444447e02000000"),
-                "Щ": (SPECIALS["Щ"][0], "000000005454547e02000000"),
-                "б": SPECIALS["б"],
-                "д": SPECIALS["д"],
-                "ё": SPECIALS["ё"],
-                "й": SPECIALS["й"],
-                "р": SPECIALS["р"],
-                "у": SPECIALS["у"],
-                "ф": SPECIALS["ф"],
-                "ц": SPECIALS["ц"],
-                "щ": SPECIALS["щ"],
-            }
-        elif path.name == "latin_normal.png":
-            selected = {
-                "Д": SPECIALS["Д"],
-                "Ё": SPECIALS["Ё"],
-                "Й": SPECIALS["Й"],
-                "Ц": SPECIALS["Ц"],
-                "Щ": SPECIALS["Щ"],
-                "б": SPECIALS["б"],
-                "д": SPECIALS["д"],
-                "ё": SPECIALS["ё"],
-                "й": SPECIALS["й"],
-                "р": SPECIALS["р"],
-                "у": SPECIALS["у"],
-                "ф": SPECIALS["ф"],
-                "ц": SPECIALS["ц"],
-                "щ": SPECIALS["щ"],
-            }
-        elif path.name == "latin_short.png":
-            selected = {
-                "Д": SPECIALS["Д"],
-                "Ё": SPECIALS["Ё"],
-                "Й": SPECIALS["Й"],
-                "Ц": SPECIALS["Ц"],
-                "Щ": SPECIALS["Щ"],
-                "б": SPECIALS["б"],
-                "д": SPECIALS["д"],
-                "ё": SPECIALS["ё"],
-                "й": SPECIALS["й"],
-                "р": SPECIALS["р"],
-                "у": SPECIALS["у"],
-                "ф": SPECIALS["ф"],
-                "ц": SPECIALS["ц"],
-                "щ": SPECIALS["щ"],
-            }
-        elif path.name == "latin_short_narrow.png":
-            selected = {
-                "Д": SPECIALS["Д"],
-                "Ё": SPECIALS["Ё"],
-                "Й": SPECIALS["Й"],
-                "Ц": SPECIALS["Ц"],
-                "Щ": SPECIALS["Щ"],
-                "б": SPECIALS["б"],
-                "д": SPECIALS["д"],
-                "ё": SPECIALS["ё"],
-                "й": SPECIALS["й"],
-                "р": SPECIALS["р"],
-                "у": SPECIALS["у"],
-                "ф": SPECIALS["ф"],
-                "ц": SPECIALS["ц"],
-                "щ": SPECIALS["щ"],
-            }
-        elif path.name == "latin_short_narrower.png":
-            selected = {
-                "Д": (SPECIALS["Д"][0], "000000003c24247e42000000"),
-                "Ё": (SPECIALS["Ё"][0], "0000000000143e203e000000"),
-                "Й": (SPECIALS["Й"][0], "0000000038262e3a32000000"),
-                "Ц": (SPECIALS["Ц"][0], "000000004444447e02000000"),
-                "Щ": (SPECIALS["Щ"][0], "000000005454547e02000000"),
-                "б": SPECIALS["б"],
-                "д": SPECIALS["д"],
-                "ё": SPECIALS["ё"],
-                "й": SPECIALS["й"],
-                "р": SPECIALS["р"],
-                "у": SPECIALS["у"],
-                "ф": SPECIALS["ф"],
-                "ц": SPECIALS["ц"],
-                "щ": SPECIALS["щ"],
-            }
-        elif path.name == "latin_small.png":
-            selected = {
-                "Ё": SPECIALS["Ё"],
-                "Й": SPECIALS["Й"],
-                "б": SPECIALS["б"],
-                "ё": SPECIALS["ё"],
-                "й": SPECIALS["й"],
-                "р": SPECIALS["р"],
-                "у": SPECIALS["у"],
-                "ф": SPECIALS["ф"],
-            }
-        elif path.name == "latin_small_narrow.png":
-            selected = {
-                "Ё": SPECIALS["Ё"],
-                "Й": SPECIALS["Й"],
-                "б": SPECIALS["б"],
-                "ё": SPECIALS["ё"],
-                "й": SPECIALS["й"],
-                "р": SPECIALS["р"],
-                "у": SPECIALS["у"],
-                "ф": SPECIALS["ф"],
-            }
-        elif path.name == "latin_small_narrower.png":
-            selected = {
-                "Ё": SPECIALS["Ё"],
-                "Й": SPECIALS["Й"],
-                "б": SPECIALS["б"],
-                "ё": SPECIALS["ё"],
-                "й": SPECIALS["й"],
-                "р": SPECIALS["р"],
-                "у": (SPECIALS["у"][0], "000000000000221430000000"),
-                "ф": SPECIALS["ф"],
-            }
-        else:
-            return original_patch_font(path)
-
-        selected_indices = {indices[ch] for ch in selected}
-        saved = {
-            idx: (ns["GLYPH_HEX"][idx], ns["SOURCE_BBOXES"][idx])
-            for idx in selected_indices
-        }
-        try:
-            for ch, (_, compact) in selected.items():
-                idx = indices[ch]
-                ns["GLYPH_HEX"][idx] = compact
-                ns["SOURCE_BBOXES"][idx] = ns["source_bbox"](compact)
-            print(f"[cyrillic-v3340] {path.name}: targeted compact Cyrillic masks enabled")
-            return original_patch_font(path)
-        finally:
-            for idx, (old_hex, old_bbox) in saved.items():
-                ns["GLYPH_HEX"][idx] = old_hex
-                ns["SOURCE_BBOXES"][idx] = old_bbox
-
-    ns["patch_font"] = patch_font_narrow_specials
-    return int(ns["main"]() or 0)
+    return 0
 
 
 if __name__ == "__main__":
