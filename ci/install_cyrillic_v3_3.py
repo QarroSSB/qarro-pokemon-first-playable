@@ -5,21 +5,13 @@ Reuses the exact v3.3.3 per-font scaler from commit 6593ba7 and changes only
 verified glyph source masks while an affected atlas is rendered. Full source
 forms remain the reference everywhere else.
 
-Current normal-font CI chain:
-- #86: Щ overflow y=0..18
-- #94: Щ passed; б overflow y=-6..14
-- #95: б passed; д overflow y=0..17
-- #96: д passed; ё overflow y=-8..14
-- #97: ё passed; й overflow y=-8..14
-- #98: й passed; р overflow y=0..20
-- #99: р passed; у overflow y=0..20
-- #100: у passed; ф overflow y=-8..20
-- #101: ф passed; ц overflow y=0..17
-- #102: ц passed; щ overflow y=0..17
+Normal-font CI chain is now fully past all observed compact-glyph blockers.
+Run #103 advanced to latin_short.png and exposed Д overflow y=0..17.
 
-The compact forms below already pass the smaller narrow atlases. Normal uses
-them only after its full form has been proven to clip. Fail-closed checks remain
-active. English, unrelated Cyrillic glyphs, Ash Bond and Ash Cap are untouched.
+The compact forms below already pass the smaller narrow atlases. Additional
+atlases use them only after CI proves the full glyph clips. Fail-closed checks
+remain active. English, unrelated Cyrillic glyphs, Ash Bond and Ash Cap are
+untouched.
 """
 from __future__ import annotations
 
@@ -110,6 +102,10 @@ def main() -> int:
                 "ф": SPECIALS["ф"],
                 "ц": SPECIALS["ц"],
                 "щ": SPECIALS["щ"],
+            }
+        elif path.name == "latin_short.png":
+            selected = {
+                "Д": SPECIALS["Д"],
             }
         else:
             return original_patch_font(path)
