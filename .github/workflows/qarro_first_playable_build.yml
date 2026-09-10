@@ -110,6 +110,7 @@ jobs:
             qarro-repo/ci/install_cyrillic_v3_3.py \
             qarro-repo/ci/localization_ru_core_v3_3.py \
             qarro-repo/ci/localize_oaks_lab_starter_v3_5.py \
+            qarro-repo/ci/localize_early_kanto_v3_9.py \
             qarro-repo/ci/normalize_accented_e_v3_8.py
 
       - name: Install FIRST PLAYABLE data and config
@@ -177,6 +178,13 @@ jobs:
           python3 qarro-repo/ci/localize_oaks_lab_starter_v3_5.py upstream \
             2>&1 | tee qarro_ci_out_v3_8/logs/localization_oaks_lab_starter_v3_5.log
 
+      - name: Apply verified early-Kanto Russian localization
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 qarro-repo/ci/localize_early_kanto_v3_9.py upstream \
+            2>&1 | tee qarro_ci_out_v3_8/logs/localize_early_kanto_v3_9.log
+
       - name: Normalize accented e to ordinary e after localization
         shell: bash
         run: |
@@ -222,6 +230,7 @@ jobs:
           if [[ -f upstream/build/qarro_kanto_wild_v3_4_audit.json ]]; then cp upstream/build/qarro_kanto_wild_v3_4_audit.json qarro_ci_out_v3_8/; fi
           if [[ -f upstream/build/qarro_qol_v3_5_audit.json ]]; then cp upstream/build/qarro_qol_v3_5_audit.json qarro_ci_out_v3_8/; fi
           if [[ -f upstream/build/qarro_ru_oak_lab_starter_v3_5_audit.json ]]; then cp upstream/build/qarro_ru_oak_lab_starter_v3_5_audit.json qarro_ci_out_v3_8/; fi
+          if [[ -f upstream/build/qarro_ru_early_kanto_v3_9_audit.json ]]; then cp upstream/build/qarro_ru_early_kanto_v3_9_audit.json qarro_ci_out_v3_8/; fi
           if [[ -f upstream/build/qarro_normalize_e_v3_8_audit.json ]]; then cp upstream/build/qarro_normalize_e_v3_8_audit.json qarro_ci_out_v3_8/; fi
           for f in pokefirered.map pokefirered.sym; do [[ -f "upstream/$f" ]] && cp "upstream/$f" qarro_ci_out_v3_8/; done
           if [[ -f upstream/pokefirered.gba ]]; then
