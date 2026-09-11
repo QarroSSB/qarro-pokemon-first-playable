@@ -240,6 +240,7 @@ jobs:
           if [[ -f upstream/src/data/trainers_frlg.h ]]; then cp upstream/src/data/trainers_frlg.h qarro_ci_out_v3_8/trainers_frlg.generated.h; fi
           if [[ -f upstream/build/qarro_content_v3_1_audit.json ]]; then cp upstream/build/qarro_content_v3_1_audit.json qarro_ci_out_v3_8/; fi
           if [[ -f upstream/build/qarro_runtime_v3_3_audit.json ]]; then cp upstream/build/qarro_runtime_v3_3_audit.json qarro_ci_out_v3_8/; fi
+          if [[ -f upstream/build/qarro_ground_items_v3_23_audit.json ]]; then cp upstream/build/qarro_ground_items_v3_23_audit.json qarro_ci_out_v3_8/; fi
           if [[ -f upstream/build/qarro_kanto_wild_v3_4_audit.json ]]; then cp upstream/build/qarro_kanto_wild_v3_4_audit.json qarro_ci_out_v3_8/; fi
           if [[ -f upstream/build/qarro_qol_v3_5_audit.json ]]; then cp upstream/build/qarro_qol_v3_5_audit.json qarro_ci_out_v3_8/; fi
           if [[ -f upstream/build/qarro_ru_oak_lab_starter_v3_5_audit.json ]]; then cp upstream/build/qarro_ru_oak_lab_starter_v3_5_audit.json qarro_ci_out_v3_8/; fi
