@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Qarro v3.10 early-Kanto Russian localization continuation.
+"""Qarro v3.11 early-Kanto Russian localization continuation.
 
-Runs the exact verified v3.9 early-Kanto localization from build #265, then
-continues the playable route through Route 2 and Viridian Forest. The new pass
-is fail-closed: every untouched English block must match exactly once.
+Runs the exact verified v3.10 pass (Route 2 + Viridian Forest) and continues
+through the first Kanto Gym: every Pewter Gym / Brock text block is localized.
+The pass is fail-closed: each untouched English block must match exactly once.
 
-Pokemon species, Move and Ability proper names remain English. Ash Bond / Ash
-Cap code is not referenced or changed.
+Pokemon species, Move and Ability proper names remain English. Gameplay,
+trainer data, Ash Bond and Ash Cap are not modified.
 """
 from __future__ import annotations
 
@@ -15,10 +15,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-BASE_COMMIT = "efd18a1123d7e91ab6e857d19b1ed197a4fde3ef"
+BASE_COMMIT = "71d6547a4293eafd75355e5fbd70a55816bb4c98"
 BASE_PATH = "ci/localize_early_kanto_v3_9.py"
-BASE_MARKER = "QARRO_RU_EARLY_KANTO_V3_9"
-MARKER = "QARRO_RU_EARLY_KANTO_V3_10"
+BASE_MARKER = "QARRO_RU_EARLY_KANTO_V3_10"
+MARKER = "QARRO_RU_EARLY_KANTO_V3_11"
 AUDIT_REL = Path("build/qarro_ru_early_kanto_v3_9_audit.json")
 
 
@@ -35,170 +35,200 @@ def load_base() -> str:
 
 
 PATCHES = {
-    "data/maps/Route2_Frlg/scripts.inc": {
-        "Route2_Text_RouteSign": (
-            (r"ROUTE 2\n", r"VIRIDIAN CITY - PEWTER CITY$"),
-            (r"МАРШРУТ 2\n", r"ВИРИДИАН-СИТИ - ПЬЮТЕР-СИТИ$"),
-        ),
-        "Route2_Text_DiglettsCave": (
-            (r"DIGLETT'S CAVE$",),
-            (r"ПЕЩЕРА DIGLETT$",),
-        ),
-    },
-    "data/maps/ViridianForest_Frlg/scripts.inc": {
-        "ViridianForest_Text_FriendsItchingToBattle": (
+    "data/maps/PewterCity_Gym_Frlg/scripts.inc": {
+        "PewterCity_Gym_Text_BrockIntro": (
             (
-                r"I came here with some friends to\n",
-                r"catch us some BUG POKéMON!\p",
-                r"They're all itching to get into\n",
-                r"some POKéMON battles!$",
+                r"So, you're here. I'm BROCK.\n",
+                r"I'm PEWTER's GYM LEADER.\p",
+                r"My rock-hard willpower is evident\n",
+                r"even in my POKéMON.\p",
+                r"My POKéMON are all rock hard, and\n",
+                r"have true-grit determination.\p",
+                r"That's right - my POKéMON are all\n",
+                r"the ROCK type!\p",
+                r"Fuhaha! You're going to challenge\n",
+                r"me knowing that you'll lose?\p",
+                r"That's the TRAINER's honor that\n",
+                r"compels you to challenge me.\p",
+                r"Fine, then!\n",
+                r"Show me your best!{PLAY_BGM}{MUS_RG_ENCOUNTER_GYM_LEADER}$",
             ),
             (
-                r"Я пришёл сюда с друзьями\n",
-                r"ловить ПОКЕМОНОВ-НАСЕКОМЫХ!\p",
-                r"Им всем не терпится\n",
-                r"сразиться в ПОКЕМОН-боях!$",
+                r"Итак, ты пришёл. Я BROCK.\n",
+                r"Я ЛИДЕР ГИМА ПЬЮТЕР-СИТИ.\p",
+                r"Моя воля тверда, как камень,\n",
+                r"как и мои ПОКЕМОНЫ.\p",
+                r"Мои ПОКЕМОНЫ крепки как скала\n",
+                r"и никогда не сдаются.\p",
+                r"Верно - все они каменного типа!\p",
+                r"Ха-ха! Ты всё равно бросаешь\n",
+                r"мне вызов, зная, что проиграешь?\p",
+                r"Такова честь ТРЕНЕРА -\n",
+                r"принять этот вызов.\p",
+                r"Хорошо!\n",
+                r"Покажи всё, на что способен!{PLAY_BGM}{MUS_RG_ENCOUNTER_GYM_LEADER}$",
             ),
         ),
-        "ViridianForest_Text_RickIntro": (
-            (r"Hey! You have POKéMON!\n", r"Come on!\l", r"Let's battle 'em!$"),
-            (r"Эй! У тебя есть ПОКЕМОНЫ!\n", r"Ну же!\l", r"Давай сразимся!$"),
-        ),
-        "ViridianForest_Text_RickDefeat": (
-            (r"No!\nCATERPIE can't hack it!$",),
-            (r"Нет!\nCATERPIE не справился!$",),
-        ),
-        "ViridianForest_Text_RickPostBattle": (
-            (r"Ssh! You'll scare the bugs away.\n", r"Another time, okay?$"),
-            (r"Тсс! Ты распугаешь насекомых.\n", r"В другой раз, ладно?$"),
-        ),
-        "ViridianForest_Text_DougIntro": (
-            (r"Yo!\n", r"You can't jam out if you're a\l", r"POKéMON TRAINER!$"),
-            (r"Йо!\n", r"Если ты ТРЕНЕР ПОКЕМОНОВ,\l", r"от боя не отвертишься!$"),
-        ),
-        "ViridianForest_Text_DougDefeat": (
-            (r"Huh?\n", r"I ran out of POKéMON!$"),
-            (r"Что?\n", r"У меня кончились ПОКЕМОНЫ!$"),
-        ),
-        "ViridianForest_Text_DougPostBattle": (
-            (r"That totally stinks! I'm going to\n", r"catch some stronger ones!$"),
-            (r"Вот отстой! Пойду ловить\n", r"кого-нибудь посильнее!$"),
-        ),
-        "ViridianForest_Text_SammyIntro": (
-            (r"Hey, wait up!\n", r"What's the hurry? Why the rush?$"),
-            (r"Эй, погоди!\n", r"Куда ты так спешишь?$"),
-        ),
-        "ViridianForest_Text_SammyDefeat": (
-            (r"I give!\n", r"You're good at this!$"),
-            (r"Сдаюсь!\n", r"У тебя отлично получается!$"),
-        ),
-        "ViridianForest_Text_SammyPostBattle": (
+        "PewterCity_Gym_Text_BrockDefeat": (
             (
-                r"Sometimes, you can find stuff on\n",
-                r"the ground.\p",
-                r"I'm looking for the stuff I\n",
-                r"dropped. Can you help me?$",
+                r"I took you for granted, and so\n",
+                r"I lost.\p",
+                r"As proof of your victory, I confer\n",
+                r"on you this…the official POKéMON\l",
+                r"LEAGUE BOULDERBADGE.\p",
+                r"{FONT_NORMAL}{PLAYER} received the BOULDERBADGE\n",
+                r"from BROCK!{PAUSE_MUSIC}{PLAY_BGM}{MUS_OBTAIN_BADGE}{PAUSE 0xFE}{PAUSE 0x56}{RESUME_MUSIC}\p",
+                r"{FONT_MALE}Just having the BOULDERBADGE makes\n",
+                r"your POKéMON more powerful.\p",
+                r"It also enables the use of the\n",
+                r"move FLASH outside of battle.\p",
+                r"Of course, a POKéMON must know the\n",
+                r"move FLASH to use it.$",
             ),
             (
-                r"Иногда на земле можно найти\n",
-                r"разные вещи.\p",
-                r"Я ищу то, что потерял.\n",
-                r"Поможешь мне?$",
+                r"Я недооценил тебя и проиграл.\p",
+                r"В знак победы я вручаю тебе\n",
+                r"официальный КАМЕННЫЙ ЗНАЧОК\l",
+                r"ЛИГИ ПОКЕМОНОВ.\p",
+                r"{FONT_NORMAL}{PLAYER} получил КАМЕННЫЙ ЗНАЧОК\n",
+                r"от BROCK!{PAUSE_MUSIC}{PLAY_BGM}{MUS_OBTAIN_BADGE}{PAUSE 0xFE}{PAUSE 0x56}{RESUME_MUSIC}\p",
+                r"{FONT_MALE}КАМЕННЫЙ ЗНАЧОК усиливает\n",
+                r"твоих ПОКЕМОНОВ.\p",
+                r"Он также позволяет применять\n",
+                r"FLASH вне боя.\p",
+                r"Конечно, ПОКЕМОН должен знать\n",
+                r"FLASH, чтобы использовать его.$",
             ),
         ),
-        "ViridianForest_Text_AnthonyIntro": (
-            (r"I might be little, but I won't like\n", r"it if you go easy on me!$"),
-            (r"Я хоть и маленький, но не смей\n", r"мне поддаваться!$"),
+        "PewterCity_Gym_Text_TakeThisWithYou": (
+            (r"Wait!\n", r"Take this with you.$"),
+            (r"Постой!\n", r"Возьми это с собой.$"),
         ),
-        "ViridianForest_Text_AnthonyDefeat": (
-            (r"Oh, boo.\n", r"Nothing went right.$"),
-            (r"Эх...\n", r"Всё пошло не так.$"),
+        "PewterCity_Gym_Text_ReceivedTM39FromBrock": (
+            (r"{PLAYER} received TM39\n", r"from BROCK.$"),
+            (r"{PLAYER} получил ТМ39\n", r"от BROCK.$"),
         ),
-        "ViridianForest_Text_AnthonyPostBattle": (
-            (r"I lost some of my allowance…$",),
-            (r"Я лишился карманных денег...$",),
-        ),
-        "ViridianForest_Text_CharlieIntro": (
-            (r"Did you know that POKéMON evolve?$",),
-            (r"ПОКЕМОНЫ умеют эволюционировать?$",),
-        ),
-        "ViridianForest_Text_CharlieDefeat": (
-            (r"Oh!\n", r"I lost!$"),
-            (r"Ох!\n", r"Я проиграл!$"),
-        ),
-        "ViridianForest_Text_CharliePostBattle": (
-            (r"BUG POKéMON evolve quickly.\n", r"They're a lot of fun!$"),
-            (r"ПОКЕМОНЫ-НАСЕКОМЫЕ быстро\n", r"эволюционируют. С ними весело!$"),
-        ),
-        "ViridianForest_Text_RanOutOfPokeBalls": (
+        "PewterCity_Gym_Text_ExplainTM39": (
             (
-                r"I was throwing POKé BALLS to\n",
-                r"catch POKéMON, and I ran out.\p",
-                r"That's why you can never have too\n",
-                r"many POKé BALLS.$",
-            ),
-            (
-                r"Я ловил ПОКЕМОНОВ ПОКЕБОЛАМИ,\n",
-                r"но они у меня закончились.\p",
-                r"Вот почему ПОКЕБОЛОВ никогда\n",
-                r"не бывает слишком много.$",
-            ),
-        ),
-        "ViridianForest_Text_AvoidGrassyAreasWhenWeak": (
-            (
-                r"TRAINER TIPS\p",
-                r"If your POKéMON are weak and you\n",
-                r"want to avoid battles, stay away\l",
-                r"from grassy areas!$",
+                r"A TM, Technical Machine, contains a\n",
+                r"technique for POKéMON.\p",
+                r"Using a TM teaches the move it\n",
+                r"contains to a POKéMON.\p",
+                r"A TM is good for only one use.\p",
+                r"So, when you use one, pick the\n",
+                r"POKéMON carefully.\p",
+                r"Anyways…\n",
+                r"TM39 contains ROCK TOMB.\p",
+                r"It hurls boulders at the foe and\n",
+                r"lowers its SPEED.$",
             ),
             (
-                r"СОВЕТЫ ТРЕНЕРА\p",
-                r"Если ПОКЕМОНЫ ослабли и ты\n",
-                r"хочешь избежать боёв, держись\l",
-                r"подальше от высокой травы!$",
+                r"ТМ, Техническая Машина,\n",
+                r"содержит приём для ПОКЕМОНОВ.\p",
+                r"Использование ТМ обучает\n",
+                r"ПОКЕМОНА указанному приёму.\p",
+                r"ТМ используется только один раз.\p",
+                r"Поэтому выбирай ПОКЕМОНА\n",
+                r"внимательно.\p",
+                r"В общем...\n",
+                r"ТМ39 содержит ROCK TOMB.\p",
+                r"Он обрушивает камни на врага\n",
+                r"и снижает его СКОРОСТЬ.$",
             ),
         ),
-        "ViridianForest_Text_UseAntidoteForPoison": (
-            (r"For poison, use ANTIDOTE!\n", r"Get it at POKéMON MARTS!$"),
-            (r"От яда - ПРОТИВОЯДИЕ!\n", r"Купи его в ПОКЕ-МАРКЕТЕ!$"),
-        ),
-        "ViridianForest_Text_ContactOakViaPCToRatePokedex": (
-            (r"TRAINER TIPS\p", r"Contact PROF. OAK via a PC to\n", r"get your POKéDEX evaluated!$"),
-            (r"СОВЕТЫ ТРЕНЕРА\p", r"Свяжись с ПРОФ. ОУКОМ через ПК,\n", r"чтобы он оценил твой ПОКЕДЕКС!$"),
-        ),
-        "ViridianForest_Text_CantCatchOwnedMons": (
+        "PewterCity_Gym_Text_BrockPostBattle": (
             (
-                r"TRAINER TIPS\p",
-                r"You can't catch a POKéMON that\n",
-                r"belongs to someone else.\p",
-                r"Throw POKé BALLS only at wild\n",
-                r"POKéMON to catch them!$",
-            ),
-            (
-                r"СОВЕТЫ ТРЕНЕРА\p",
-                r"Нельзя поймать ПОКЕМОНА,\n",
-                r"который принадлежит другому.\p",
-                r"Бросай ПОКЕБОЛЫ только\n",
-                r"в диких ПОКЕМОНОВ!$",
-            ),
-        ),
-        "ViridianForest_Text_WeakenMonsBeforeCapture": (
-            (
-                r"TRAINER TIPS\p",
-                r"Weaken POKéMON before attempting\n",
-                r"capture!\p",
-                r"When healthy, they may escape!$",
+                r"There are all kinds of TRAINERS in\n",
+                r"this huge world of ours.\p",
+                r"You appear to be very gifted as a\n",
+                r"POKéMON TRAINER.\p",
+                r"So let me make a suggestion.\p",
+                r"Go to the GYM in CERULEAN and test\n",
+                r"your abilities.$",
             ),
             (
-                r"СОВЕТЫ ТРЕНЕРА\p",
-                r"Ослабь ПОКЕМОНА перед тем,\n",
-                r"как пытаться его поймать!\p",
-                r"Здоровый ПОКЕМОН может сбежать!$",
+                r"В нашем огромном мире много\n",
+                r"разных ТРЕНЕРОВ.\p",
+                r"Похоже, у тебя настоящий талант\n",
+                r"ТРЕНЕРА ПОКЕМОНОВ.\p",
+                r"Вот мой совет.\p",
+                r"Иди в ГИМ ЦЕРУЛИН-СИТИ и\n",
+                r"проверь свои силы.$",
             ),
         ),
-        "ViridianForest_Text_LeavingViridianForest": (
-            (r"LEAVING VIRIDIAN FOREST\n", r"PEWTER CITY AHEAD$"),
-            (r"ВЫХОД ИЗ ВИРИДИАНСКОГО ЛЕСА\n", r"ВПЕРЕДИ ПЬЮТЕР-СИТИ$"),
+        "PewterCity_Gym_Text_DontHaveRoomForThis": (
+            (r"You don't have room for this.$",),
+            (r"В СУМКЕ нет места для этого.$",),
+        ),
+        "PewterCity_Gym_Text_LiamIntro": (
+            (r"Stop right there, kid!\p", r"You're ten thousand light-years \n", r"from facing BROCK!$"),
+            (r"Стой, малыш!\p", r"До BROCK тебе ещё десять тысяч\n", r"световых лет!$"),
+        ),
+        "PewterCity_Gym_Text_LiamDefeat": (
+            (r"Darn!\p", r"Light-years isn't time…\n", r"It measures distance!$"),
+            (r"Чёрт!\p", r"Световой год - это не время...\n", r"Это единица расстояния!$"),
+        ),
+        "PewterCity_Gym_Text_LiamPostBattle": (
+            (r"You're pretty hot.\n", r"…But not as hot as BROCK!$"),
+            (r"Ты силён.\n", r"...Но до BROCK тебе далеко!$"),
+        ),
+        "PewterCity_Gym_Text_LetMeTakeYouToTheTop": (
+            (
+                r"Hiya!\n",
+                r"Do you want to dream big?\p",
+                r"Do you dare to dream of becoming\n",
+                r"the POKéMON champ?\p",
+                r"I'm no TRAINER, but I can advise\n",
+                r"you on how to win.\p",
+                r"Let me take you to the top!$",
+            ),
+            (
+                r"Привет!\n",
+                r"Хочешь мечтать по-крупному?\p",
+                r"Готов стать ЧЕМПИОНОМ\n",
+                r"ПОКЕМОНОВ?\p",
+                r"Я не ТРЕНЕР, но могу подсказать,\n",
+                r"как побеждать.\p",
+                r"Позволь провести тебя к вершине!$",
+            ),
+        ),
+        "PewterCity_Gym_Text_LetsGetHappening": (
+            (r"All right!\n", r"Let's get happening!$"),
+            (r"Отлично!\n", r"Тогда начинаем!$"),
+        ),
+        "PewterCity_Gym_Text_TryDifferentPartyOrders": (
+            (
+                r"The first POKéMON out in a match is\n",
+                r"at the left of the POKéMON LIST.\p",
+                r"By changing the order of POKéMON,\n",
+                r"you may gain an advantage.\p",
+                r"Try different orders to suit your\n",
+                r"opponent's party.$",
+            ),
+            (
+                r"Первым в бой выходит ПОКЕМОН\n",
+                r"слева в СПИСКЕ ПОКЕМОНОВ.\p",
+                r"Меняя порядок ПОКЕМОНОВ,\n",
+                r"можно получить преимущество.\p",
+                r"Подбирай порядок под команду\n",
+                r"соперника.$",
+            ),
+        ),
+        "PewterCity_Gym_Text_ItsFreeLetsGetHappening": (
+            (r"It's a free service!\n", r"Let's get happening!$"),
+            (r"Это бесплатно!\n", r"Тогда начинаем!$"),
+        ),
+        "PewterCity_Gym_Text_YoureChampMaterial": (
+            (r"Just as I thought!\n", r"You're POKéMON champ material!$"),
+            (r"Так я и думал!\n", r"У тебя задатки ЧЕМПИОНА!$"),
+        ),
+        "PewterCity_Gym_Text_GymStatue": (
+            (r"PEWTER POKéMON GYM\n", r"LEADER: BROCK\p", r"WINNING TRAINERS:\n", r"{RIVAL}$"),
+            (r"ПОКЕМОН-ГИМ ПЬЮТЕР-СИТИ\n", r"ЛИДЕР: BROCK\p", r"ПОБЕДИВШИЕ ТРЕНЕРЫ:\n", r"{RIVAL}$"),
+        ),
+        "PewterCity_Gym_Text_GymStatuePlayerWon": (
+            (r"PEWTER POKéMON GYM\n", r"LEADER: BROCK\p", r"WINNING TRAINERS:\n", r"{RIVAL}, {PLAYER}$"),
+            (r"ПОКЕМОН-ГИМ ПЬЮТЕР-СИТИ\n", r"ЛИДЕР: BROCK\p", r"ПОБЕДИВШИЕ ТРЕНЕРЫ:\n", r"{RIVAL}, {PLAYER}$"),
         ),
     },
 }
@@ -237,7 +267,7 @@ def main() -> int:
 
     code = load_base()
     ns = {
-        "__name__": "qarro_ru_early_kanto_v39_base",
+        "__name__": "qarro_ru_early_kanto_v310_base",
         "__file__": str(Path(__file__).resolve()),
     }
     exec(compile(code, f"{BASE_COMMIT}:{BASE_PATH}", "exec"), ns)
@@ -250,10 +280,10 @@ def main() -> int:
     if not audit_path.is_file():
         raise RuntimeError(f"base localization audit missing: {AUDIT_REL}")
     audit = json.loads(audit_path.read_text(encoding="utf-8"))
-    if audit.get("marker") != BASE_MARKER or audit.get("selectedBlocksLocalized") != 64:
+    if audit.get("marker") != BASE_MARKER or audit.get("selectedBlocksLocalized") != 89:
         raise RuntimeError(
             "base localization audit drift: expected marker "
-            f"{BASE_MARKER!r} and 64 blocks, got "
+            f"{BASE_MARKER!r} and 89 blocks, got "
             f"{audit.get('marker')!r}/{audit.get('selectedBlocksLocalized')!r}"
         )
 
@@ -268,11 +298,11 @@ def main() -> int:
             "selectedBlocks": len(blocks),
             "changedThisRun": changed,
         }
-        print(f"[ru-early-v310] {rel}: {changed}/{len(blocks)} blocks changed")
+        print(f"[ru-early-v311] {rel}: {changed}/{len(blocks)} blocks changed")
 
-    expected_new = 25
+    expected_new = 17
     if sum(len(v) for v in PATCHES.values()) != expected_new:
-        raise RuntimeError("Route 2 / Viridian Forest localization scope drift")
+        raise RuntimeError("Pewter Gym localization scope drift")
     if changed_total != expected_new:
         raise RuntimeError(
             f"fresh pinned checkout should change all {expected_new} new blocks; got {changed_total}"
@@ -280,22 +310,23 @@ def main() -> int:
 
     audit["previousMarker"] = BASE_MARKER
     audit["marker"] = MARKER
-    audit["selectedBlocksLocalized"] = 64 + expected_new
+    audit["selectedBlocksLocalized"] = 89 + expected_new
     audit["blocksChangedThisRun"] = int(audit.get("blocksChangedThisRun", 0)) + changed_total
-    audit["route2Localized"] = True
-    audit["viridianForestLocalized"] = True
-    audit["viridianForestTrainerDialogueLocalized"] = True
-    audit["viridianForestTrainerTipsLocalized"] = True
-    audit["pokemonSpeciesProperNamesEnglish"] = True
-    audit["moveProperNamesEnglish"] = True
-    audit["abilityProperNamesEnglish"] = True
+    audit["pewterGymLocalized"] = True
+    audit["brockDialogueLocalized"] = True
+    audit["pewterGymAdviceLocalized"] = True
+    audit["pokemonSpeciesNamesEnglish"] = True
+    audit["moveNamesEnglish"] = ["FLASH", "ROCK TOMB"]
+    audit["abilityNamesEnglish"] = True
+    audit["gameplayTouched"] = False
+    audit["trainerDataTouched"] = False
     audit["ashBondTouched"] = False
     audit["ashCapTouched"] = False
     audit_path.write_text(json.dumps(audit, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     print(
-        f"[{MARKER}] PASS: base 64 + {expected_new} Route 2/Forest blocks = "
-        f"{audit['selectedBlocksLocalized']} localized blocks"
+        f"[{MARKER}] PASS: base {BASE_MARKER} preserved; "
+        f"localized {changed_total} Pewter Gym/Brock blocks; total={audit['selectedBlocksLocalized']}"
     )
     return 0
 
