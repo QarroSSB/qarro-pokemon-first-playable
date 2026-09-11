@@ -4,8 +4,9 @@
 Runs after the existing QoL and RU foundation audits. It verifies that their
 machine-readable reports exist and still encode the confirmed user policy:
 FireRed / Expansion 1.17.0 / Gen I-V, readable Cyrillic coverage, no money
-loss on defeat, failed-catch Ball refund only, and the one-time post-Pokedex
-starter kit. It changes no gameplay data and does not touch Ash Bond/Cap.
+loss on defeat, failed-catch Ball refund only, the one-time post-Pokedex
+starter kit, and the confirmed post-Viridian visible ground-item progression.
+It changes no gameplay data and does not touch Ash Bond/Cap.
 """
 from __future__ import annotations
 
@@ -42,6 +43,7 @@ def main() -> int:
     build = root / "build"
     qol = load(build / "qarro_qol_regression_v3_10_audit.json")
     ru = load(build / "qarro_ru_foundation_v3_9_audit.json")
+    ground = load(build / "qarro_ground_items_v3_23_audit.json")
 
     require(qol.get("marker") == "QARRO_QOL_REGRESSION_V3_10", "QoL audit marker drift")
     money = qol.get("money", {})
@@ -76,11 +78,25 @@ def main() -> int:
     require(text.get("cyrillic_characters", 0) >= 100, "Russian localization character-count regression")
     require(text.get("accented_e_file_count") == 0, "accented-e normalization regression")
 
+    require(ground.get("marker") == "QARRO_GROUND_ITEMS_V3_23", "ground-item audit marker drift")
+    require(ground.get("preViridianHiddenRemoved") == 1,
+            "pre-Viridian custom pickup regression")
+    require(ground.get("visibleCustomPickupCount") == 4,
+            "post-Viridian visible pickup count regression")
+    pickups = ground.get("visiblePostViridianPickups", [])
+    require(isinstance(pickups, list) and len(pickups) == 4,
+            "post-Viridian pickup evidence regression")
+    require(all(isinstance(p, dict) and p.get("map") in {"Route2_Frlg", "Route3_Frlg", "Route4_Frlg"}
+                for p in pickups), "ground-item route progression regression")
+    require(ground.get("ashBondTouched") is False and ground.get("ashCapTouched") is False,
+            "Ash invariant regression in ground-item audit")
+
     report = {
         "marker": MARKER,
         "policy": "FireRed / Expansion 1.17.0 / Gen I-V",
         "qolRegression": "PASS",
         "ruFoundation": "PASS",
+        "groundItems": "PASS",
         "ashBondTouched": False,
         "ashCapTouched": False,
     }
@@ -89,21 +105,22 @@ def main() -> int:
 
     # The workflow artifact already uploads qarro_ci_out_v3_8/**. Mirror the
     # read-only audit evidence there when running in CI so a GREEN ROM carries
-    # the exact QoL/RU regression proof that gated it. Outside CI this is a no-op.
+    # the exact regression proof that gated it. Outside CI this is a no-op.
     ci_out = root.parent / "qarro_ci_out_v3_8"
     if ci_out.is_dir():
         for name in (
             "qarro_qol_regression_v3_10_audit.json",
             "qarro_ru_foundation_v3_9_audit.json",
+            "qarro_ground_items_v3_23_audit.json",
             "qarro_regression_bundle_v3_11_audit.json",
         ):
             src = build / name
             if not src.is_file():
                 raise RuntimeError(f"missing audit evidence for artifact: {src}")
             (ci_out / name).write_bytes(src.read_bytes())
-        print(f"[{MARKER}] preserved 3 regression audit reports in {ci_out}")
+        print(f"[{MARKER}] preserved 4 regression audit reports in {ci_out}")
 
-    print(f"[{MARKER}] PASS: QoL + RU foundation policies remain internally consistent")
+    print(f"[{MARKER}] PASS: QoL + RU foundation + ground-item policies remain internally consistent")
     print(f"audit: {out}")
     return 0
 
