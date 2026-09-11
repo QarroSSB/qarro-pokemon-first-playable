@@ -1,0 +1,192 @@
+name: Qarro regression smoke
+
+on:
+  push:
+    branches:
+      - test/regression-20260912
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  BASELINE_RUN: "34643545214"
+  BASELINE_ARTIFACT: "Qarro-FIRST-PLAYABLE-v3.8-301"
+  BASELINE_SHA: "7e7d4b4403e2d72360f998de14b0f13828af3427"
+  EXPECTED_ROM_SHA256: "51635760ae35aca01aaf7b97bbb2dc576f56e628889f6186476f7bfa15ae7ed0"
+
+jobs:
+  regression-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout regression branch
+        uses: actions/checkout@v4
+
+      - name: Download exact green baseline artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p baseline regression_out
+          gh run download "$BASELINE_RUN" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "$BASELINE_ARTIFACT" \
+            --dir baseline
+          test -f baseline/Qarro_FIRST_PLAYABLE_v3_8.gba
+          test -f baseline/qarro_qol_regression_v3_10_audit.json
+          test -f baseline/qarro_regression_bundle_v3_11_audit.json
+          test -f baseline/qarro_ru_foundation_v3_9_audit.json
+          test -f baseline/qarro_protected_features_v3_13_audit.json
+
+      - name: Five independent static regression passes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' | tee regression_out/static_regression.log
+          from pathlib import Path
+          import hashlib, json
+
+          root = Path('baseline')
+          rom_path = root / 'Qarro_FIRST_PLAYABLE_v3_8.gba'
+          expected_sha = '51635760ae35aca01aaf7b97bbb2dc576f56e628889f6186476f7bfa15ae7ed0'
+
+          def load(name):
+              return json.loads((root / name).read_text(encoding='utf-8'))
+
+          def one_pass(n):
+              rom = rom_path.read_bytes()
+              assert len(rom) == 32 * 1024 * 1024, len(rom)
+              sha = hashlib.sha256(rom).hexdigest()
+              assert sha == expected_sha, sha
+              assert rom[0xAC:0xB0] == b'BPRE', rom[0xAC:0xB0]
+              assert rom[0xB2] == 0x96, hex(rom[0xB2])
+              calc = (-(sum(rom[0xA0:0xBD]) + 0x19)) & 0xFF
+              assert calc == rom[0xBD], (hex(calc), hex(rom[0xBD]))
+
+              built = load('qarro_built_rom_v3_12_audit.json')
+              assert built['sizeBytes'] == 33554432
+              assert built['gameCode'] == 'BPRE'
+              assert built['sha256'] == expected_sha
+              assert built['ashBondTouched'] is False
+              assert built['ashCapTouched'] is False
+
+              qol = load('qarro_qol_regression_v3_10_audit.json')
+              assert qol['money']['removeMoneyCalls'] == 0
+              assert qol['money']['winRewardPreserved'] is True
+              assert qol['failedCatchBall']['refundCalls'] == 1
+              assert qol['failedCatchBall']['refundAfterSuccessfulCaptureReturn'] is True
+              assert qol['failedCatchBall']['successStillConsumesBall'] is True
+              assert qol['failedCatchBall']['safariExcluded'] is True
+              kit = qol['starterKit']
+              assert kit['oneTimeSceneGuard'] is True
+              assert kit['pokeBallsTotal'] == 20
+              assert kit['potions'] == 10
+              assert kit['antidotes'] == 5
+              assert kit['paralyzeHeals'] == 5
+              assert kit['duplicateNewGameGrant'] is False
+              assert qol['ashBondTouched'] is False
+              assert qol['ashCapTouched'] is False
+
+              bundle = load('qarro_regression_bundle_v3_11_audit.json')
+              assert bundle['policy'] == 'FireRed / Expansion 1.17.0 / Gen I-V'
+              assert bundle['qolRegression'] == 'PASS'
+              assert bundle['ruFoundation'] == 'PASS'
+              assert bundle['groundItems'] == 'PASS'
+              assert bundle['ashBondTouched'] is False
+              assert bundle['ashCapTouched'] is False
+
+              ru = load('qarro_ru_foundation_v3_9_audit.json')
+              assert ru['cyrillic_glyph_count'] == 66
+              assert ru['text']['cyrillic_characters'] >= 29893
+              assert ru['text']['accented_e_file_count'] == 0
+              assert len(ru['fonts']) == 9
+              for name, data in ru['fonts'].items():
+                  assert data['cyrillic_nonempty'] == 66, (name, data)
+                  assert data['advance_raster_matches'] == 66, (name, data)
+
+              protected = load('qarro_protected_features_v3_13_audit.json')
+              assert protected['ashBondTouched'] is False
+              assert protected['ashCapTouched'] is False
+              assert protected['protectedPathHits'] == 0
+              assert protected['protectedDiffLineHits'] == 0
+
+              exp = load('qarro_exp_share_evo_v3_25_audit.json')
+              assert exp['expShareMode'] == 'GEN_6 party-wide key-item toggle'
+              assert exp['offFieldSlotEligible'] is True
+              assert exp['postBattleEvolutionGatePresent'] is True
+              assert exp['gameplayChangedByAudit'] is False
+
+              ground = load('qarro_ground_items_v3_23_audit.json')
+              assert ground['visibleCustomPickupCount'] == 4
+              assert ground['preViridianHiddenRemoved'] == 1
+              assert ground['ashBondTouched'] is False
+              assert ground['ashCapTouched'] is False
+
+              print(f'PASS static regression {n}: sha={sha[:16]}... BPRE header+checksum OK; QoL/RU/protected/EXP/ground evidence OK')
+
+          for i in range(1, 6):
+              one_pass(i)
+          PY
+
+      - name: Install mGBA runtime smoke dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo add-apt-repository -y universe
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends mgba-qt xvfb
+          command -v mgba-qt || test -x /usr/games/mgba-qt
+          (mgba-qt --version || /usr/games/mgba-qt --version) 2>&1 | tee regression_out/mgba_version.log
+
+      - name: Five fresh emulator boot smoke runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROM="$PWD/baseline/Qarro_FIRST_PLAYABLE_v3_8.gba"
+          EMU="$(command -v mgba-qt || true)"
+          [[ -n "$EMU" ]] || EMU=/usr/games/mgba-qt
+          for i in 1 2 3 4 5; do
+            log="regression_out/mgba_boot_${i}.log"
+            set +e
+            timeout --signal=TERM 12s xvfb-run -a -s '-screen 0 640x480x24' "$EMU" "$ROM" >"$log" 2>&1
+            rc=$?
+            set -e
+            if [[ "$rc" -ne 124 ]]; then
+              echo "Boot smoke $i failed: emulator exited before 12s with rc=$rc"
+              cat "$log"
+              exit 1
+            fi
+            echo "PASS emulator boot smoke $i: ROM remained running for 12s" | tee -a regression_out/runtime_summary.log
+          done
+
+      - name: Write regression report
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          out = Path('regression_out')
+          report = {
+              'marker': 'QARRO_REGRESSION_SMOKE_20260912',
+              'baselineRun': 34643545214,
+              'baselineCommit': '7e7d4b4403e2d72360f998de14b0f13828af3427',
+              'staticPassesRequested': 5,
+              'emulatorBootPassesRequested': 5,
+              'scope': 'artifact integrity + ROM header + QoL/RU/protected/EXP/ground evidence + mGBA boot smoke',
+              'note': 'Boot smoke proves the ROM boots and remains alive under mGBA; it does not yet automate gameplay input paths.'
+          }
+          out.mkdir(exist_ok=True)
+          (out / 'regression_report.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
+          PY
+
+      - name: Upload regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Qarro-regression-smoke-${{ github.run_number }}
+          retention-days: 30
+          path: regression_out/**
