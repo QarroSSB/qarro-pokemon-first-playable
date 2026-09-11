@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Qarro v3.13 early-Kanto Russian localization: Pallet starting-zone completion.
+"""Qarro v3.13 early-Kanto Russian localization: finish Pallet Town exterior.
 
-Runs the exact CI-verified v3.12 pass (through Route 3), then closes the
-remaining user-facing text in Pallet Town exterior plus the player's house
-1F/2F. The pass is fail-closed: every untouched English block must match
-exactly once.
+Runs the exact CI-verified v3.12 pass (through Route 3). The core localization
+step already translates the starting room, downstairs home and early Pallet
+Town interactions, so this pass adds only the four genuinely untranslated
+Pallet Town postgame/Oak-rating text blocks. Exact source matching keeps the
+pass fail-closed and avoids double-patching text already translated earlier.
 
 Pokemon species, Move and Ability proper names remain English. Gameplay,
 trainer data, Ash Bond and Ash Cap are not modified.
@@ -37,69 +38,6 @@ def load_base() -> str:
 
 PATCHES = {
     "data/maps/PalletTown_Frlg/scripts.inc": {
-        "PalletTown_Text_OakDontGoOut": (
-            (r"OAK: Hey! Wait!\n", r"Don't go out!$"),
-            (r"ОУК: Эй! Стой!\n", r"Не выходи из города!$"),
-        ),
-        "PalletTown_Text_OakGrassUnsafeNeedMon": (
-            (
-                r"OAK: It's unsafe!\n",
-                r"Wild POKéMON live in tall grass!\p",
-                r"You need your own POKéMON for\n",
-                r"your protection.\p",
-                r"I know!\n",
-                r"Here, come with me!$",
-            ),
-            (
-                r"ОУК: Это опасно!\n",
-                r"В высокой траве живут дикие\n",
-                r"ПОКЕМОНЫ!\p",
-                r"Тебе нужен свой ПОКЕМОН\n",
-                r"для защиты.\p",
-                r"Знаю!\n",
-                r"Иди за мной!$",
-            ),
-        ),
-        "PalletTown_Text_RaisingMonsToo": (
-            (
-                r"I'm raising POKéMON, too.\p",
-                r"When they get strong, they can\n",
-                r"protect me.$",
-            ),
-            (
-                r"Я тоже выращиваю ПОКЕМОНОВ.\p",
-                r"Когда они станут сильнее,\n",
-                r"они смогут меня защитить.$",
-            ),
-        ),
-        "PalletTown_Text_CanStoreItemsAndMonsInPC": (
-            (
-                r"Technology is incredible!\p",
-                r"You can now store and recall items\n",
-                r"and POKéMON as data via PC.$",
-            ),
-            (
-                r"Технологии потрясают!\p",
-                r"Теперь предметы и ПОКЕМОНОВ\n",
-                r"можно хранить в ПК как данные.$",
-            ),
-        ),
-        "PalletTown_Text_OakPokemonResearchLab": (
-            (r"OAK POKéMON RESEARCH LAB$",),
-            (r"ЛАБОРАТОРИЯ ПОКЕМОНОВ ОУКА$",),
-        ),
-        "PalletTown_Text_PlayersHouse": (
-            (r"{PLAYER}'s house$",),
-            (r"Дом {PLAYER}$",),
-        ),
-        "PalletTown_Text_RivalsHouse": (
-            (r"{RIVAL}'s house$",),
-            (r"Дом {RIVAL}$",),
-        ),
-        "PalletTown_Text_TownSign": (
-            (r"PALLET TOWN\n", r"Shades of your journey await!$"),
-            (r"ПАЛЛЕТ-ТАУН\n", r"Здесь начинается твой путь!$"),
-        ),
         "PalletTown_Text_OakLetMeSeePokedex": (
             (
                 r"OAK: Ah, {PLAYER}!\n",
@@ -128,9 +66,9 @@ PATCHES = {
             ),
             (
                 r"Поймано: {STR_VAR_2}...\p",
-                r"Хм, вижу, ты честно стараешься.\p",
-                r"Когда заполнишь его еще\n",
-                r"немного, покажи мне снова.$",
+                r"Хм, вижу, ты стараешься.\p",
+                r"Заполни ПОКЕДЕКС еще немного\n",
+                r"и снова покажи его мне.$",
             ),
         ),
         "PalletTown_Text_CaughtXImpressiveFollowMe": (
@@ -144,7 +82,7 @@ PATCHES = {
             ),
             (
                 r"Поймано... {STR_VAR_2}!?\n",
-                r"Впечатляет!\p",
+                r"Вот это впечатляет!\p",
                 r"Я хотел кое о чем тебя\n",
                 r"попросить, {PLAYER}.\p",
                 r"Идем.\n",
@@ -163,151 +101,13 @@ PATCHES = {
             ),
             (
                 r"ОУК: А, {PLAYER}!\n",
-                r"Похоже, путешествия тебе\n",
-                r"по душе.\p",
-                r"Зная тебя, я уверен:\n",
+                r"Похоже, тебе нравится\n",
+                r"путешествовать.\p",
+                r"Зная тебя, {PLAYER}, уверен:\n",
                 r"ты увидишь еще больше\l",
                 r"далеких мест.\p",
                 r"Так держать!\n",
                 r"Хо-хо-хо.$",
-            ),
-        ),
-        "PalletTown_Text_HmmIsThatRight": (
-            (r"Hmm…\n", r"Is that right…$"),
-            (r"Хм...\n", r"Вот как...$"),
-        ),
-        "PalletTown_Text_OhLookLook": (
-            (r"Oh!\n", r"Look, look!$"),
-            (r"О!\n", r"Смотри, смотри!$"),
-        ),
-        "PalletTown_Text_ReadItReadIt": (
-            (r"Read it, read it!$",),
-            (r"Прочитай, прочитай!$",),
-        ),
-        "PalletTown_Text_PressStartToOpenMenu": (
-            (r"TRAINER TIPS\p", r"Press START to open the MENU!$"),
-            (r"СОВЕТЫ ТРЕНЕРА\p", r"Нажми START, чтобы открыть\n", r"МЕНЮ!$"),
-        ),
-        "PalletTown_Text_SignsAreUsefulArentThey": (
-            (r"Signs are useful, aren't they?$",),
-            (r"Таблички полезны, правда?$",),
-        ),
-        "PalletTown_Text_LookCopiedTrainerTipsSign": (
-            (
-                r"Look, look!\p",
-                r"I copied what it said on one of\n",
-                r"those TRAINER TIPS signs!$",
-            ),
-            (
-                r"Смотри, смотри!\p",
-                r"Я переписала текст с одной\n",
-                r"таблички СОВЕТОВ ТРЕНЕРА!$",
-            ),
-        ),
-        "PalletTown_Text_PressStartToOpenMenuCopy": (
-            (r"TRAINER TIPS!\p", r"Press START to open the MENU!$"),
-            (r"СОВЕТЫ ТРЕНЕРА!\p", r"Нажми START, чтобы открыть\n", r"МЕНЮ!$"),
-        ),
-    },
-    "data/maps/PalletTown_PlayersHouse_1F_Frlg/scripts.inc": {
-        "PalletTown_PlayersHouse_1F_Text_AllBoysLeaveOakLookingForYou": (
-            (
-                r"MOM: …Right.\n",
-                r"All boys leave home someday.\l",
-                r"It said so on TV.\p",
-                r"Oh, yes. PROF. OAK, next door, was\n",
-                r"looking for you.$",
-            ),
-            (
-                r"МАМА: ...Верно.\n",
-                r"Когда-нибудь все мальчики\l",
-                r"уходят из дома.\p",
-                r"Так сказали по ТВ.\p",
-                r"А, да. ПРОФ. ОУК по соседству\n",
-                r"тебя искал.$",
-            ),
-        ),
-        "PalletTown_PlayersHouse_1F_Text_AllGirlsLeaveOakLookingForYou": (
-            (
-                r"MOM: …Right.\n",
-                r"All girls dream of traveling.\l",
-                r"It said so on TV.\p",
-                r"Oh, yes. PROF. OAK, next door, was\n",
-                r"looking for you.$",
-            ),
-            (
-                r"МАМА: ...Верно.\n",
-                r"Все девочки мечтают\l",
-                r"о путешествиях.\p",
-                r"Так сказали по ТВ.\p",
-                r"А, да. ПРОФ. ОУК по соседству\n",
-                r"тебя искал.$",
-            ),
-        ),
-        "PalletTown_PlayersHouse_1F_Text_YouShouldTakeQuickRest": (
-            (r"MOM: {PLAYER}!\n", r"You should take a quick rest.$"),
-            (r"МАМА: {PLAYER}!\n", r"Тебе стоит немного отдохнуть.$"),
-        ),
-        "PalletTown_PlayersHouse_1F_Text_LookingGreatTakeCare": (
-            (
-                r"MOM: Oh, good! You and your\n",
-                r"POKéMON are looking great.\l",
-                r"Take care now!$",
-            ),
-            (
-                r"МАМА: Вот и хорошо! Ты и твои\n",
-                r"ПОКЕМОНЫ отлично выглядите.\l",
-                r"Береги себя!$",
-            ),
-        ),
-        "PalletTown_PlayersHouse_1F_Text_MovieOnTVFourBoysOnRailroad": (
-            (
-                r"There's a movie on TV.\n",
-                r"Four boys are walking on railroad\l",
-                r"tracks.\p",
-                r"…I better go, too.$",
-            ),
-            (
-                r"По телевизору идет фильм.\n",
-                r"Четверо мальчиков идут вдоль\l",
-                r"железной дороги.\p",
-                r"...Мне тоже пора идти.$",
-            ),
-        ),
-        "PalletTown_PlayersHouse_1F_Text_MovieOnTVGirlOnBrickRoad": (
-            (
-                r"There's a movie on TV.\n",
-                r"A girl with her hair in pigtails is\l",
-                r"walking up a brick road.\p",
-                r"…I better go, too.$",
-            ),
-            (
-                r"По телевизору идет фильм.\n",
-                r"Девочка с косичками идет\l",
-                r"по дороге из кирпича.\p",
-                r"...Мне тоже пора идти.$",
-            ),
-        ),
-        "PalletTown_PlayersHouse_1F_Text_OopsWrongSide": (
-            (r"Oops, wrong side…$",),
-            (r"Ой, не с той стороны...$",),
-        ),
-    },
-    "data/maps/PalletTown_PlayersHouse_2F_Frlg/scripts.inc": {
-        "PalletTown_PlayersHouse_2F_Text_PlayedWithNES": (
-            (r"{PLAYER} played with the NES.\p", r"…Okay!\n", r"It's time to go!$"),
-            (r"{PLAYER} играет в NES.\p", r"...Ладно!\n", r"Пора идти!$"),
-        ),
-        "PalletTown_PlayersHouse_2F_Text_PressLRForHelp": (
-            (
-                r"It's a posted notice…\p",
-                r"If you're confused, ask for HELP!\n",
-                r"Press the L or R Button!$",
-            ),
-            (
-                r"На стене висит записка...\p",
-                r"Если запутался, открой ПОМОЩЬ!\n",
-                r"Нажми кнопку L или R!$",
             ),
         ),
     },
@@ -380,9 +180,9 @@ def main() -> int:
         }
         print(f"[ru-early-v313] {rel}: {changed}/{len(blocks)} blocks changed")
 
-    expected_new = 28
+    expected_new = 4
     if sum(len(v) for v in PATCHES.values()) != expected_new:
-        raise RuntimeError("Pallet starting-zone localization scope drift")
+        raise RuntimeError("Pallet Town completion scope drift")
     if changed_total != expected_new:
         raise RuntimeError(
             f"fresh pinned checkout should change all {expected_new} new blocks; got {changed_total}"
@@ -392,8 +192,8 @@ def main() -> int:
     audit["marker"] = MARKER
     audit["selectedBlocksLocalized"] = 132 + expected_new
     audit["blocksChangedThisRun"] = int(audit.get("blocksChangedThisRun", 0)) + changed_total
-    audit["palletTownExteriorLocalized"] = True
-    audit["palletPlayersHouseLocalized"] = True
+    audit["palletTownExteriorCompleted"] = True
+    audit["palletCoreEarlyTextAlreadyHandledByCoreLocalization"] = True
     audit["pokemonSpeciesNamesEnglish"] = True
     audit["moveNamesEnglish"] = True
     audit["abilityNamesEnglish"] = True
@@ -405,7 +205,7 @@ def main() -> int:
 
     print(
         f"[{MARKER}] PASS: base {BASE_MARKER} preserved; "
-        f"localized {changed_total} Pallet starting-zone blocks; "
+        f"localized {changed_total} genuinely untranslated Pallet Town blocks; "
         f"total={audit['selectedBlocksLocalized']}"
     )
     return 0
