@@ -65,7 +65,7 @@ FILES = {
 "PewterCity_House2_Text_MonsLearnTechniquesAsTheyGrow": B(r"По мере роста ПОКЕМОНЫ учат\n",r"новые приемы.\p",r"Но некоторым атакам их должны\n",r"обучать люди.$"),
 "PewterCity_House2_Text_MonsEasierCatchIfStatused": B(r"ПОКЕМОНА легче поймать,\n",r"если у него есть статус.\p",r"Сон, яд, ожог или паралич -\n",r"все это помогает.\p",r"Но поимка ПОКЕМОНА никогда\n",r"не гарантирована!$"),
 }),
-"data/maps/PewterCity_PokemonCenter_1F_Frlg/scripts.inc": ("d4a7e9ef7894e4ee171f6a7173a6c5fa4685a53", {
+"data/maps/PewterCity_PokemonCenter_1F_Frlg/scripts.inc": ("d4a7e9ef7894e4ee171f6a7173a6c5fa4685a53d", {
 "PewterCity_PokemonCenter_1F_Text_TeamRocketMtMoonImOnPhone": B(r"Что!?\p",r"КОМАНДА R на MT. MOON?\n",r"Что?\p",r"Я по телефону говорю!\n",r"Отойди!$"),
 "PewterCity_PokemonCenter_1F_Text_Jigglypuff": B(r"JIGGLYPUFF: Пуу-пупуу!$"),
 "PewterCity_PokemonCenter_1F_Text_WhenJiggylypuffSingsMonsGetDrowsy": B(r"Зеваю!\p",r"Когда JIGGLYPUFF поет,\n",r"ПОКЕМОНОВ клонит в сон...\p",r"...Меня тоже...\n",r"Хр-р-р...$"),
