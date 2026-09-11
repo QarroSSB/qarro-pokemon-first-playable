@@ -66,12 +66,39 @@ def main() -> int:
     if remaining:
         raise RuntimeError(f"accented e remained in authored source: {remaining[:20]}")
 
+    # v3.25 Ability-description localization intentionally makes Gen I-V
+    # descriptions unconditional. On the pinned Expansion source, Snow Warning
+    # is the one block whose #if starts before .description; the localization
+    # pass removes #else/#endif with the old descriptions but leaves that
+    # leading #if behind. Remove only this exact orphaned directive and fail
+    # closed if the expected localized block shape is not present.
+    abilities = root / "src/data/abilities.h"
+    ability_text = abilities.read_text(encoding="utf-8")
+    snow_bad = (
+        '        .name = _("Snow Warning"),\n'
+        '    #if B_SNOW_WARNING >= GEN_9\n'
+        '        .description = COMPOUND_STRING("Вызывает снежную погоду."),\n'
+        '        .aiRating = 8,'
+    )
+    snow_good = (
+        '        .name = _("Snow Warning"),\n'
+        '        .description = COMPOUND_STRING("Вызывает снежную погоду."),\n'
+        '        .aiRating = 8,'
+    )
+    if snow_bad in ability_text:
+        ability_text = ability_text.replace(snow_bad, snow_good, 1)
+        abilities.write_text(ability_text, encoding="utf-8")
+        print(f"[{MARKER}] repaired exact orphaned Snow Warning preprocessor guard")
+    elif snow_good not in ability_text:
+        raise RuntimeError("Snow Warning localized block drifted; refusing speculative repair")
+
     audit = {
         "marker": MARKER,
         "replacement": "é/É -> e/E",
         "replacements": replaced,
         "changedFiles": len(changed_files),
         "sampleFiles": changed_files[:50],
+        "snowWarningGuardRepair": True,
         "charmapTouched": False,
         "fontTablesTouched": False,
         "ashBondTouched": False,
