@@ -18,6 +18,7 @@ ROM_NAME = "Qarro_FIRST_PLAYABLE_v3_8.gba"
 SHA_NAME = ROM_NAME + ".sha256"
 REQUIRED_AUDITS = {
     "qarro_qol_regression_v3_10_audit.json": "QARRO_QOL_REGRESSION_V3_10",
+    "qarro_ground_items_v3_23_audit.json": "QARRO_GROUND_ITEMS_V3_23",
     "qarro_regression_bundle_v3_11_audit.json": "QARRO_REGRESSION_BUNDLE_V3_11",
     "qarro_protected_features_v3_13_audit.json": "QARRO_PROTECTED_FEATURES_V3_13",
 }
