@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Replace unsupported Russian guillemets with FireRed-supported curly quotes.
+"""Normalize unsupported Unicode punctuation after Russian localization.
 
-The early-Kanto localization intentionally runs fail-closed against pinned source
-blocks. One translated Daisy/Clefairy flavor string used Unicode guillemets
-(U+00AB/U+00BB), which the FireRed charmap rejects. The original game already
-uses U+201C/U+201D curly quotes in the same string slot, so normalize only those
-unsupported guillemets after the verified localization pass.
+The verified localization passes intentionally fail closed against pinned source
+blocks, but translated prose can still introduce typographic characters that
+FireRed's assembler/charmap does not accept. Keep the proven Pallet guillemet
+normalization and additionally normalize U+2014 EM DASH in event-script .inc
+files to an ASCII hyphen before the real ARM build.
 
-No gameplay, font raster, or protected Ash features are touched.
+No gameplay, font raster, trainer data, or protected Ash features are touched.
 """
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ import json
 import sys
 from pathlib import Path
 
-MARKER = "QARRO_RU_QUOTES_V3_18"
+MARKER = "QARRO_RU_QUOTES_V3_19"
 TARGET = Path("data/maps/PalletTown_RivalsHouse_Frlg/scripts.inc")
 
 
@@ -39,32 +39,48 @@ def main() -> int:
     text = text.replace("«", "“").replace("»", "”")
     path.write_text(text, encoding="utf-8")
 
-    # Guard the full event-script tree against reintroducing either unsupported
-    # guillemet later in the same CI run.
-    offenders = []
-    for p in (root / "data").rglob("*.inc"):
+    # U+2014 is rejected by the pinned FireRed assembler/charmap. Normalize it
+    # after all verified localization layers so future Russian prose cannot
+    # reintroduce the same late make-firered failure.
+    em_dash_replacements = 0
+    data_root = root / "data"
+    for p in data_root.rglob("*.inc"):
         s = p.read_text(encoding="utf-8")
-        if "«" in s or "»" in s:
+        count = s.count("—")
+        if count:
+            p.write_text(s.replace("—", "-"), encoding="utf-8")
+            em_dash_replacements += count
+
+    # Guard the full event-script tree against reintroducing unsupported
+    # guillemets or em dashes later in the same CI run.
+    offenders = []
+    for p in data_root.rglob("*.inc"):
+        s = p.read_text(encoding="utf-8")
+        if "«" in s or "»" in s or "—" in s:
             offenders.append(str(p.relative_to(root)))
     if offenders:
-        raise RuntimeError(f"unsupported guillemets remain: {offenders[:20]}")
+        raise RuntimeError(f"unsupported punctuation remains: {offenders[:20]}")
 
     audit = {
         "marker": MARKER,
         "target": str(TARGET),
         "replacedLeftGuillemet": left,
         "replacedRightGuillemet": right,
-        "replacement": "U+201C/U+201D FireRed-supported curly quotes",
+        "guillemetReplacement": "U+201C/U+201D FireRed-supported curly quotes",
+        "replacedEmDash": em_dash_replacements,
+        "emDashReplacement": "ASCII hyphen",
         "fontTouched": False,
+        "gameplayTouched": False,
+        "trainerDataTouched": False,
         "ashBondTouched": False,
         "ashCapTouched": False,
     }
     out = root / "build/qarro_ru_quotes_v3_18_audit.json"
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(audit, ensure_ascii=False, indent=2), encoding="utf-8")
+    out.write_text(json.dumps(audit, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(
-        "[QARRO_RU_QUOTES_V3_18] PASS: one unsupported guillemet pair normalized "
-        "to FireRed-supported curly quotes; font/gameplay/Ash untouched"
+        f"[{MARKER}] PASS: guillemets normalized; {em_dash_replacements} unsupported "
+        "em dash(es) normalized; font/gameplay/trainer/Ash untouched"
     )
     return 0
 
