@@ -14,7 +14,6 @@ source does not use it anywhere else at runtime. It fails closed on source drift
 from __future__ import annotations
 
 import json
-import re
 import sys
 from pathlib import Path
 
@@ -39,6 +38,11 @@ def prove_flag_is_available(root: Path) -> dict:
     if expected_define not in flags:
         die("FLAG_0x260 definition changed in pinned FireRed constants")
 
+    # These are definition/aggregation headers, not runtime consumers.
+    constant_definition_files = {
+        Path("include/constants/flags_frlg.h"),
+        Path("include/constants/flags.h"),
+    }
     allowed_after_patch = {
         Path("include/config/item.h"),
         Path("data/maps/PalletTown_ProfessorOaksLab_Frlg/scripts.inc"),
@@ -49,7 +53,7 @@ def prove_flag_is_available(root: Path) -> dict:
         if not path.is_file() or path.suffix.lower() not in {".c", ".h", ".inc", ".s"}:
             continue
         rel = path.relative_to(root)
-        if rel == Path("include/constants/flags_frlg.h"):
+        if rel in constant_definition_files:
             continue
         try:
             text = path.read_text(encoding="utf-8")
@@ -64,7 +68,7 @@ def prove_flag_is_available(root: Path) -> dict:
     return {
         "flag": FLAG,
         "value": "0x260",
-        "preexistingRuntimeUses": [p for p in observed if p not in {str(x) for x in allowed_after_patch}],
+        "runtimeConsumersBeforeOrAfterPatch": observed,
         "reservedForExpShare": True,
     }
 
