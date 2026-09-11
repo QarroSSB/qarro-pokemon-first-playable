@@ -16,7 +16,9 @@ BASE_COUNT = 250
 MARKER = "QARRO_RU_EARLY_KANTO_V3_18"
 AUDIT_REL = Path("build/qarro_ru_early_kanto_v3_9_audit.json")
 ROUTE4_REL = Path("data/maps/Route4_Frlg/scripts.inc")
-ROUTE4_BLOB = "c93e60ba5443fc44fdc8a6371e5d0b1311442be5"
+# Route4 is intentionally modified by content_pass_v3_1.py before localization.
+# Guard the exact deterministic post-content-pass source state seen by this step.
+ROUTE4_BLOB = "e5e8ecc7c88aac5a4a4838651c021158e098c714"
 
 def B(*lines: str) -> tuple[str, ...]: return lines
 
@@ -76,7 +78,7 @@ def main() -> int:
     path = root / ROUTE4_REL
     actual = subprocess.check_output(["git", "-C", str(root), "hash-object", str(path)], text=True).strip()
     if actual != ROUTE4_BLOB:
-        raise RuntimeError(f"{ROUTE4_REL}: pinned source blob drift: {actual} != {ROUTE4_BLOB}")
+        raise RuntimeError(f"{ROUTE4_REL}: post-content source blob drift: {actual} != {ROUTE4_BLOB}")
     text = path.read_text(encoding="utf-8")
     for label, lines in BLOCKS.items():
         text = patch_label(text, label, lines)
