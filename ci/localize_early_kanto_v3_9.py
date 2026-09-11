@@ -1,107 +1,138 @@
 #!/usr/bin/env python3
-"""Qarro v3.15 early-Kanto Russian localization: complete Pewter City exterior.
+"""Qarro v3.16: close untranslated Viridian / Route 2 interior gaps.
 
-Runs the exact CI-verified v3.14 pass from cd003c8, then localizes the remaining
-user-facing English text in PewterCity_Frlg/scripts.inc. Exact source matching
-keeps the pass fail-closed. Pokemon species, Move and Ability proper names stay
-English. Gameplay, trainer data, Ash Bond and Ash Cap are not modified.
+Runs CI-green v3.15, then patches only previously untouched pinned FireRed map
+files. Every source file is checked against its exact pinned git-blob SHA before
+editing. Pokemon species, Move and Ability proper names stay English.
+Gameplay, trainer data, Ash Bond and Ash Cap are not modified.
 """
 from __future__ import annotations
-import json, subprocess, sys
+import json, re, subprocess, sys
 from pathlib import Path
 
-BASE_COMMIT = "cd003c8fa30685d9e1b77c5d466e6ca7f6bf0a69"
+BASE_COMMIT = "3df3c4dc390d79b56a21c8e365d3d9e9bd8c27c8"
 BASE_PATH = "ci/localize_early_kanto_v3_9.py"
-BASE_MARKER = "QARRO_RU_EARLY_KANTO_V3_14"
-MARKER = "QARRO_RU_EARLY_KANTO_V3_15"
+BASE_MARKER = "QARRO_RU_EARLY_KANTO_V3_15"
+BASE_COUNT = 177
+MARKER = "QARRO_RU_EARLY_KANTO_V3_16"
 AUDIT_REL = Path("build/qarro_ru_early_kanto_v3_9_audit.json")
-REL = "data/maps/PewterCity_Frlg/scripts.inc"
-
-def load_base() -> str:
-    repo = Path(__file__).resolve().parents[1]
-    subprocess.run(["git", "-C", str(repo), "fetch", "--quiet", "--depth=1", "origin", BASE_COMMIT], check=True)
-    return subprocess.check_output(["git", "-C", str(repo), "show", f"{BASE_COMMIT}:{BASE_PATH}"], text=True)
 
 def B(*lines: str) -> tuple[str, ...]: return lines
 
-PATCHES = {
-"Text_DreamEaterTeach": (B(r"Yawn!\n",r"I must have dozed off in the sun.\p",r"I had this weird dream about\n",r"a DROWZEE eating my dream.\p",r"And…\n",r"I learned how to eat dreams…\p",r"Oogh, this is too spooky!\p",r"Let me teach it to a POKéMON so\n",r"I can forget about it!$"), B(r"Зеваю!\n",r"Кажется, я задремал на солнце.\p",r"Мне приснился странный сон:\n",r"DROWZEE пожирал мой сон.\p",r"А потом...\n",r"я научился пожирать сны...\p",r"Ух, жутковато!\p",r"Научу этому ПОКЕМОНА,\n",r"чтобы самому забыть!$")),
-"Text_DreamEaterDeclined": (B(r"…Snore…$"), B(r"...Хр-р-р...$")),
-"Text_DreamEaterWhichMon": (B(r"Which POKéMON wants to learn\n",r"DREAM EATER?$"), B(r"Какой ПОКЕМОН хочет выучить\n",r"DREAM EATER?$")),
-"Text_DreamEaterTaught": (B(r"…ZZZ…\n",r"I…can't eat…anymore…$"), B(r"...Хр-р-р...\n",r"Я... больше не могу есть...$")),
-"PewterCity_Text_ClefairyCameFromMoon": (B(r"CLEFAIRY came from the moon.\n",r"That's what the rumor is.\p",r"They appeared after MOON STONES\n",r"fell on MT. MOON.$"), B(r"Говорят, CLEFAIRY пришли с Луны.\p",r"Они появились после того, как\n",r"MOON STONES упали на MT. MOON.$")),
-"PewterCity_Text_BrockOnlySeriousTrainerHere": (B(r"There aren't many serious POKéMON\n",r"TRAINERS here.\p",r"They're all like BUG CATCHERS,\n",r"you know, just hobbyists.\p",r"But PEWTER GYM's BROCK isn't like\n",r"that, not one bit.$"), B(r"Здесь мало серьезных тренеров.\p",r"В основном любители вроде\n",r"ловцов жуков.\p",r"Но BROCK из PEWTER GYM\n",r"совсем другой.$")),
-"PewterCity_Text_DidYouCheckOutMuseum": (B(r"Did you check out the MUSEUM?$"), B(r"Ты уже был в МУЗЕЕ?$")),
-"PewterCity_Text_WerentThoseFossilsAmazing": (B(r"Weren't those fossils from MT. MOON\n",r"amazing?$"), B(r"Правда, окаменелости с MT. MOON\n",r"потрясающие?$")),
-"PewterCity_Text_ReallyYouHaveToGo": (B(r"Really?\n",r"You absolutely have to go!$"), B(r"Правда?\n",r"Тогда тебе обязательно надо туда!$")),
-"PewterCity_Text_ThisIsTheMuseum": (B(r"This is it, the MUSEUM.\p",r"You have to pay to get in, but it's\n",r"worth it. See you around!$"), B(r"Вот он, МУЗЕЙ.\p",r"Вход платный, но оно того стоит.\n",r"Еще увидимся!$")),
-"PewterCity_Text_DoYouKnowWhatImDoing": (B(r"Psssst!\n",r"Do you know what I'm doing?$"), B(r"Пс-с-с!\n",r"Знаешь, что я делаю?$")),
-"PewterCity_Text_ThatsRightItsHardWork": (B(r"That's right!\n",r"It's hard work!$"), B(r"Верно!\n",r"Работа непростая!$")),
-"PewterCity_Text_SprayingRepelToKeepWildMonsOut": (B(r"I'm spraying REPEL to keep wild\n",r"POKéMON out of my garden!$"), B(r"Я распыляю REPEL, чтобы дикие\n",r"ПОКЕМОНЫ не лезли в мой сад!$")),
-"PewterCity_Text_BrocksLookingForChallengersFollowMe": (B(r"You're a TRAINER, right?\p",r"BROCK's looking for new\n",r"challengers. Follow me!$"), B(r"Ты тренер, верно?\p",r"BROCK ищет новых соперников.\n",r"Иди за мной!$")),
-"PewterCity_Text_GoTakeOnBrock": (B(r"If you have the right stuff,\n",r"go take on BROCK!$"), B(r"Если уверен в себе,\n",r"брось вызов BROCK!$")),
-"PewterCity_Text_TrainerTipsEarningEXP": (B(r"TRAINER TIPS\p",r"All POKéMON that appear in battle,\n",r"however briefly, earn EXP Points.$"), B(r"СОВЕТ ТРЕНЕРУ\p",r"Все ПОКЕМОНЫ, участвовавшие\n",r"в бою, получают EXP Points.$")),
-"PewterCity_Text_CallPoliceIfInfoOnThieves": (B(r"NOTICE!\p",r"Thieves have been stealing POKéMON\n",r"fossils from MT. MOON.\p",r"Please call the PEWTER POLICE if\n",r"you have any information.$"), B(r"ОБЪЯВЛЕНИЕ!\p",r"Воры крадут окаменелости\n",r"ПОКЕМОНОВ с MT. MOON.\p",r"Если что-то знаете, сообщите\n",r"полиции ПЬЮТЕРА.$")),
-"PewterCity_Text_MuseumOfScience": (B(r"PEWTER MUSEUM OF SCIENCE$"), B(r"МУЗЕЙ НАУКИ ПЬЮТЕРА$")),
-"PewterCity_Text_GymSign": (B(r"PEWTER CITY POKéMON GYM\n",r"LEADER: BROCK\l",r"The Rock-Solid POKéMON TRAINER!$"), B(r"ПОКЕМОН-ГИМ ПЬЮТЕРА\n",r"ЛИДЕР: BROCK\l",r"Непоколебимый каменный тренер!$")),
-"PewterCity_Text_CitySign": (B(r"PEWTER CITY\n",r"A Stone Gray City$"), B(r"ПЬЮТЕР-СИТИ\n",r"Город каменно-серого цвета$")),
-"PewterCity_Text_OhPlayer": (B(r"Oh, {PLAYER}{KUN}!$"), B(r"О, {PLAYER}{KUN}!$")),
-"PewterCity_Text_AskedToDeliverThis": (B(r"I'm glad I caught up to you.\n",r"I'm PROF. OAK's AIDE.\p",r"I've been asked to deliver this,\n",r"so here you go.$"), B(r"Хорошо, что я тебя догнал.\n",r"Я помощник PROF. OAK.\p",r"Меня просили передать это тебе.\n",r"Держи.$")),
-"PewterCity_Text_ReceivedRunningShoesFromAide": (B(r"{PLAYER} received the\n",r"RUNNING SHOES from the AIDE.$"), B(r"{PLAYER} получает\n",r"RUNNING SHOES от ПОМОЩНИКА.$")),
-"PewterCity_Text_SwitchedShoesWithRunningShoes": (B(r"{PLAYER} switched shoes with the\n",r"RUNNING SHOES.$"), B(r"{PLAYER} переобувается\n",r"в RUNNING SHOES.$")),
-"PewterCity_Text_ExplainRunningShoes": (B(r"Press the B Button to run.\n",r"But only where there's room to run!$"), B(r"Нажми кнопку B, чтобы бежать.\n",r"Но только там, где хватает места!$")),
-"PewterCity_Text_MustBeGoingBackToLab": (B(r"Well, I must be going back to\n",r"the LAB.\p",r"Bye-bye!$"), B(r"Ну, мне пора возвращаться\n",r"в ЛАБОРАТОРИЮ.\p",r"Пока!$")),
-"PewterCity_Text_RunningShoesLetterFromMom": (B(r"There's a letter attached…\p",r"Dear {PLAYER},\p",r"Here is a pair of RUNNING SHOES\n",r"for my beloved challenger.\p",r"Remember, I'll always cheer for\n",r"you! Don't ever give up!\p",r"From Mom$"), B(r"К обуви прикреплено письмо...\p",r"Дорогой {PLAYER},\p",r"Вот RUNNING SHOES для моего\n",r"любимого чемпиона.\p",r"Помни: я всегда болею за тебя!\n",r"Никогда не сдавайся!\p",r"Мама$")),
+FILES = {
+"data/maps/ViridianCity_House_Frlg/scripts.inc": ("17041c37d73dfbf5465c72e09743626bbf3e7c4d", {
+"ViridianCity_House_Text_NicknamingIsFun": B(r"Придумывать прозвища весело,\n",r"но это не так уж просто.\p",r"Хитрые имена хороши, но простые\n",r"легче запомнить.$"),
+"ViridianCity_House_Text_MyDaddyLovesMonsToo": B(r"Мой папа тоже любит ПОКЕМОНОВ.$"),
+"ViridianCity_House_Text_Speary": B(r"SPEARY: Чирик-чирик!$"),
+"ViridianCity_House_Text_SpearowNameSpeary": B(r"SPEAROW\n",r"Имя: SPEARY$"),
+}),
+"data/maps/ViridianCity_School_Frlg/scripts.inc": ("2c8fe149775d5c8839d79e47a2f6ee630dbc626c", {
+"ViridianCity_School_Text_TryingToMemorizeNotes": B(r"Уф! Пытаюсь запомнить все\n",r"свои записи.$"),
+"ViridianCity_School_Text_ReadBlackboardCarefully": B(r"Хорошо!\p",r"Обязательно внимательно прочитай,\n",r"что написано на доске!$"),
+"ViridianCity_School_Text_NotebookFirstPage": B(r"Посмотрим тетрадь.\p",r"Первая страница...\p",r"ПОКЕБОЛЫ используют, чтобы\n",r"ловить ПОКЕМОНОВ.\p",r"В команде можно носить до шести\n",r"ПОКЕМОНОВ.\p",r"Тех, кто растит ПОКЕМОНОВ и\n",r"сражается ими, зовут ТРЕНЕРАМИ.$"),
+"ViridianCity_School_Text_NotebookSecondPage": B(r"Вторая страница...\p",r"Здорового ПОКЕМОНА поймать трудно,\n",r"поэтому сначала ослабь его.\p",r"Яд, ожог или другой статус\n",r"помогут его ослабить.$"),
+"ViridianCity_School_Text_NotebookThirdPage": B(r"Третья страница...\p",r"ТРЕНЕРЫ ПОКЕМОНОВ ищут других,\n",r"чтобы сразиться с ними.\p",r"Для ТРЕНЕРА вкус победы\n",r"особенно сладок.\p",r"В ПОКЕМОН-ГИМАХ повсюду\n",r"постоянно идут бои.$"),
+"ViridianCity_School_Text_NotebookFourthPage": B(r"Четвертая страница...\p",r"Главная цель каждого ТРЕНЕРА\n",r"ПОКЕМОНОВ проста.\p",r"Победить восемь сильнейших\n",r"ЛИДЕРОВ ПОКЕМОН-ГИМОВ.\p",r"Тогда получишь право встретиться...\p",r"с ЭЛИТНОЙ ЧЕТВЕРКОЙ\n",r"ЛИГИ ПОКЕМОНОВ!$"),
+"ViridianCity_School_Text_TurnThePage": B(r"Перевернуть страницу?$"),
+"ViridianCity_School_Text_HeyDontLookAtMyNotes": B(r"ДЕВОЧКА: Эй!\n",r"Не смотри мои записи!$"),
+"ViridianCity_School_Text_BlackboardListsStatusProblems": B(r"На доске перечислены статусные\n",r"проблемы ПОКЕМОНОВ в бою.$"),
+"ViridianCity_School_Text_ReadWhichTopic": B(r"Какую тему хочешь прочитать?$"),
+"ViridianCity_School_Text_ExplainSleep": B(r"Спящий ПОКЕМОН не может\n",r"атаковать.\p",r"Сон сохраняется даже после боя.\p",r"Используй ПРОБУЖДЕНИЕ,\n",r"чтобы разбудить ПОКЕМОНА.$"),
+"ViridianCity_School_Text_ExplainBurn": B(r"Ожог снижает силу АТАКИ\n",r"и постепенно отнимает HP.\p",r"Ожог остается после боя.\n",r"Используй ЛЕЧЕНИЕ ОЖОГА.$"),
+"ViridianCity_School_Text_ExplainPoison": B(r"При отравлении здоровье ПОКЕМОНА\n",r"постепенно уменьшается.\p",r"Яд остается после боя.\n",r"Используй ПРОТИВОЯДИЕ!$"),
+"ViridianCity_School_Text_ExplainFreeze": B(r"Замороженный ПОКЕМОН не может\n",r"двигаться.\p",r"Он остается замороженным после боя.\p",r"Используй ЛЕЧЕНИЕ ЛЬДА,\n",r"чтобы отогреть ПОКЕМОНА.$"),
+"ViridianCity_School_Text_ExplainParalysis": B(r"Паралич снижает СКОРОСТЬ и может\n",r"помешать ПОКЕМОНУ двигаться.\p",r"Паралич остается после боя.\n",r"Используй ЛЕЧЕНИЕ ПАРАЛИЧА.$"),
+}),
+"data/maps/ViridianCity_PokemonCenter_1F_Frlg/scripts.inc": ("eb57a4cc12ab8a60ee57972558b1163656091bdf", {
+"ViridianCity_PokemonCenter_1F_Text_FeelFreeToUsePC": B(r"Можешь свободно пользоваться ПК\n",r"в углу.\p",r"Так сказала медсестра.\n",r"Очень мило с ее стороны!$"),
+"ViridianCity_PokemonCenter_1F_Text_PokeCenterInEveryTown": B(r"В каждом городе впереди есть\n",r"ПОКЕМОН-ЦЕНТР.\p",r"Лечение бесплатное, так что\n",r"смело лечи своих ПОКЕМОНОВ.$"),
+"ViridianCity_PokemonCenter_1F_Text_PokeCentersHealMons": B(r"ПОКЕМОН-ЦЕНТРЫ лечат уставших,\n",r"раненых и потерявших сознание.\p",r"Здесь ПОКЕМОНЫ полностью\n",r"восстанавливают здоровье.$"),
+}),
+"data/maps/Route2_ViridianForest_SouthEntrance_Frlg/scripts.inc": ("6df492b7eaa3f0a026c45fe6e8270a3ac60a0271", {
+"Route2_ViridianForest_SouthEntrance_Text_ForestIsMaze": B(r"Идешь в ВИРИДИАНСКИЙ ЛЕС?\n",r"Там настоящий природный лабиринт.\l",r"Смотри не заблудись.$"),
+"Route2_ViridianForest_SouthEntrance_Text_RattataHasWickedBite": B(r"RATTATA мал, но не стоит\n",r"недооценивать его укус.\p",r"Ты уже поймал одного?$"),
+}),
+"data/maps/Route2_ViridianForest_NorthEntrance_Frlg/scripts.inc": ("1778637c8d6238c3019f2f8ea8212b1d46ae906b", {
+"Route2_ViridianForest_NorthEntrance_Text_ManyMonsOnlyInForests": B(r"Многие ПОКЕМОНЫ живут только\n",r"в лесах и пещерах.\p",r"Будь настойчив и ищи повсюду,\n",r"чтобы находить разные виды.$"),
+"Route2_ViridianForest_NorthEntrance_Text_CanCutSkinnyTrees": B(r"Замечал тонкие деревья у дороги?\p",r"Говорят, их можно срубить\n",r"особой атакой ПОКЕМОНА.$"),
+"Route2_ViridianForest_NorthEntrance_Text_CanCancelEvolution": B(r"Знаешь, как отменить эволюцию?\p",r"Когда ПОКЕМОН эволюционирует,\n",r"процесс можно остановить.\p",r"Так можно растить ПОКЕМОНА,\n",r"не меняя его форму.$"),
+}),
+"data/maps/Route2_House_Frlg/scripts.inc": ("d3aab6eb4777e4963cfe24e9d33e21bd03c60469", {
+"Route2_House_Text_FaintedMonsCanUseFieldMoves": B(r"ПОКЕМОН без сознания лишь не может\n",r"продолжать бой.\p",r"Вне боя он все еще может\n",r"использовать атаки вроде CUT.$"),
+}),
+"data/maps/Route2_EastBuilding_Frlg/scripts.inc": ("eed59e03fb00a397e4c6be6b176d1e7244eb4fbf", {
+"Route2_EastBuilding_Text_GiveHM05IfSeen10Mons": B(r"Привет! Помнишь меня?\n",r"Я один из помощников PROF. OAK.\p",r"Если в ПОКЕДЕКСЕ есть данные\n",r"о десяти видах, я должен\l",r"дать тебе награду.\p",r"PROF. OAK доверил мне HM05.\p",r"Итак, {PLAYER}, скажи:\p",r"у тебя есть данные хотя бы\n",r"о десяти видах ПОКЕМОНОВ?$"),
+"Route2_EastBuilding_Text_GreatHereYouGo": B(r"Отлично! У тебя есть данные\n",r"о {STR_VAR_3} видах ПОКЕМОНОВ!\p",r"Поздравляю!\n",r"Держи!$"),
+"Route2_EastBuilding_Text_ReceivedHM05FromAide": B(r"{PLAYER} получает HM05\n",r"от ПОМОЩНИКА.$"),
+"Route2_EastBuilding_Text_ExplainHM05": B(r"В HM05 находится скрытая атака\n",r"FLASH.\p",r"FLASH освещает даже самые темные\n",r"пещеры и подземелья.$"),
+"Route2_EastBuilding_Text_CanGetThroughRockTunnel": B(r"Когда ПОКЕМОН выучит FLASH,\n",r"ты сможешь пройти ROCK TUNNEL.$"),
+}),
 }
+
+def load_base() -> str:
+    repo = Path(__file__).resolve().parents[1]
+    subprocess.run(["git","-C",str(repo),"fetch","--quiet","--depth=1","origin",BASE_COMMIT], check=True)
+    return subprocess.check_output(["git","-C",str(repo),"show",f"{BASE_COMMIT}:{BASE_PATH}"], text=True)
 
 def render(label: str, lines: tuple[str, ...]) -> str:
     return label + "::\n" + "".join(f'\t.string "{line}"\n' for line in lines)
+
+def patch_label(text: str, label: str, lines: tuple[str, ...]) -> str:
+    pat = re.compile(rf"(?m)^{re.escape(label)}::\n(?:\t\.string .*\n)+")
+    hits = list(pat.finditer(text))
+    if len(hits) != 1:
+        raise RuntimeError(f"{label}: expected exactly one string block, got {len(hits)}")
+    old = hits[0].group(0)
+    if any("\u0400" <= ch <= "\u04ff" for ch in old):
+        raise RuntimeError(f"{label}: source block unexpectedly already contains Cyrillic")
+    return text[:hits[0].start()] + render(label, lines) + text[hits[0].end():]
 
 def main() -> int:
     if len(sys.argv) != 2:
         print(f"usage: {Path(sys.argv[0]).name} <pokeemerald-expansion-root>", file=sys.stderr); return 2
     code = load_base()
-    ns = {"__name__":"qarro_ru_early_kanto_v314_base", "__file__":str(Path(__file__).resolve())}
+    ns = {"__name__":"qarro_ru_early_kanto_v315_base","__file__":str(Path(__file__).resolve())}
     exec(compile(code, f"{BASE_COMMIT}:{BASE_PATH}", "exec"), ns)
     rc = int(ns["main"]() or 0)
     if rc: return rc
     root = Path(sys.argv[1]).resolve()
     audit_path = root / AUDIT_REL
     audit = json.loads(audit_path.read_text(encoding="utf-8"))
-    if audit.get("marker") != BASE_MARKER or audit.get("selectedBlocksLocalized") != 150:
+    if audit.get("marker") != BASE_MARKER or audit.get("selectedBlocksLocalized") != BASE_COUNT:
         raise RuntimeError(f"base localization audit drift: {audit.get('marker')!r}/{audit.get('selectedBlocksLocalized')!r}")
-    path = root / REL
-    text = path.read_text(encoding="utf-8")
-    changed = 0
-    for label, (old_lines, new_lines) in PATCHES.items():
-        old, new = render(label, old_lines), render(label, new_lines)
-        oc, nc = text.count(old), text.count(new)
-        if oc == 1 and nc == 0:
-            text = text.replace(old, new, 1); changed += 1
-        elif oc == 0 and nc == 1:
-            pass
-        else:
-            raise RuntimeError(f"{REL}: {label}: expected one untouched or translated block; old={oc}, new={nc}")
-    if changed != len(PATCHES):
-        raise RuntimeError(f"fresh pinned checkout should change all {len(PATCHES)} Pewter blocks; got {changed}")
-    path.write_text(text, encoding="utf-8")
-    audit.setdefault("files", {})[REL] = {"selectedBlocks": len(PATCHES), "changedThisRun": changed}
-    audit["previousMarker"] = BASE_MARKER
-    audit["marker"] = MARKER
-    audit["selectedBlocksLocalized"] = 150 + changed
-    audit["blocksChangedThisRun"] = int(audit.get("blocksChangedThisRun", 0)) + changed
-    audit["pewterCityExteriorLocalized"] = True
-    audit["pewterRunningShoesLocalized"] = True
-    audit["dreamEaterTutorDialogueLocalized"] = True
-    audit["pokemonSpeciesProperNamesEnglish"] = True
-    audit["moveProperNamesEnglish"] = True
-    audit["abilityProperNamesEnglish"] = True
-    audit["gameplayTouched"] = False
-    audit["trainerDataTouched"] = False
-    audit["ashBondTouched"] = False
-    audit["ashCapTouched"] = False
-    audit_path.write_text(json.dumps(audit, indent=2, ensure_ascii=False)+"\n", encoding="utf-8")
-    print(f"[{MARKER}] PASS: base 150 + {changed} Pewter City blocks = {150 + changed} localized blocks")
+    changed_total = 0
+    for rel, (blob, blocks) in FILES.items():
+        path = root / rel
+        actual = subprocess.check_output(["git","-C",str(root),"hash-object",str(path)], text=True).strip()
+        if actual != blob:
+            raise RuntimeError(f"{rel}: pinned source blob drift: {actual} != {blob}")
+        text = path.read_text(encoding="utf-8")
+        for label, lines in blocks.items():
+            text = patch_label(text, label, lines)
+            changed_total += 1
+        path.write_text(text, encoding="utf-8")
+        audit.setdefault("files", {})[rel] = {"selectedBlocks":len(blocks),"changedThisRun":len(blocks),"sourceBlob":blob}
+        print(f"[ru-early-v316] {rel}: {len(blocks)}/{len(blocks)} blocks changed")
+    expected_new = sum(len(v[1]) for v in FILES.values())
+    if expected_new != 33 or changed_total != expected_new:
+        raise RuntimeError(f"Viridian/Route2 scope drift: expected 33, got {expected_new}/{changed_total}")
+    audit.update({
+        "previousMarker": BASE_MARKER,
+        "marker": MARKER,
+        "selectedBlocksLocalized": BASE_COUNT + expected_new,
+        "blocksChangedThisRun": int(audit.get("blocksChangedThisRun",0)) + changed_total,
+        "viridianAccessibleInteriorsLocalized": True,
+        "route2BuildingsAndForestGatesLocalized": True,
+        "pokemonSpeciesProperNamesEnglish": True,
+        "moveProperNamesEnglish": True,
+        "abilityProperNamesEnglish": True,
+        "gameplayTouched": False,
+        "trainerDataTouched": False,
+        "ashBondTouched": False,
+        "ashCapTouched": False,
+    })
+    audit_path.write_text(json.dumps(audit, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(f"[{MARKER}] PASS: base {BASE_COUNT} + {expected_new} interior/gate blocks = {BASE_COUNT + expected_new}")
     return 0
 
 if __name__ == "__main__":
