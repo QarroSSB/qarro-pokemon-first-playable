@@ -2,7 +2,7 @@ name: Qarro FIRST PLAYABLE v3.8 readable RU+EN foundation
 
 on:
   push:
-    branches: [main]
+    branches: [main, test/gym-5of6-rework-20260911]
   workflow_dispatch:
 
 permissions:
