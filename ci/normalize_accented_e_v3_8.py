@@ -7,8 +7,9 @@ used by the localization scripts remain valid during their own execution.
 
 Charmap/font tables are deliberately excluded; the legacy FireRed slot stays
 untouched but no authored game text should reference it after this pass.
-After normalization, run the read-only RU font/localization foundation audit,
-consolidated QoL/RU regression bundle, and protected Ash feature guard.
+After normalization, re-run final-state QoL and Exp. Share regressions, then
+run the read-only RU font/localization foundation audit, consolidated QoL/RU
+regression bundle, and protected Ash feature guard.
 """
 from __future__ import annotations
 
@@ -99,6 +100,8 @@ def main() -> int:
         "changedFiles": len(changed_files),
         "sampleFiles": changed_files[:50],
         "snowWarningGuardRepair": True,
+        "finalStateQolRegression": True,
+        "finalStateExpShareRegression": True,
         "charmapTouched": False,
         "fontTablesTouched": False,
         "ashBondTouched": False,
@@ -114,6 +117,23 @@ def main() -> int:
     )
 
     here = Path(__file__).resolve().parent
+
+    # Second regression pass over the FINAL source state. The same QoL audit is
+    # already run when the QoL patch is installed, but later localization also
+    # edits Oak's scripts. Re-running here proves no later pass damaged the
+    # no-money-loss, failed-catch Ball, or one-time post-Pokedex kit behavior.
+    qol_audit = here / "audit_qol_regressions_v3_10.py"
+    if not qol_audit.is_file():
+        raise RuntimeError(f"missing final-state QoL regression audit: {qol_audit}")
+    subprocess.run([sys.executable, str(qol_audit), str(root)], check=True)
+
+    # Exp. Share is audited once immediately after installation and again here
+    # after every localization/normalization pass, catching late source drift.
+    exp_audit = here / "audit_exp_share_evolution_v3_25.py"
+    if not exp_audit.is_file():
+        raise RuntimeError(f"missing final-state Exp. Share regression audit: {exp_audit}")
+    subprocess.run([sys.executable, str(exp_audit), str(root)], check=True)
+
     ru_audit = here / "audit_ru_foundation_v3_9.py"
     if not ru_audit.is_file():
         raise RuntimeError(f"missing RU foundation audit: {ru_audit}")
