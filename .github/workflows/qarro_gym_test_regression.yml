@@ -1,0 +1,199 @@
+name: Qarro Gym test regression
+
+on:
+  push:
+    branches:
+      - test/gym-5of6-rework-20260911
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  BASELINE_RUN: "34653223047"
+  BASELINE_ARTIFACT: "Qarro-FIRST-PLAYABLE-v3.8-303"
+  EXPECTED_ROM_SHA256: "9db853feced23206eaafb997d60d837b9afc04b30da9325377dc65641386f19d"
+
+jobs:
+  gym-test-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout isolated Gym test branch
+        uses: actions/checkout@v4
+
+      - name: Download exact green Gym test artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p baseline regression_out
+          gh run download "$BASELINE_RUN" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "$BASELINE_ARTIFACT" \
+            --dir baseline
+          test -f baseline/Qarro_FIRST_PLAYABLE_v3_8.gba
+          test -f baseline/logs/balance_kanto_v3_2.log
+          test -f baseline/logs/qol_v3_5.log
+          test -f baseline/qarro_built_rom_v3_12_audit.json
+          test -f baseline/qarro_qol_regression_v3_10_audit.json
+          test -f baseline/qarro_regression_bundle_v3_11_audit.json
+          test -f baseline/qarro_protected_features_v3_13_audit.json
+
+      - name: Five independent Gym and QoL evidence passes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' | tee regression_out/static_regression.log
+          from pathlib import Path
+          import hashlib, json
+
+          root = Path('baseline')
+          rom_path = root / 'Qarro_FIRST_PLAYABLE_v3_8.gba'
+          expected_sha = '9db853feced23206eaafb997d60d837b9afc04b30da9325377dc65641386f19d'
+
+          leaders = {
+              'BROCK': ('Regirock -> Rhyperior', 'Ace=Tyranitar'),
+              'MISTY': ('Suicune -> Milotic', 'Ace=Starmie'),
+              'LT_SURGE': ('Zapdos -> Eelektross', 'Ace=Electivire'),
+              'ERIKA': ('Virizion -> Roserade', 'Ace=Venusaur'),
+              'KOGA': ('Darkrai -> Drapion', 'Ace=Crobat'),
+              'SABRINA': ('Mewtwo -> Gallade', 'Ace=Alakazam'),
+              'BLAINE': ('Moltres -> Chandelure', 'Ace=Arcanine'),
+              'GIOVANNI': ('Groudon -> Hippowdon', 'Ace=Nidoking'),
+          }
+
+          def load(name):
+              return json.loads((root / name).read_text(encoding='utf-8'))
+
+          balance_log = (root / 'logs/balance_kanto_v3_2.log').read_text(encoding='utf-8')
+          qol_log = (root / 'logs/qol_v3_5.log').read_text(encoding='utf-8')
+
+          def one_pass(n):
+              rom = rom_path.read_bytes()
+              assert len(rom) == 32 * 1024 * 1024, len(rom)
+              sha = hashlib.sha256(rom).hexdigest()
+              assert sha == expected_sha, sha
+              assert rom[0xAC:0xB0] == b'BPRE', rom[0xAC:0xB0]
+              assert rom[0xB2] == 0x96, hex(rom[0xB2])
+              calc = (-(sum(rom[0xA0:0xBD]) + 0x19)) & 0xFF
+              assert calc == rom[0xBD], (hex(calc), hex(rom[0xBD]))
+
+              assert '[QARRO_GYM_FIVE_V3_26] PASS:' in balance_log
+              assert 'save-stable five' in balance_log
+              assert 'designated Ace always present' in balance_log
+              assert '[QARRO_BALANCE_GYM_V3_25] PASS:' in balance_log
+              for leader, (replacement, ace) in leaders.items():
+                  marker = f'TRAINER_LEADER_{leader}'
+                  assert marker in balance_log, marker
+                  assert replacement in balance_log, replacement
+                  assert ace in balance_log, ace
+
+              assert '[QARRO_EXP_SHARE_V3_22] PASS:' in qol_log
+              assert 'party-wide toggle ON by default' in qol_log
+              assert 'switch it OFF/ON' in qol_log
+              assert 'Gen I-V content policy' in qol_log
+
+              qol = load('qarro_qol_regression_v3_10_audit.json')
+              assert qol['money']['removeMoneyCalls'] == 0
+              assert qol['money']['winRewardPreserved'] is True
+              assert qol['failedCatchBall']['refundCalls'] == 1
+              assert qol['failedCatchBall']['successStillConsumesBall'] is True
+              assert qol['failedCatchBall']['safariExcluded'] is True
+              kit = qol['starterKit']
+              assert kit['oneTimeSceneGuard'] is True
+              assert kit['pokeBallsTotal'] == 20
+              assert kit['potions'] == 10
+              assert kit['antidotes'] == 5
+              assert kit['paralyzeHeals'] == 5
+              assert kit['duplicateNewGameGrant'] is False
+              assert qol['ashBondTouched'] is False
+              assert qol['ashCapTouched'] is False
+
+              bundle = load('qarro_regression_bundle_v3_11_audit.json')
+              assert bundle['policy'] == 'FireRed / Expansion 1.17.0 / Gen I-V'
+              assert bundle['qolRegression'] == 'PASS'
+              assert bundle['ashBondTouched'] is False
+              assert bundle['ashCapTouched'] is False
+
+              built = load('qarro_built_rom_v3_12_audit.json')
+              assert built['sizeBytes'] == 33554432
+              assert built['gameCode'] == 'BPRE'
+              assert built['sha256'] == expected_sha
+              assert built['ashBondTouched'] is False
+              assert built['ashCapTouched'] is False
+
+              protected = load('qarro_protected_features_v3_13_audit.json')
+              assert protected['ashBondTouched'] is False
+              assert protected['ashCapTouched'] is False
+              assert protected['protectedPathHits'] == 0
+              assert protected['protectedDiffLineHits'] == 0
+
+              print(f'PASS Gym regression {n}: {sha[:16]}...; 8 no-legend pools + protected Aces + EXP Share + QoL + Ash protection evidence OK')
+
+          for i in range(1, 6):
+              one_pass(i)
+          PY
+
+      - name: Install mGBA runtime smoke dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo add-apt-repository -y universe
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends mgba-qt xvfb
+          command -v mgba-qt || test -x /usr/games/mgba-qt
+          (mgba-qt --version || /usr/games/mgba-qt --version) 2>&1 | tee regression_out/mgba_version.log
+
+      - name: Five fresh emulator boot smoke runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROM="$PWD/baseline/Qarro_FIRST_PLAYABLE_v3_8.gba"
+          EMU="$(command -v mgba-qt || true)"
+          [[ -n "$EMU" ]] || EMU=/usr/games/mgba-qt
+          for i in 1 2 3 4 5; do
+            log="regression_out/mgba_boot_${i}.log"
+            set +e
+            timeout --signal=TERM 12s xvfb-run -a -s '-screen 0 640x480x24' "$EMU" "$ROM" >"$log" 2>&1
+            rc=$?
+            set -e
+            if [[ "$rc" -ne 124 ]]; then
+              echo "Boot smoke $i failed: emulator exited before 12s with rc=$rc"
+              cat "$log"
+              exit 1
+            fi
+            echo "PASS emulator boot smoke $i: Gym test ROM remained running for 12s" | tee -a regression_out/runtime_summary.log
+          done
+
+      - name: Write Gym test regression report
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          out = Path('regression_out')
+          report = {
+              'marker': 'QARRO_GYM_TEST_REGRESSION_20260912',
+              'baselineRun': 34653223047,
+              'baselineCommit': 'ac674e62bec17c2bdc9025e95dd4757f3055a8eb',
+              'romSha256': '9db853feced23206eaafb997d60d837b9afc04b30da9325377dc65641386f19d',
+              'staticPassesRequested': 5,
+              'emulatorBootPassesRequested': 5,
+              'scope': 'exact #303 artifact + 8 Gym no-legend/Ace/save-stable evidence + EXP Share/QoL/protected evidence + mGBA boot smoke',
+              'note': 'This proves compiled evidence and boot stability of the isolated Gym test ROM. It does not yet automate controller input through a full Gym battle or save/reload sequence.'
+          }
+          out.mkdir(exist_ok=True)
+          (out / 'gym_test_regression_report.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
+          PY
+
+      - name: Upload Gym regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Qarro-gym-test-regression-${{ github.run_number }}
+          retention-days: 30
+          path: regression_out/**
