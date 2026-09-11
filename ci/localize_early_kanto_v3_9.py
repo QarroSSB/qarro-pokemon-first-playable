@@ -1,27 +1,74 @@
 #!/usr/bin/env python3
-"""Qarro v3.26: localize the Route 5 Underground Path sign.
+"""Qarro v3.27: localize Route 6 exterior trainer dialogue and sign.
 
-Runs CI-green v3.25 first, then localizes the remaining Route 5 sign text in
-Route5_Frlg/scripts.inc. Pokemon species, Move and Ability proper names stay
-English. Gameplay, trainer data, Ash Bond and Ash Cap are not modified.
+Runs CI-green v3.26 first, then localizes the remaining Route 6 user-facing
+text in Route6_Frlg/scripts.inc. Pokemon species, Move and Ability proper names
+stay English. Gameplay, trainer data, Ash Bond and Ash Cap are not modified.
 """
 from __future__ import annotations
 import json, re, subprocess, sys
 from pathlib import Path
 
-BASE_COMMIT = "1d8fe2282b9060d4650d7391d051e9c41d9a26de"
+BASE_COMMIT = "704fb74f7b6171f53ef1a38e03352dbda87dd667"
 BASE_PATH = "ci/localize_early_kanto_v3_9.py"
-BASE_MARKER = "QARRO_RU_EARLY_KANTO_V3_25"
-BASE_COUNT = 396
-MARKER = "QARRO_RU_EARLY_KANTO_V3_26"
+BASE_MARKER = "QARRO_RU_EARLY_KANTO_V3_26"
+BASE_COUNT = 397
+MARKER = "QARRO_RU_EARLY_KANTO_V3_27"
 AUDIT_REL = Path("build/qarro_ru_early_kanto_v3_9_audit.json")
-REL = Path("data/maps/Route5_Frlg/scripts.inc")
-SOURCE_BLOB = "ff2d0756081c3a5354448bfc2e5b6b679fd64e1f"
+REL = Path("data/maps/Route6_Frlg/scripts.inc")
+SOURCE_BLOB = "04d9f984145d4b671a869a8804d52dceaf959bb5"
 
 def B(*lines: str) -> tuple[str, ...]: return lines
 
 BLOCKS = {
-    "Route5_Text_UndergroundPathSign": B(
+    "Route6_Text_RickyIntro": B(
+        r"Кто там?\n",
+        r"Хватит нас подслушивать!$"),
+    "Route6_Text_RickyDefeat": B(r"Я просто не могу победить!$"),
+    "Route6_Text_RickyPostBattle": B(
+        r"Шепот…\n",
+        r"Шепот…$"),
+    "Route6_Text_NancyIntro": B(
+        r"Извини!\n",
+        r"Это личный разговор!$"),
+    "Route6_Text_NancyDefeat": B(
+        r"Уф!\n",
+        r"Ненавижу проигрывать.$"),
+    "Route6_Text_NancyPostBattle": B(
+        r"Шепот…\n",
+        r"Шепот…$"),
+    "Route6_Text_KeigoIntro": B(r"Здесь не так много насекомых.$"),
+    "Route6_Text_KeigoDefeat": B(
+        r"Нет!\n",
+        r"Ты шутишь!$"),
+    "Route6_Text_KeigoPostBattle": B(
+        r"Я люблю насекомых, так что вернусь\n",
+        r"в ВИРИДИАНСКИЙ ЛЕС.$"),
+    "Route6_Text_JeffIntro": B(
+        r"А?\n",
+        r"Хочешь поговорить со мной?$"),
+    "Route6_Text_JeffDefeat": B(
+        r"Вот отстой…\n",
+        r"Я не справился с твоим вызовом…$"),
+    "Route6_Text_JeffPostBattle": B(
+        r"Надо брать с собой больше ПОКЕМОНОВ.\n",
+        r"Так я буду чувствовать себя спокойнее.$"),
+    "Route6_Text_IsabelleIntro": B(
+        r"Я?\n",
+        r"Ну ладно. Давай сыграем!$"),
+    "Route6_Text_IsabelleDefeat": B(r"Ничего не получилось…$"),
+    "Route6_Text_IsabellePostBattle": B(
+        r"Я хочу стать сильнее.\n",
+        r"В чем твой секрет?$"),
+    "Route6_Text_ElijahIntro": B(
+        r"Я тебя раньше здесь не видел.\n",
+        r"Ты хорошо сражаешься?$"),
+    "Route6_Text_ElijahDefeat": B(r"Ты слишком силен!$"),
+    "Route6_Text_ElijahPostBattle": B(
+        r"Мои ПОКЕМОНЫ слабые?\n",
+        r"Или это я плохо сражаюсь?\l",
+        r"Как думаешь?$"),
+    "Route6_Text_UndergroundPathSign": B(
         r"ПОДЗЕМНЫЙ ПЕРЕХОД\n",
         r"CERULEAN CITY - VERMILION CITY$"),
 }
@@ -56,7 +103,7 @@ def main() -> int:
         raise RuntimeError(f"{REL}: pinned source blob drift before base pass: {actual} != {SOURCE_BLOB}")
 
     code = load_base()
-    ns = {"__name__": "qarro_ru_early_kanto_v325_base", "__file__": str(Path(__file__).resolve())}
+    ns = {"__name__": "qarro_ru_early_kanto_v326_base", "__file__": str(Path(__file__).resolve())}
     exec(compile(code, f"{BASE_COMMIT}:{BASE_PATH}", "exec"), ns)
     rc = int(ns["main"]() or 0)
     if rc:
@@ -73,8 +120,8 @@ def main() -> int:
     path.write_text(text, encoding="utf-8")
 
     changed = len(BLOCKS)
-    if changed != 1:
-        raise RuntimeError(f"Route 5 scope drift: expected 1 block, got {changed}")
+    if changed != 19:
+        raise RuntimeError(f"Route 6 scope drift: expected 19 blocks, got {changed}")
     previous = audit.get("files", {}).get(str(REL), {})
     audit.setdefault("files", {})[str(REL)] = {
         "selectedBlocks": int(previous.get("selectedBlocks", 0)) + changed,
@@ -86,7 +133,7 @@ def main() -> int:
         "marker": MARKER,
         "selectedBlocksLocalized": BASE_COUNT + changed,
         "blocksChangedThisRun": int(audit.get("blocksChangedThisRun", 0)) + changed,
-        "route5ExteriorComplete": True,
+        "route6ExteriorComplete": True,
         "pokemonSpeciesProperNamesEnglish": True,
         "moveProperNamesEnglish": True,
         "abilityProperNamesEnglish": True,
@@ -96,7 +143,7 @@ def main() -> int:
         "ashCapTouched": False,
     })
     audit_path.write_text(json.dumps(audit, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"[{MARKER}] PASS: base {BASE_COUNT} + {changed} Route 5 block = {BASE_COUNT + changed}")
+    print(f"[{MARKER}] PASS: base {BASE_COUNT} + {changed} Route 6 blocks = {BASE_COUNT + changed}")
     return 0
 
 if __name__ == "__main__":
