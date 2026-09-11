@@ -1,43 +1,81 @@
 #!/usr/bin/env python3
-"""Qarro v3.18: localize the next verified English Kanto gap, Route 4.
+"""Qarro v3.19: complete Viridian City zone localization with Viridian Gym.
 
-Runs CI-green v3.17 first, then patches only pinned FireRed Route 4 text.
-Pokemon species and Move/Ability proper names stay English. Gameplay, trainer
-data, Ash Bond and Ash Cap are not modified.
+Runs CI-green v3.18 first, then localizes all 35 user-facing FireRed text
+blocks in ViridianCity_Gym_Frlg/scripts.inc. Pokemon species, Move and Ability
+proper names stay English. Gameplay, trainer data, Ash Bond and Ash Cap are not
+modified.
 """
 from __future__ import annotations
 import json, re, subprocess, sys
 from pathlib import Path
 
-BASE_COMMIT = "7dc141cba2912d46df59cdc82835a469620052f3"
+BASE_COMMIT = "f235e5556e1b5a97b665e356c958e688db1c745c"
 BASE_PATH = "ci/localize_early_kanto_v3_9.py"
-BASE_MARKER = "QARRO_RU_EARLY_KANTO_V3_17"
-BASE_COUNT = 250
-MARKER = "QARRO_RU_EARLY_KANTO_V3_18"
+BASE_MARKER = "QARRO_RU_EARLY_KANTO_V3_18"
+BASE_COUNT = 265
+MARKER = "QARRO_RU_EARLY_KANTO_V3_19"
 AUDIT_REL = Path("build/qarro_ru_early_kanto_v3_9_audit.json")
-ROUTE4_REL = Path("data/maps/Route4_Frlg/scripts.inc")
-# Route4 is intentionally modified by content_pass_v3_1.py before localization.
-# Guard the exact deterministic post-content-pass source state seen by this step.
-ROUTE4_BLOB = "e5e8ecc7c88aac5a4a4838651c021158e098c714"
+REL = Path("data/maps/ViridianCity_Gym_Frlg/scripts.inc")
+SOURCE_BLOB = "7cbe9a6800a46495d789b1b858696dfc61301177"
 
 def B(*lines: str) -> tuple[str, ...]: return lines
 
 BLOCKS = {
-    "Route4_Text_TrippedOverGeodude": B(r"Ай! Я споткнулась о каменного\n", r"ПОКЕМОНА GEODUDE!$"),
-    "Route4_Text_CrissyIntro": B(r"Я пришла на MT. MOON искать\n", r"грибных ПОКЕМОНОВ.$"),
-    "Route4_Text_CrissyDefeat": B(r"А я так старалась их поймать!$"),
-    "Route4_Text_CrissyPostBattle": B(r"Похоже, грибов здесь больше\n", r"не осталось.\p", r"Кажется, я поймала их всех.$"),
-    "Route4_Text_MtMoonEntrance": B(r"MT. MOON\n", r"Вход в туннель$"),
-    "Route4_Text_RouteSign": B(r"МАРШРУТ 4\n", r"MT. MOON - CERULEAN CITY$"),
-    "Text_MegaPunchTeach": B(r"Удар сокрушительной мощи!\p", r"В нем заключена разрушительная сила!\p", r"Когда выбора не остается,\n", r"MEGA PUNCH - лучшая атака!\l", r"Согласен?\p", r"Тогда вперед!\n", r"Я научу ей твоего ПОКЕМОНА!$"),
-    "Text_MegaPunchDeclined": B(r"Ты еще вернешься, когда поймешь\n", r"ценность MEGA PUNCH.$"),
-    "Text_MegaPunchWhichMon": B(r"Отлично!\n", r"Какой ПОКЕМОН выучит ее?$"),
-    "Text_MegaPunchTaught": B(r"Теперь мы товарищи по искусству\n", r"удара!\p", r"Лучше уходи, пока тебя не увидел\n", r"тот заблудший глупец, который\l", r"тренирует только удары ногами.$"),
-    "Text_MegaKickTeach": B(r"Удар ногой бешеной силы!\p", r"В нем заключена разрушительная мощь!\p", r"Если говорить начистоту,\n", r"MEGA KICK - лучшая атака!\l", r"Разве не так?\p", r"Хорошо!\n", r"Я научу ей твоего ПОКЕМОНА!$"),
-    "Text_MegaKickDeclined": B(r"Ты еще приползешь обратно, когда\n", r"поймешь ценность MEGA KICK.$"),
-    "Text_MegaKickWhichMon": B(r"Ладно!\n", r"Какой ПОКЕМОН хочет ее выучить?$"),
-    "Text_MegaKickTaught": B(r"Теперь мы родственные души в\n", r"искусстве удара ногой!\p", r"Лучше беги, пока тебя не увидел\n", r"тот заблудший болван, который\l", r"тренирует только удары руками.$"),
-    "Route4_Text_PeopleLikeAndRespectBrock": B(r"Ого, это же BOULDERBADGE!\n", r"Ты получил его у BROCK, верно?\p", r"BROCK крут. Он не только силен.\n", r"Его любят и уважают.\p", r"Я тоже хочу стать GYM LEADER,\n", r"как он.$"),
+"ViridianCity_Gym_Text_GiovanniIntro": B(
+    r"Ха-ха-ха!\n", r"Добро пожаловать в мое убежище!\p",
+    r"Оно останется им, пока я не верну\n", r"КОМАНДЕ R былую славу.\p",
+    r"Но ты снова меня нашел.\n", r"Что ж.\l", r"На этот раз я не сдерживаюсь!\p",
+    r"Ты снова встретишься с\n", r"GIOVANNI, величайшим ТРЕНЕРОМ!{PLAY_BGM}{MUS_RG_ENCOUNTER_ROCKET}$"),
+"ViridianCity_Gym_Text_GiovanniDefeat": B(
+    r"Ха!\n", r"Это был по-настоящему жаркий бой.\l", r"Ты победил!\p",
+    r"В доказательство - ЗНАЧОК ЗЕМЛИ!\n",
+    r"{PAUSE_MUSIC}{PLAY_BGM}{MUS_OBTAIN_BADGE}{PAUSE 0xFE}{PAUSE 0x56}{RESUME_MUSIC}$"),
+"ViridianCity_Gym_Text_GiovanniPostBattle": B(
+    r"После такого поражения я не могу\n", r"смотреть своим людям в глаза.\l", r"Я предал их доверие.\p",
+    r"С этого дня КОМАНДА R\n", r"распущена навсегда!\p", r"А я снова посвящу свою жизнь\n",
+    r"тренировкам.\p", r"Когда-нибудь мы еще встретимся!\n", r"Прощай!$"),
+"ViridianCity_Gym_Text_ExplainEarthBadgeTakeThis": B(
+    r"ЗНАЧОК ЗЕМЛИ заставит ПОКЕМОНОВ\n", r"любого уровня слушаться тебя.\p",
+    r"Он доказывает твое мастерство\n", r"ТРЕНЕРА ПОКЕМОНОВ.\p", r"Теперь ты можешь бросить вызов\n",
+    r"ЛИГЕ ПОКЕМОНОВ.\p", r"И еще возьми эту TM.\p", r"Считай ее подарком перед твоим\n",
+    r"испытанием в ЛИГЕ ПОКЕМОНОВ.$"),
+"ViridianCity_Gym_Text_ReceivedTM26FromGiovanni": B(r"{PLAYER} получает TM26\n", r"от GIOVANNI.$"),
+"ViridianCity_Gym_Text_ExplainTM26": B(
+    r"TM26 содержит EARTHQUAKE.\p", r"Это мощная атака, вызывающая\n", r"сильнейшее землетрясение.\p",
+    r"Я создал ее, когда руководил\n", r"этим ГИМОМ много лет назад...$"),
+"ViridianCity_Gym_Text_YouDoNotHaveSpace": B(r"В СУМКЕ нет места для этого!$"),
+"ViridianCity_Gym_Text_YujiIntro": B(r"Хех!\n", r"Наверняка ты уже выдохся!$"),
+"ViridianCity_Gym_Text_YujiDefeat": B(r"У меня кончились силы!$"),
+"ViridianCity_Gym_Text_YujiPostBattle": B(r"Тебе понадобится сила, чтобы\n", r"сравниться с нашим ЛИДЕРОМ ГИМА.$"),
+"ViridianCity_Gym_Text_AtsushiIntro": B(r"Р-р-р-р!\n", r"Я довожу себя до ярости!$"),
+"ViridianCity_Gym_Text_AtsushiDefeat": B(r"Уа-а-а!$"),
+"ViridianCity_Gym_Text_AtsushiPostBattle": B(r"Я все еще недостаточно хорош!$"),
+"ViridianCity_Gym_Text_JasonIntro": B(r"Мы с ПОКЕМОНОМ создаем\n", r"прекрасную музыку вместе!$"),
+"ViridianCity_Gym_Text_JasonDefeat": B(r"У тебя идеальная гармония!$"),
+"ViridianCity_Gym_Text_JasonPostBattle": B(r"Ты знаешь, кто наш\n", r"ЛИДЕР ГИМА?$"),
+"ViridianCity_Gym_Text_KiyoIntro": B(r"Каратэ - высшая форма\n", r"боевых искусств!$"),
+"ViridianCity_Gym_Text_KiyoDefeat": B(r"Ай-я!$"),
+"ViridianCity_Gym_Text_KiyoPostBattle": B(r"Если бы мои ПОКЕМОНЫ владели\n", r"каратэ так же хорошо, как я...$"),
+"ViridianCity_Gym_Text_WarrenIntro": B(r"Настоящий талант побеждает стильно.$"),
+"ViridianCity_Gym_Text_WarrenDefeat": B(r"Я потерял хватку!$"),
+"ViridianCity_Gym_Text_WarrenPostBattle": B(r"ЛИДЕР будет ругать меня за\n", r"такое поражение...$"),
+"ViridianCity_Gym_Text_TakashiIntro": B(r"Я КОРОЛЬ КАРАТЭ!\n", r"Твоя судьба в моих руках!$"),
+"ViridianCity_Gym_Text_TakashiDefeat": B(r"Ай-я!$"),
+"ViridianCity_Gym_Text_TakashiPostBattle": B(r"ЛИГА ПОКЕМОНОВ?\n", r"Ты? Не зазнавайся!$"),
+"ViridianCity_Gym_Text_ColeIntro": B(r"Мои удары кнута заставят\n", r"твоих ПОКЕМОНОВ дрожать!$"),
+"ViridianCity_Gym_Text_ColeDefeat": B(r"Ай!\n", r"Вот это удар!$"),
+"ViridianCity_Gym_Text_ColePostBattle": B(r"Постой!\n", r"Я просто был неосторожен!$"),
+"ViridianCity_Gym_Text_SamuelIntro": B(r"ВИРИДИАН-ГИМ долго был закрыт.\p", r"Но теперь наш ЛИДЕР вернулся!$"),
+"ViridianCity_Gym_Text_SamuelDefeat": B(r"Меня победили?$"),
+"ViridianCity_Gym_Text_SamuelPostBattle": B(r"Попасть в ЛИГУ ПОКЕМОНОВ можно,\n", r"только победив нашего\l", r"ЛИДЕРА ГИМА!$"),
+"ViridianCity_Gym_Text_GymGuyAdvice": B(
+    r"Йо!\n", r"Будущий чемпион!\p", r"Даже я не знаю, кто является\n", r"ЛИДЕРОМ ВИРИДИАН-ГИМА.\p",
+    r"Но одно ясно наверняка:\n", r"это будет самый трудный\l", r"из всех ЛИДЕРОВ ГИМОВ.\p",
+    r"Я также слышал, что ТРЕНЕРЫ\n", r"здесь любят ПОКЕМОНОВ земляного типа.$"),
+"ViridianCity_Gym_Text_GymGuyPostVictory": B(r"Вот это да! GIOVANNI был\n", r"ЛИДЕРОМ ВИРИДИАН-ГИМА?$"),
+"ViridianCity_Gym_Text_GymStatue": B(r"ПОКЕМОН-ГИМ ВИРИДИАН-СИТИ\n", r"ЛИДЕР: ?\p", r"ПОБЕДИВШИЕ ТРЕНЕРЫ:\n", r"{RIVAL}$"),
+"ViridianCity_Gym_Text_GymStatuePlayerWon": B(r"ПОКЕМОН-ГИМ ВИРИДИАН-СИТИ\n", r"ЛИДЕР: GIOVANNI\p", r"ПОБЕДИВШИЕ ТРЕНЕРЫ:\n", r"{RIVAL}, {PLAYER}$"),
 }
 
 def load_base() -> str:
@@ -63,7 +101,7 @@ def main() -> int:
         print(f"usage: {Path(sys.argv[0]).name} <pokeemerald-expansion-root>", file=sys.stderr)
         return 2
     code = load_base()
-    ns = {"__name__": "qarro_ru_early_kanto_v317_base", "__file__": str(Path(__file__).resolve())}
+    ns = {"__name__": "qarro_ru_early_kanto_v318_base", "__file__": str(Path(__file__).resolve())}
     exec(compile(code, f"{BASE_COMMIT}:{BASE_PATH}", "exec"), ns)
     rc = int(ns["main"]() or 0)
     if rc:
@@ -75,29 +113,26 @@ def main() -> int:
     if audit.get("marker") != BASE_MARKER or int(audit.get("selectedBlocksLocalized", -1)) != BASE_COUNT:
         raise RuntimeError(f"base localization audit drift: {audit.get('marker')!r}/{audit.get('selectedBlocksLocalized')!r}")
 
-    path = root / ROUTE4_REL
+    path = root / REL
     actual = subprocess.check_output(["git", "-C", str(root), "hash-object", str(path)], text=True).strip()
-    if actual != ROUTE4_BLOB:
-        raise RuntimeError(f"{ROUTE4_REL}: post-content source blob drift: {actual} != {ROUTE4_BLOB}")
+    if actual != SOURCE_BLOB:
+        raise RuntimeError(f"{REL}: pinned source blob drift: {actual} != {SOURCE_BLOB}")
     text = path.read_text(encoding="utf-8")
     for label, lines in BLOCKS.items():
         text = patch_label(text, label, lines)
     path.write_text(text, encoding="utf-8")
 
     changed = len(BLOCKS)
-    if changed != 15:
-        raise RuntimeError(f"Route 4 scope drift: expected 15 blocks, got {changed}")
-    audit.setdefault("files", {})[str(ROUTE4_REL)] = {
-        "selectedBlocks": changed,
-        "changedThisRun": changed,
-        "sourceBlob": ROUTE4_BLOB,
-    }
+    if changed != 35:
+        raise RuntimeError(f"Viridian Gym scope drift: expected 35 blocks, got {changed}")
+    audit.setdefault("files", {})[str(REL)] = {"selectedBlocks": changed, "changedThisRun": changed, "sourceBlob": SOURCE_BLOB}
     audit.update({
         "previousMarker": BASE_MARKER,
         "marker": MARKER,
         "selectedBlocksLocalized": BASE_COUNT + changed,
         "blocksChangedThisRun": int(audit.get("blocksChangedThisRun", 0)) + changed,
-        "route4Localized": True,
+        "viridianGymLocalized": True,
+        "viridianCityZoneComplete": True,
         "pokemonSpeciesProperNamesEnglish": True,
         "moveProperNamesEnglish": True,
         "abilityProperNamesEnglish": True,
@@ -107,7 +142,7 @@ def main() -> int:
         "ashCapTouched": False,
     })
     audit_path.write_text(json.dumps(audit, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"[{MARKER}] PASS: base {BASE_COUNT} + {changed} Route 4 blocks = {BASE_COUNT + changed}")
+    print(f"[{MARKER}] PASS: base {BASE_COUNT} + {changed} Viridian Gym blocks = {BASE_COUNT + changed}")
     return 0
 
 if __name__ == "__main__":
