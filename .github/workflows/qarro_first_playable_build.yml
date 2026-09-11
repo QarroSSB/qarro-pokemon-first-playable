@@ -107,10 +107,12 @@ jobs:
             qarro-repo/ci/runtime_content_v3_3.py \
             qarro-repo/ci/kanto_wild_diversity_v3_4.py \
             qarro-repo/ci/qol_v3_5.py \
+            qarro-repo/ci/audit_exp_share_evolution_v3_25.py \
             qarro-repo/ci/install_cyrillic_v3_3.py \
             qarro-repo/ci/localization_ru_core_v3_3.py \
             qarro-repo/ci/localize_oaks_lab_starter_v3_5.py \
             qarro-repo/ci/localize_early_kanto_v3_9.py \
+            qarro-repo/ci/localize_system_descriptions_v3_25.py \
             qarro-repo/ci/sanitize_ru_quotes_v3_18.py \
             qarro-repo/ci/normalize_accented_e_v3_8.py
 
@@ -163,6 +165,13 @@ jobs:
           python3 qarro-repo/ci/qol_v3_5.py upstream \
             2>&1 | tee qarro_ci_out_v3_8/logs/qol_v3_5.log
 
+      - name: Verify party-wide Exp. Share evolution path
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 qarro-repo/ci/audit_exp_share_evolution_v3_25.py upstream \
+            2>&1 | tee qarro_ci_out_v3_8/logs/exp_share_evolution_v3_25.log
+
       - name: Install v3.8 readable FireRed-style RU+EN font
         shell: bash
         run: |
@@ -190,6 +199,13 @@ jobs:
           set -euo pipefail
           python3 qarro-repo/ci/localize_oaks_lab_starter_v3_5.py upstream \
             2>&1 | tee qarro_ci_out_v3_8/logs/localization_oaks_lab_starter_v3_5.log
+
+      - name: Apply Gen I-V system description localization
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 qarro-repo/ci/localize_system_descriptions_v3_25.py upstream \
+            2>&1 | tee qarro_ci_out_v3_8/logs/localize_system_descriptions_v3_25.log
 
       - name: Normalize unsupported Russian quote marks
         shell: bash
@@ -243,12 +259,14 @@ jobs:
           if [[ -f upstream/build/qarro_ground_items_v3_23_audit.json ]]; then cp upstream/build/qarro_ground_items_v3_23_audit.json qarro_ci_out_v3_8/; fi
           if [[ -f upstream/build/qarro_kanto_wild_v3_4_audit.json ]]; then cp upstream/build/qarro_kanto_wild_v3_4_audit.json qarro_ci_out_v3_8/; fi
           if [[ -f upstream/build/qarro_qol_v3_5_audit.json ]]; then cp upstream/build/qarro_qol_v3_5_audit.json qarro_ci_out_v3_8/; fi
+          if [[ -f upstream/build/qarro_exp_share_evo_v3_25_audit.json ]]; then cp upstream/build/qarro_exp_share_evo_v3_25_audit.json qarro_ci_out_v3_8/; fi
           if [[ -f upstream/build/qarro_ru_oak_lab_starter_v3_5_audit.json ]]; then cp upstream/build/qarro_ru_oak_lab_starter_v3_5_audit.json qarro_ci_out_v3_8/; fi
           if [[ -f upstream/build/qarro_ru_early_kanto_v3_9_audit.json ]]; then cp upstream/build/qarro_ru_early_kanto_v3_9_audit.json qarro_ci_out_v3_8/; fi
+          if [[ -f upstream/build/qarro_ru_system_v3_25_audit.json ]]; then cp upstream/build/qarro_ru_system_v3_25_audit.json qarro_ci_out_v3_8/; fi
           if [[ -f upstream/build/qarro_ru_quotes_v3_18_audit.json ]]; then cp upstream/build/qarro_ru_quotes_v3_18_audit.json qarro_ci_out_v3_8/; fi
           if [[ -f upstream/build/qarro_normalize_e_v3_8_audit.json ]]; then cp upstream/build/qarro_normalize_e_v3_8_audit.json qarro_ci_out_v3_8/; fi
           if [[ -f upstream/build/qarro_font_variant2_v3_17_audit.json ]]; then cp upstream/build/qarro_font_variant2_v3_17_audit.json qarro_ci_out_v3_8/; fi
-          for f in pokefirered.map pokefirered.sym; do [[ -f "upstream/$f" ]] && cp "upstream/$f" qarro_ci_out_v3_8/; done
+          for f in pokefirered.map pokefirered.sym; do [[ -f "upstream/$f" ]] && cp upstream/$f qarro_ci_out_v3_8/; done
           if [[ -f upstream/pokefirered.gba ]]; then
             cp upstream/pokefirered.gba qarro_ci_out_v3_8/Qarro_FIRST_PLAYABLE_v3_8.gba
             sha256sum qarro_ci_out_v3_8/Qarro_FIRST_PLAYABLE_v3_8.gba > qarro_ci_out_v3_8/Qarro_FIRST_PLAYABLE_v3_8.gba.sha256
