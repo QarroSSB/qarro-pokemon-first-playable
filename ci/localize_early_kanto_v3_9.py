@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Qarro v3.22: localize Route 24 / Nugget Bridge.
+"""Qarro v3.23: localize Route 25.
 
-Runs CI-green v3.21 first, then localizes all remaining user-facing FireRed
-text blocks in Route24_Frlg/scripts.inc. Pokemon species, Move and Ability
+Runs CI-green v3.22 first, then localizes all remaining user-facing FireRed
+text blocks in Route25_Frlg/scripts.inc. Pokemon species, Move and Ability
 proper names stay English. Gameplay, trainer data, Ash Bond and Ash Cap are
 not modified.
 """
@@ -10,95 +10,106 @@ from __future__ import annotations
 import json, re, subprocess, sys
 from pathlib import Path
 
-BASE_COMMIT = "d11d26d9b9c17f51c92b1426bbf84d336166eb17"
+BASE_COMMIT = "d4c4a8093244373993954128cc9eaa8d43881ae6"
 BASE_PATH = "ci/localize_early_kanto_v3_9.py"
-BASE_MARKER = "QARRO_RU_EARLY_KANTO_V3_21"
-BASE_COUNT = 310
-MARKER = "QARRO_RU_EARLY_KANTO_V3_22"
+BASE_MARKER = "QARRO_RU_EARLY_KANTO_V3_22"
+BASE_COUNT = 334
+MARKER = "QARRO_RU_EARLY_KANTO_V3_23"
 AUDIT_REL = Path("build/qarro_ru_early_kanto_v3_9_audit.json")
-REL = Path("data/maps/Route24_Frlg/scripts.inc")
-SOURCE_BLOB = "75686a2a7f42498deda79f2dd8c776d1ac017c8f"
+REL = Path("data/maps/Route25_Frlg/scripts.inc")
+SOURCE_BLOB = "a16819121433c92dca1dd8efecb6d4cfec85e620"
 
 def B(*lines: str) -> tuple[str, ...]: return lines
 
 BLOCKS = {
-"Route24_Text_JustEarnedFabulousPrize": B(
-    r"Поздравляем! Ты победил всех\n",
-    r"пятерых ТРЕНЕРОВ!\p",
-    r"Ты заслужил отличный приз!$"),
-"Route24_Text_ReceivedNuggetFromMysteryTrainer": B(
-    r"{PLAYER} получил САМОРОДОК\n",
-    r"от таинственного ТРЕНЕРА!$"),
-"Route24_Text_YouDontHaveAnyRoom": B(
-    r"У тебя нет свободного места!$"),
-"Route24_Text_JoinTeamRocket": B(
-    r"Кстати, не хочешь вступить\n",
-    r"в КОМАНДУ R?\p",
-    r"Мы профессиональные преступники,\n",
-    r"и наша специализация — ПОКЕМОНЫ!\p",
-    r"Хочешь к нам?\p",
-    r"Точно не хочешь?\p",
-    r"Ну же, вступай!\p",
-    r"Я говорю: вступай!\p",
-    r"…Ладно, тебя надо убедить!\p",
-    r"Сделаю предложение, от которого\n",
-    r"ты не сможешь отказаться!$"),
-"Route24_Text_RocketDefeat": B(
-    r"Арргх!\n",
-    r"А ты хорош!$"),
-"Route24_Text_YoudBecomeTopRocketLeader": B(
-    r"С твоими способностями ты стал бы\n",
-    r"лучшим лидером КОМАНДЫ R.\p",
-    r"Подумай, какая возможность!\n",
-    r"Не упускай такой шанс.$"),
-"Route24_Text_ShaneIntro": B(
-    r"Я видел твой подвиг из травы!$"),
-"Route24_Text_ShaneDefeat": B(
-    r"Я так и думал!$"),
-"Route24_Text_ShanePostBattle": B(
-    r"Я спрятался, потому что люди\n",
-    r"на мосту меня напугали.$"),
-"Route24_Text_EthanIntro": B(
-    r"Так! Я номер 5!\n",
-    r"Я тебя растопчу!$"),
-"Route24_Text_EthanDefeat": B(
-    r"Ого!\n",
-    r"Это слишком!$"),
-"Route24_Text_EthanPostBattle": B(
-    r"Я сделал всё, что мог. Без сожалений!$"),
-"Route24_Text_ReliIntro": B(
-    r"Я номер 4!\n",
-    r"Уже устал?$"),
-"Route24_Text_ReliDefeat": B(
-    r"Я тоже проиграл!$"),
-"Route24_Text_ReliPostBattle": B(
-    r"Я сделал всё, что мог. Без сожалений!$"),
-"Route24_Text_TimmyIntro": B(
-    r"А вот и номер 3!\n",
-    r"Со мной будет непросто!$"),
-"Route24_Text_TimmyDefeat": B(
-    r"Ай!\n",
-    r"Раздавил в лепёшку!$"),
-"Route24_Text_TimmyPostBattle": B(
-    r"Я сделал всё, что мог. Без сожалений!$"),
-"Route24_Text_AliIntro": B(
-    r"Я второй!\n",
-    r"Теперь всё серьёзно!$"),
-"Route24_Text_AliDefeat": B(
-    r"Как я мог проиграть?$"),
-"Route24_Text_AliPostBattle": B(
-    r"Я сделал всё, что мог. Без сожалений!$"),
-"Route24_Text_CaleIntro": B(
-    r"Это место зовут МОСТОМ\n",
-    r"САМОРОДКА!\p",
-    r"Победи пятерых ТРЕНЕРОВ\n",
-    r"и получи отличный приз!\p",
-    r"Думаешь, справишься?$"),
-"Route24_Text_CaleDefeat": B(
-    r"Ух!\n",
-    r"Отлично!$"),
-"Route24_Text_CalePostBattle": B(
-    r"Я сделал всё, что мог. Без сожалений!$"),
+"Route25_Text_JoeyIntro": B(
+    r"Местные ТРЕНЕРЫ приходят сюда\n",
+    r"тренироваться.$"),
+"Route25_Text_JoeyDefeat": B(
+    r"Ты неплох.$"),
+"Route25_Text_JoeyPostBattle": B(
+    r"У всех POKéMON есть слабости.\n",
+    r"Даже у самых сильных.\p",
+    r"Поэтому лучше растить POKéMON\n",
+    r"разных типов.$"),
+"Route25_Text_DanIntro": B(
+    r"Папа водил меня на отличную\n",
+    r"вечеринку на S.S. ANNE в VERMILION CITY.$"),
+"Route25_Text_DanDefeat": B(
+    r"Я не злюсь!$"),
+"Route25_Text_DanPostBattle": B(
+    r"На S.S. ANNE я видел ТРЕНЕРОВ\n",
+    r"со всего мира.$"),
+"Route25_Text_FlintIntro": B(
+    r"Я крутой парень.\n",
+    r"У меня есть девушка!$"),
+"Route25_Text_FlintDefeat": B(
+    r"Вот досада...$"),
+"Route25_Text_FlintPostBattle": B(
+    r"Ну и ладно.\n",
+    r"Моя девушка меня подбодрит.$"),
+"Route25_Text_KelseyIntro": B(
+    r"Привет!\n",
+    r"Мой парень крутой!$"),
+"Route25_Text_KelseyDefeat": B(
+    r"Моя форма не лучшая...$"),
+"Route25_Text_KelseyPostBattle": B(
+    r"Вот бы мой парень был так же\n",
+    r"хорош, как ты.$"),
+"Route25_Text_ChadIntro": B(
+    r"У меня было предчувствие...\n",
+    r"Я знал, что должен сразиться с тобой!$"),
+"Route25_Text_ChadDefeat": B(
+    r"Я знал, что проиграю!$"),
+"Route25_Text_ChadPostBattle": B(
+    r"Если твой POKéMON запутался,\n",
+    r"замени его.\p",
+    r"Это хорошая тактика.$"),
+"Route25_Text_HaleyIntro": B(
+    r"У моей подруги много милых POKéMON.\n",
+    r"Я так завидую!$"),
+"Route25_Text_HaleyDefeat": B(
+    r"Теперь я не так завидую!$"),
+"Route25_Text_HaleyPostBattle": B(
+    r"Ты пришел с MT. MOON?\n",
+    r"Можно мне CLEFAIRY?$"),
+"Route25_Text_FranklinIntro": B(
+    r"Я только что спустился с MT. MOON,\n",
+    r"но сил у меня еще полно!$"),
+"Route25_Text_FranklinDefeat": B(
+    r"Ты отлично постарался!$"),
+"Route25_Text_FranklinPostBattle": B(
+    r"Черт!\n",
+    r"В той пещере меня укусил ZUBAT.$"),
+"Route25_Text_NobIntro": B(
+    r"Я иду посмотреть коллекцию\n",
+    r"POKéMANIAC на мысе.$"),
+"Route25_Text_NobDefeat": B(
+    r"Ты меня здорово уделал!$"),
+"Route25_Text_NobPostBattle": B(
+    r"POKéMANIAC полностью оправдывает\n",
+    r"свое имя.\p",
+    r"В его коллекции много редких\n",
+    r"видов POKéMON.$"),
+"Route25_Text_WayneIntro": B(
+    r"Идешь к BILL?\n",
+    r"Сначала сразись со мной!$"),
+"Route25_Text_WayneDefeat": B(
+    r"А ты хорош.$"),
+"Route25_Text_WaynePostBattle": B(
+    r"Тропа внизу - короткий путь\n",
+    r"в CERULEAN CITY.$"),
+"Route25_Text_SeaCottageSign": B(
+    r"МОРСКОЙ ДОМ\n",
+    r"Здесь живет BILL!$"),
+"Route25_Text_MistyHighHopesAboutThisPlace": B(
+    r"Этот мыс - известное место для свиданий.\p",
+    r"MISTY, ЛИДЕР ЗАЛА, возлагает\n",
+    r"на это место большие надежды.$"),
+"Route25_Text_AreYouHereAlone": B(
+    r"Привет, ты здесь один?\p",
+    r"Если уж пришел на мыс CERULEAN...\n",
+    r"Лучше приходить сюда вдвоем.$"),
 }
 
 def load_base() -> str:
@@ -124,7 +135,7 @@ def main() -> int:
         print(f"usage: {Path(sys.argv[0]).name} <pokeemerald-expansion-root>", file=sys.stderr)
         return 2
     code = load_base()
-    ns = {"__name__": "qarro_ru_early_kanto_v321_base", "__file__": str(Path(__file__).resolve())}
+    ns = {"__name__": "qarro_ru_early_kanto_v322_base", "__file__": str(Path(__file__).resolve())}
     exec(compile(code, f"{BASE_COMMIT}:{BASE_PATH}", "exec"), ns)
     rc = int(ns["main"]() or 0)
     if rc:
@@ -146,15 +157,15 @@ def main() -> int:
     path.write_text(text, encoding="utf-8")
 
     changed = len(BLOCKS)
-    if changed != 24:
-        raise RuntimeError(f"Route 24 scope drift: expected 24 blocks, got {changed}")
+    if changed != 30:
+        raise RuntimeError(f"Route 25 scope drift: expected 30 blocks, got {changed}")
     audit.setdefault("files", {})[str(REL)] = {"selectedBlocks": changed, "changedThisRun": changed, "sourceBlob": SOURCE_BLOB}
     audit.update({
         "previousMarker": BASE_MARKER,
         "marker": MARKER,
         "selectedBlocksLocalized": BASE_COUNT + changed,
         "blocksChangedThisRun": int(audit.get("blocksChangedThisRun", 0)) + changed,
-        "route24NuggetBridgeLocalized": True,
+        "route25Localized": True,
         "pokemonSpeciesProperNamesEnglish": True,
         "moveProperNamesEnglish": True,
         "abilityProperNamesEnglish": True,
@@ -164,7 +175,7 @@ def main() -> int:
         "ashCapTouched": False,
     })
     audit_path.write_text(json.dumps(audit, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"[{MARKER}] PASS: base {BASE_COUNT} + {changed} Route 24 blocks = {BASE_COUNT + changed}")
+    print(f"[{MARKER}] PASS: base {BASE_COUNT} + {changed} Route 25 blocks = {BASE_COUNT + changed}")
     return 0
 
 if __name__ == "__main__":
