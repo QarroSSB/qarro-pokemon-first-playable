@@ -1,26 +1,24 @@
 #!/usr/bin/env python3
-"""Qarro v3.3 runtime content corrections.
+"""Qarro runtime wrapper: proven Build 249 v3.3 + post-Viridian item pass.
 
-Applied after the proven v3.1 content pass and v3.2 Kanto balance pass.
-
-Goals:
-- Remove the two custom Route 1 item balls placed before Viridian City, plus
-  their now-unreachable pickup scripts.
-- Make the remaining custom visible item ball use FireRed's standard `finditem`
-  flow so its object flag is set and the ball stays gone after pickup.
-- Broaden early FireRed land encounters with Gen I-V species, with extra Grass,
-  Fighting and Steel representation while preserving the original slot levels.
-
-Ordinary wild tables never add starters, Legendary/Mythical species or Gen VI+.
-No Ash Bond / Ash Cap code is touched.
+Preserves the exact green Build 249 runtime-content implementation, then applies
+our confirmed ground-item rule:
+- no custom accessible ground/hidden pickups before Viridian City;
+- custom pickups begin on Route 2 and use visible persistent item balls;
+- Route 2 / Route 3 / Route 4 early progression gets useful, modest supplies;
+- wild encounter work from v3.3 is preserved exactly;
+- Ash Bond / Ash Cap remain untouched.
 """
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
-MARKER = "QARRO_RUNTIME_V3_3"
+BASE_COMMIT = "cdce73eba8ca7c7b6c2ef12eca199e197abe2687"
+BASE_PATH = "ci/runtime_content_v3_3.py"
+MARKER = "QARRO_GROUND_ITEMS_V3_23"
 
 
 def die(msg: str) -> None:
@@ -28,211 +26,241 @@ def die(msg: str) -> None:
 
 
 def read(path: Path) -> str:
-    if not path.exists():
+    if not path.is_file():
         die(f"missing {path}")
     return path.read_text(encoding="utf-8")
 
 
-def patch_item_balls(root: Path) -> dict:
-    route1 = root / "data/maps/Route1_Frlg/map.json"
-    data = json.loads(read(route1))
-    scripts_to_remove = {
-        "Route1_EventScript_QarroItemPokeballs",
-        "Route1_EventScript_QarroItemPotion",
-    }
-    before = list(data.get("object_events", []))
-    removed = [obj for obj in before if obj.get("script") in scripts_to_remove]
-    if len(removed) != 2:
-        die(f"Route1: expected exactly 2 pre-Viridian Qarro item balls, got {len(removed)}")
-    data["object_events"] = [obj for obj in before if obj.get("script") not in scripts_to_remove]
-    route1.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-
-    route1_scripts = root / "data/maps/Route1_Frlg/scripts.inc"
-    text1 = read(route1_scripts)
-    dead_blocks = (
-        "Route1_EventScript_QarroItemPokeballs::\n    giveitem ITEM_POKE_BALL, 5\n    end\n\n",
-        "Route1_EventScript_QarroItemPotion::\n    giveitem ITEM_POTION, 2\n    end\n\n",
+def load_base(repo: Path) -> dict:
+    subprocess.run(
+        ["git", "-C", str(repo), "fetch", "--quiet", "--depth=1", "origin", BASE_COMMIT],
+        check=True,
     )
-    for block in dead_blocks:
-        if block not in text1:
-            die("Route1 dead pre-Viridian item script did not match v3.1 baseline")
-        text1 = text1.replace(block, "", 1)
-    route1_scripts.write_text(text1, encoding="utf-8")
-
-    route2 = root / "data/maps/Route2_Frlg/scripts.inc"
-    text = read(route2)
-    old = """Route2_EventScript_QarroItemRepel::\n    giveitem ITEM_REPEL, 2\n    end\n"""
-    new = """Route2_EventScript_QarroItemRepel::\n    finditem ITEM_REPEL\n    end\n"""
-    if new in text:
-        pass
-    elif old in text:
-        text = text.replace(old, new, 1)
-        route2.write_text(text, encoding="utf-8")
-    else:
-        die("Route2 custom Repel item script did not match v3.1 baseline")
-
-    print(f"[{MARKER}] item balls: removed 2 pre-Viridian objects/scripts; Route2 pickup now uses finditem")
-    return {
-        "preViridianItemBallsRemoved": 2,
-        "preViridianItemScriptsRemoved": 2,
-        "route2PersistentPickupFixed": True,
-    }
+    code = subprocess.check_output(
+        ["git", "-C", str(repo), "show", f"{BASE_COMMIT}:{BASE_PATH}"],
+        text=True,
+    )
+    ns = {"__name__": "qarro_runtime_build249_baseline", "__file__": str(Path(__file__).resolve())}
+    exec(compile(code, f"{BASE_COMMIT}:{BASE_PATH}", "exec"), ns)
+    return ns
 
 
-POOLS = {
-    "MAP_ROUTE1": [
-        "SPECIES_PIDGEY", "SPECIES_ODDISH", "SPECIES_SENTRET", "SPECIES_HOPPIP",
-        "SPECIES_POOCHYENA", "SPECIES_SEEDOT", "SPECIES_STARLY", "SPECIES_BUDEW",
-        "SPECIES_LILLIPUP", "SPECIES_SEWADDLE", "SPECIES_MANKEY", "SPECIES_FERROSEED",
-    ],
-    "MAP_ROUTE2": [
-        "SPECIES_CATERPIE", "SPECIES_BELLSPROUT", "SPECIES_SPINARAK", "SPECIES_HOPPIP",
-        "SPECIES_WURMPLE", "SPECIES_SHROOMISH", "SPECIES_KRICKETOT", "SPECIES_BUDEW",
-        "SPECIES_SEWADDLE", "SPECIES_PETILIL", "SPECIES_MANKEY", "SPECIES_MAGNEMITE",
-    ],
-    "MAP_VIRIDIAN_FOREST": [
-        "SPECIES_CATERPIE", "SPECIES_WEEDLE", "SPECIES_PIKACHU", "SPECIES_HOPPIP",
-        "SPECIES_PINECO", "SPECIES_SHROOMISH", "SPECIES_SEEDOT", "SPECIES_BUDEW",
-        "SPECIES_BRONZOR", "SPECIES_SEWADDLE", "SPECIES_COTTONEE", "SPECIES_FERROSEED",
-    ],
-    "MAP_ROUTE3": [
-        "SPECIES_SPEAROW", "SPECIES_MANKEY", "SPECIES_HOPPIP", "SPECIES_MAREEP",
-        "SPECIES_MAKUHITA", "SPECIES_ARON", "SPECIES_SHINX", "SPECIES_RIOLU",
-        "SPECIES_BUDEW", "SPECIES_TIMBURR", "SPECIES_DEERLING", "SPECIES_KLINK",
-    ],
-    "MAP_MT_MOON_1F": [
-        "SPECIES_ZUBAT", "SPECIES_GEODUDE", "SPECIES_MACHOP", "SPECIES_ONIX",
-        "SPECIES_WOOPER", "SPECIES_PINECO", "SPECIES_MAKUHITA", "SPECIES_ARON",
-        "SPECIES_BRONZOR", "SPECIES_RIOLU", "SPECIES_ROGGENROLA", "SPECIES_KLINK",
-    ],
-    "MAP_MT_MOON_B1F": [
-        "SPECIES_ZUBAT", "SPECIES_GEODUDE", "SPECIES_MACHOP", "SPECIES_CLEFAIRY",
-        "SPECIES_WOOPER", "SPECIES_PINECO", "SPECIES_MAWILE", "SPECIES_ARON",
-        "SPECIES_BRONZOR", "SPECIES_RIOLU", "SPECIES_FERROSEED", "SPECIES_TIMBURR",
-    ],
-    "MAP_MT_MOON_B2F": [
-        "SPECIES_ZUBAT", "SPECIES_GEODUDE", "SPECIES_CLEFAIRY", "SPECIES_MACHOP",
-        "SPECIES_WOOPER", "SPECIES_PINECO", "SPECIES_ARON", "SPECIES_MAWILE",
-        "SPECIES_BRONZOR", "SPECIES_RIOLU", "SPECIES_FERROSEED", "SPECIES_KLINK",
-    ],
-    "MAP_ROUTE4": [
-        "SPECIES_SPEAROW", "SPECIES_ODDISH", "SPECIES_MANKEY", "SPECIES_HOPPIP",
-        "SPECIES_MAREEP", "SPECIES_SEEDOT", "SPECIES_MAKUHITA", "SPECIES_ARON",
-        "SPECIES_BUDEW", "SPECIES_RIOLU", "SPECIES_DEERLING", "SPECIES_TIMBURR",
-    ],
-    "MAP_ROUTE22": [
-        "SPECIES_NIDORAN_M", "SPECIES_MANKEY", "SPECIES_ODDISH", "SPECIES_HOPPIP",
-        "SPECIES_MAREEP", "SPECIES_POOCHYENA", "SPECIES_SEEDOT", "SPECIES_STARLY",
-        "SPECIES_BUDEW", "SPECIES_LILLIPUP", "SPECIES_DEERLING", "SPECIES_TIMBURR",
-    ],
-    "MAP_ROUTE5": [
-        "SPECIES_ODDISH", "SPECIES_BELLSPROUT", "SPECIES_MEOWTH", "SPECIES_HOPPIP",
-        "SPECIES_MAREEP", "SPECIES_SHROOMISH", "SPECIES_ELECTRIKE", "SPECIES_BUDEW",
-        "SPECIES_RIOLU", "SPECIES_DEERLING", "SPECIES_TIMBURR", "SPECIES_KLINK",
-    ],
-    "MAP_ROUTE6": [
-        "SPECIES_ODDISH", "SPECIES_BELLSPROUT", "SPECIES_MEOWTH", "SPECIES_HOPPIP",
-        "SPECIES_MAREEP", "SPECIES_SHROOMISH", "SPECIES_ELECTRIKE", "SPECIES_BUDEW",
-        "SPECIES_RIOLU", "SPECIES_DEERLING", "SPECIES_TIMBURR", "SPECIES_MAGNEMITE",
-    ],
-    "MAP_ROUTE24": [
-        "SPECIES_ODDISH", "SPECIES_BELLSPROUT", "SPECIES_ABRA", "SPECIES_HOPPIP",
-        "SPECIES_MAREEP", "SPECIES_SHROOMISH", "SPECIES_MAKUHITA", "SPECIES_BUDEW",
-        "SPECIES_RIOLU", "SPECIES_PETILIL", "SPECIES_TIMBURR", "SPECIES_FERROSEED",
-    ],
-    "MAP_ROUTE25": [
-        "SPECIES_ODDISH", "SPECIES_BELLSPROUT", "SPECIES_ABRA", "SPECIES_HOPPIP",
-        "SPECIES_MAREEP", "SPECIES_SEEDOT", "SPECIES_MAKUHITA", "SPECIES_BUDEW",
-        "SPECIES_RIOLU", "SPECIES_COTTONEE", "SPECIES_TIMBURR", "SPECIES_KLINK",
-    ],
-}
-
-REQUIRED_CORE = {
-    "MAP_ROUTE1", "MAP_ROUTE2", "MAP_VIRIDIAN_FOREST", "MAP_ROUTE3",
-    "MAP_MT_MOON_1F", "MAP_MT_MOON_B1F", "MAP_ROUTE4",
-}
-
-FORBIDDEN_ORDINARY_WILD = (
-    "BULBASAUR", "IVYSAUR", "VENUSAUR", "CHARMANDER", "CHARMELEON", "CHARIZARD",
-    "SQUIRTLE", "WARTORTLE", "BLASTOISE", "CHIKORITA", "CYNDAQUIL", "TOTODILE",
-    "TREECKO", "TORCHIC", "MUDKIP", "TURTWIG", "CHIMCHAR", "PIPLUP",
-    "SNIVY", "TEPIG", "OSHAWOTT",
-)
-
-
-def patch_wild(root: Path) -> dict:
-    path = root / "src/data/wild_encounters.json"
-    data = json.loads(read(path))
-    group = next((g for g in data.get("wild_encounter_groups", [])
-                  if g.get("for_maps") and g.get("label") == "gWildMonHeaders"), None)
-    if group is None:
-        die("gWildMonHeaders encounter group not found")
-
-    species_text = read(root / "include/constants/species.h")
-    all_species = {s for pool in POOLS.values() for s in pool}
-    for species in sorted(all_species):
-        if species not in species_text:
-            die(f"species constant missing in pinned source: {species}")
-        if any(name in species for name in FORBIDDEN_ORDINARY_WILD):
-            die(f"starter family accidentally requested for ordinary wild table: {species}")
-
-    found: dict[str, dict] = {}
-    for rec in group.get("encounters", []):
-        map_name = rec.get("map")
-        if map_name not in POOLS or "FireRed" not in rec.get("base_label", ""):
-            continue
-        land = rec.get("land_mons")
-        if not isinstance(land, dict):
-            continue
-        mons = land.get("mons", [])
-        if len(mons) != 12:
-            die(f"{map_name}: expected 12 FireRed land slots, got {len(mons)}")
-        before = [m.get("species") for m in mons]
-        after = POOLS[map_name]
-        for mon, species in zip(mons, after):
-            mon["species"] = species
-        found[map_name] = {"before": before, "after": after}
-
-    missing_core = sorted(REQUIRED_CORE - set(found))
-    if missing_core:
-        die(f"missing required early FireRed encounter records: {missing_core}")
-
+def save_json(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    optional_patched = sorted(set(found) - REQUIRED_CORE)
-    optional_missing = sorted((set(POOLS) - REQUIRED_CORE) - set(found))
-    print(
-        f"[{MARKER}] wild encounters: patched {len(found)} FireRed maps; "
-        f"optional patched={optional_patched}; optional absent={optional_missing}"
-    )
+
+
+def item_obj(x: int, y: int, script: str, flag: str) -> dict:
     return {
-        "mapsPatched": sorted(found),
-        "optionalMissing": optional_missing,
-        "grassFightingSteelBias": True,
-        "genRange": "I-V",
-        "startersAddedToOrdinaryWild": False,
-        "legendaryMythicalAddedToOrdinaryWild": False,
+        "type": "object",
+        "graphics_id": "OBJ_EVENT_GFX_ITEM_BALL",
+        "x": x,
+        "y": y,
+        "elevation": 3,
+        "movement_type": "MOVEMENT_TYPE_FACE_DOWN",
+        "movement_range_x": 1,
+        "movement_range_y": 1,
+        "trainer_type": "TRAINER_TYPE_NONE",
+        "trainer_sight_or_berry_tree_id": "0",
+        "script": script,
+        "flag": flag,
     }
+
+
+def assert_object_flags_free(root: Path, flags: set[str]) -> None:
+    # These generic flags were originally selected by Qarro's v3.1 content pass
+    # for these same pickups before hidden-item range validation moved the hidden
+    # versions to 0x4A7..0x4AA. Re-prove they have no runtime consumers before
+    # converting the pickups into visible item objects.
+    definition_files = {
+        Path("include/constants/flags.h"),
+        Path("include/constants/flags_frlg.h"),
+    }
+    collisions: dict[str, list[str]] = {flag: [] for flag in flags}
+    for path in root.rglob("*"):
+        if not path.is_file() or path.suffix.lower() not in {".c", ".h", ".inc", ".s", ".json"}:
+            continue
+        rel = path.relative_to(root)
+        if rel in definition_files:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        for flag in flags:
+            if flag in text:
+                collisions[flag].append(str(rel))
+    bad = {flag: paths for flag, paths in collisions.items() if paths}
+    if bad:
+        die(f"visible-item object flags are not free: {bad}")
+
+
+def remove_hidden(data: dict, *, flag: str, item: str, required: bool = True) -> int:
+    events = data.get("bg_events", [])
+    matches = [
+        event for event in events
+        if isinstance(event, dict)
+        and event.get("type") == "hidden_item"
+        and event.get("flag") == flag
+        and event.get("item") == item
+    ]
+    if required and len(matches) != 1:
+        die(f"expected one hidden {item}/{flag}, found {len(matches)}")
+    data["bg_events"] = [event for event in events if event not in matches]
+    return len(matches)
+
+
+def add_visible(data: dict, obj: dict) -> None:
+    objects = data.setdefault("object_events", [])
+    same_script = [o for o in objects if isinstance(o, dict) and o.get("script") == obj["script"]]
+    same_flag = [o for o in objects if isinstance(o, dict) and o.get("flag") == obj["flag"]]
+    if same_script or same_flag:
+        die(f"duplicate visible item script/flag for {obj['script']} / {obj['flag']}")
+    objects.append(obj)
+
+
+def append_finditem_script(path: Path, label: str, item: str) -> None:
+    text = read(path)
+    if f"{label}::" in text:
+        die(f"duplicate item script label {label}")
+    text = text.rstrip() + f"\n\n{label}::\n    finditem {item}\n    end\n"
+    path.write_text(text, encoding="utf-8")
+
+
+def apply_ground_items(root: Path) -> dict:
+    visible_flags = {"FLAG_0x0B2", "FLAG_0x0B3", "FLAG_0x0B4"}
+    assert_object_flags_free(root, visible_flags)
+
+    # Route 1 is before the first city. v3.3 already removes both custom visible
+    # balls; remove the remaining custom hidden Oran Berry as well.
+    route1_path = root / "data/maps/Route1_Frlg/map.json"
+    route1 = json.loads(read(route1_path))
+    removed_route1_hidden = remove_hidden(
+        route1, flag="FLAG_UNUSED_0x4A9", item="ITEM_ORAN_BERRY", required=True
+    )
+    custom_route1_visible = [
+        o for o in route1.get("object_events", [])
+        if isinstance(o, dict) and str(o.get("script", "")).startswith("Route1_EventScript_QarroItem")
+    ]
+    if custom_route1_visible:
+        die(f"pre-Viridian custom visible pickups remain: {custom_route1_visible}")
+    custom_route1_hidden = [
+        e for e in route1.get("bg_events", [])
+        if isinstance(e, dict) and e.get("flag") in {
+            "FLAG_UNUSED_0x4A7", "FLAG_UNUSED_0x4A8", "FLAG_UNUSED_0x4A9", "FLAG_UNUSED_0x4AA"
+        }
+    ]
+    if custom_route1_hidden:
+        die(f"pre-Viridian custom hidden pickups remain: {custom_route1_hidden}")
+    save_json(route1_path, route1)
+
+    conversions = [
+        {
+            "map": "Route2_Frlg",
+            "hidden_flag": "FLAG_UNUSED_0x4AA",
+            "hidden_item": "ITEM_SUPER_POTION",
+            "x": 16,
+            "y": 54,
+            "script": "Route2_EventScript_QarroItemSuperPotion",
+            "object_flag": "FLAG_0x0B2",
+            "item": "ITEM_SUPER_POTION",
+        },
+        {
+            "map": "Route3_Frlg",
+            "hidden_flag": "FLAG_UNUSED_0x4A7",
+            "hidden_item": "ITEM_GREAT_BALL",
+            "x": 27,
+            "y": 9,
+            "script": "Route3_EventScript_QarroItemGreatBall",
+            "object_flag": "FLAG_0x0B3",
+            "item": "ITEM_GREAT_BALL",
+        },
+        {
+            "map": "Route4_Frlg",
+            "hidden_flag": "FLAG_UNUSED_0x4A8",
+            "hidden_item": "ITEM_SUPER_REPEL",
+            "x": 68,
+            "y": 17,
+            "script": "Route4_EventScript_QarroItemSuperRepel",
+            "object_flag": "FLAG_0x0B4",
+            "item": "ITEM_SUPER_REPEL",
+        },
+    ]
+
+    for spec in conversions:
+        map_path = root / f"data/maps/{spec['map']}/map.json"
+        data = json.loads(read(map_path))
+        remove_hidden(data, flag=spec["hidden_flag"], item=spec["hidden_item"], required=True)
+        add_visible(
+            data,
+            item_obj(spec["x"], spec["y"], spec["script"], spec["object_flag"]),
+        )
+        save_json(map_path, data)
+        append_finditem_script(
+            root / f"data/maps/{spec['map']}/scripts.inc",
+            spec["script"],
+            spec["item"],
+        )
+
+    # Validate the already-existing Route 2 Repel from v3.3 remains visible and
+    # persistent. Together with the three conversions this is the first ground-
+    # item tranche after Viridian, without front-loading Pallet/Route 1.
+    route2 = json.loads(read(root / "data/maps/Route2_Frlg/map.json"))
+    repel = [
+        o for o in route2.get("object_events", [])
+        if isinstance(o, dict)
+        and o.get("script") == "Route2_EventScript_QarroItemRepel"
+        and o.get("flag") == "FLAG_0x0B1"
+    ]
+    if len(repel) != 1:
+        die(f"Route2 persistent Repel pickup changed; expected one, found {len(repel)}")
+
+    report = {
+        "marker": MARKER,
+        "rule": "no custom accessible pickups before Viridian; visible ground items begin Route 2",
+        "preViridianHiddenRemoved": removed_route1_hidden,
+        "visiblePostViridianPickups": [
+            {"map": "Route2_Frlg", "item": "ITEM_REPEL", "flag": "FLAG_0x0B1", "source": "v3.3"},
+            *[
+                {
+                    "map": spec["map"],
+                    "item": spec["item"],
+                    "flag": spec["object_flag"],
+                    "convertedFromHidden": spec["hidden_flag"],
+                }
+                for spec in conversions
+            ],
+        ],
+        "visibleCustomPickupCount": 4,
+        "ashBondTouched": False,
+        "ashCapTouched": False,
+    }
+    out = root / "build/qarro_ground_items_v3_23_audit.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(
+        f"[{MARKER}] PASS: removed final pre-Viridian custom hidden pickup; "
+        f"4 persistent visible custom pickups now begin on Route 2"
+    )
+    return report
 
 
 def main() -> int:
     if len(sys.argv) != 2:
         print(f"usage: {Path(sys.argv[0]).name} <upstream-root>", file=sys.stderr)
         return 2
-    root = Path(sys.argv[1]).resolve()
-    item_audit = patch_item_balls(root)
-    wild_audit = patch_wild(root)
 
-    audit = {
-        "marker": MARKER,
-        "items": item_audit,
-        "wild": wild_audit,
-        "ashBondTouched": False,
-        "ashCapTouched": False,
-    }
-    out = root / "build/qarro_runtime_v3_3_audit.json"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(audit, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"[{MARKER}] PASS: runtime items + early Gen I-V encounters corrected; Ash code untouched")
+    repo = Path(__file__).resolve().parents[1]
+    base = load_base(repo)
+    rc = int(base["main"]() or 0)
+    if rc:
+        return rc
+
+    root = Path(sys.argv[1]).resolve()
+    apply_ground_items(root)
+    print(
+        f"[{MARKER}] runtime baseline preserved; ground-item progression advanced; "
+        f"Ash Bond / Ash Cap untouched"
+    )
     return 0
 
 
