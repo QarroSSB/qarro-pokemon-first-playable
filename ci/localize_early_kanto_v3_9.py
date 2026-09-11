@@ -10,7 +10,7 @@ from __future__ import annotations
 import json, re, subprocess, sys
 from pathlib import Path
 
-BASE_COMMIT = "d4c4a8093244373993954128cc9eaa8d43881ae6"
+BASE_COMMIT = "d4c4a8de52cde2f5cdb53d36ce1159f4e654562e"
 BASE_PATH = "ci/localize_early_kanto_v3_9.py"
 BASE_MARKER = "QARRO_RU_EARLY_KANTO_V3_22"
 BASE_COUNT = 334
