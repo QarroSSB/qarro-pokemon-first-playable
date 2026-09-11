@@ -1,71 +1,76 @@
 #!/usr/bin/env python3
-"""Qarro v3.16: close untranslated Viridian / Route 2 interior gaps.
+"""Qarro v3.17: close untranslated Pewter City interior gaps.
 
-Runs CI-green v3.15, then patches only previously untouched pinned FireRed map
-files. Every source file is checked against its exact pinned git-blob SHA before
-editing. Pokemon species, Move and Ability proper names stay English.
-Gameplay, trainer data, Ash Bond and Ash Cap are not modified.
+Runs CI-green v3.16, then patches only previously untouched pinned FireRed
+Pewter interior files. Each source file is verified against its exact pinned
+git-blob SHA before editing. Pokemon species, Move and Ability proper names
+stay English. Gameplay, trainer data, Ash Bond and Ash Cap are not modified.
 """
 from __future__ import annotations
 import json, re, subprocess, sys
 from pathlib import Path
 
-BASE_COMMIT = "3df3c4dc390d79b56a21c8e365d3d9e9bd8c27c8"
+BASE_COMMIT = "2585e018f0e6c0243c1781d876fd3fd41c44147d"
 BASE_PATH = "ci/localize_early_kanto_v3_9.py"
-BASE_MARKER = "QARRO_RU_EARLY_KANTO_V3_15"
-BASE_COUNT = 177
-MARKER = "QARRO_RU_EARLY_KANTO_V3_16"
+BASE_MARKER = "QARRO_RU_EARLY_KANTO_V3_16"
+BASE_COUNT = 210
+MARKER = "QARRO_RU_EARLY_KANTO_V3_17"
 AUDIT_REL = Path("build/qarro_ru_early_kanto_v3_9_audit.json")
 
 def B(*lines: str) -> tuple[str, ...]: return lines
 
 FILES = {
-"data/maps/ViridianCity_House_Frlg/scripts.inc": ("17041c37d73dfbf5465c72e09743626bbf3e7c4d", {
-"ViridianCity_House_Text_NicknamingIsFun": B(r"Придумывать прозвища весело,\n",r"но это не так уж просто.\p",r"Хитрые имена хороши, но простые\n",r"легче запомнить.$"),
-"ViridianCity_House_Text_MyDaddyLovesMonsToo": B(r"Мой папа тоже любит ПОКЕМОНОВ.$"),
-"ViridianCity_House_Text_Speary": B(r"SPEARY: Чирик-чирик!$"),
-"ViridianCity_House_Text_SpearowNameSpeary": B(r"SPEAROW\n",r"Имя: SPEARY$"),
+"data/maps/PewterCity_Museum_1F_Frlg/scripts.inc": ("a30b96ac99b5b88afeaa1991bd5cde2e7a800d3b", {
+"PewterCity_Museum_1F_Text_Its50YForChildsTicket": B(r"Да-да.\n",r"Детский билет стоит ¥50.\p",r"Хочешь войти?$"),
+"PewterCity_Museum_1F_Text_ComeAgain": B(r"Приходи еще!$"),
+"PewterCity_Museum_1F_Text_Right50YThankYou": B(r"Верно, ¥50!\n",r"Спасибо!$"),
+"PewterCity_Museum_1F_Text_DontHaveEnoughMoney": B(r"У тебя недостаточно денег.$"),
+"PewterCity_Museum_1F_Text_PleaseEnjoyYourself": B(r"Приятного посещения.$"),
+"PewterCity_Museum_1F_Text_DoYouKnowWhatAmberIs": B(r"С черного хода не проскользнуть!\n",r"Хорошая попытка, но нет.\p",r"Ладно!\n",r"Ты знаешь, что такое ЯНТАРЬ?$"),
+"PewterCity_Museum_1F_Text_AmberContainsGeneticMatter": B(r"В ЯНТАРЕ сохраняется генетический\n",r"материал древних ПОКЕМОНОВ.\p",r"Где-то есть ЛАБОРАТОРИЯ,\n",r"пытающаяся оживлять их из ЯНТАРЯ.$"),
+"PewterCity_Museum_1F_Text_AmberIsFossilizedSap": B(r"ЯНТАРЬ - это окаменевшая смола,\n",r"которая когда-то текла из деревьев.\p",r"Древняя смола со временем\n",r"окаменела и стала ЯНТАРЕМ.$"),
+"PewterCity_Museum_1F_Text_ShouldBeGratefulForLongLife": B(r"Надо ценить мою долгую жизнь.\p",r"Никогда не думал, что увижу\n",r"кости настоящего дракона!$"),
+"PewterCity_Museum_1F_Text_WantYouToGetAmberExamined": B(r"Тсс! Мне нужно поделиться\n",r"с кем-нибудь секретом.\p",r"Думаю, в этом куске ЯНТАРЯ\n",r"есть ДНК ПОКЕМОНА!\p",r"Если ПОКЕМОНОВ можно оживлять,\n",r"это будет научный прорыв.\p",r"Но коллеги меня не слушают.\p",r"Поэтому прошу тебя:\p",r"отнеси его на исследование\n",r"в какую-нибудь ЛАБОРАТОРИЮ.$"),
+"PewterCity_Museum_1F_Text_ReceivedOldAmberFromMan": B(r"{PLAYER} получает СТАРЫЙ ЯНТАРЬ\n",r"от мужчины.$"),
+"PewterCity_Museum_1F_Text_GetOldAmberChecked": B(r"Тсс!\n",r"Проверь СТАРЫЙ ЯНТАРЬ!$"),
+"PewterCity_Museum_1F_Text_DontHaveSpaceForThis": B(r"Для этого нет места.$"),
+"PewterCity_Museum_1F_Text_WeHaveTwoFossilsOnExhibit": B(r"У нас выставлены две окаменелости\n",r"редких древних ПОКЕМОНОВ.$"),
+"PewterCity_Museum_1F_Text_BeautifulPieceOfAmber": B(r"Здесь красивый кусок прозрачного\n",r"золотистого ЯНТАРЯ.$"),
+"PewterCity_Museum_1F_Text_AerodactylFossil": B(r"Окаменелость AERODACTYL\n",r"Редкий древний ПОКЕМОН.$"),
+"PewterCity_Museum_1F_Text_KabutopsFossil": B(r"Окаменелость KABUTOPS\n",r"Редкий древний ПОКЕМОН.$"),
 }),
-"data/maps/ViridianCity_School_Frlg/scripts.inc": ("2c8fe149775d5c8839d79e47a2f6ee630dbc626c", {
-"ViridianCity_School_Text_TryingToMemorizeNotes": B(r"Уф! Пытаюсь запомнить все\n",r"свои записи.$"),
-"ViridianCity_School_Text_ReadBlackboardCarefully": B(r"Хорошо!\p",r"Обязательно внимательно прочитай,\n",r"что написано на доске!$"),
-"ViridianCity_School_Text_NotebookFirstPage": B(r"Посмотрим тетрадь.\p",r"Первая страница...\p",r"ПОКЕБОЛЫ используют, чтобы\n",r"ловить ПОКЕМОНОВ.\p",r"В команде можно носить до шести\n",r"ПОКЕМОНОВ.\p",r"Тех, кто растит ПОКЕМОНОВ и\n",r"сражается ими, зовут ТРЕНЕРАМИ.$"),
-"ViridianCity_School_Text_NotebookSecondPage": B(r"Вторая страница...\p",r"Здорового ПОКЕМОНА поймать трудно,\n",r"поэтому сначала ослабь его.\p",r"Яд, ожог или другой статус\n",r"помогут его ослабить.$"),
-"ViridianCity_School_Text_NotebookThirdPage": B(r"Третья страница...\p",r"ТРЕНЕРЫ ПОКЕМОНОВ ищут других,\n",r"чтобы сразиться с ними.\p",r"Для ТРЕНЕРА вкус победы\n",r"особенно сладок.\p",r"В ПОКЕМОН-ГИМАХ повсюду\n",r"постоянно идут бои.$"),
-"ViridianCity_School_Text_NotebookFourthPage": B(r"Четвертая страница...\p",r"Главная цель каждого ТРЕНЕРА\n",r"ПОКЕМОНОВ проста.\p",r"Победить восемь сильнейших\n",r"ЛИДЕРОВ ПОКЕМОН-ГИМОВ.\p",r"Тогда получишь право встретиться...\p",r"с ЭЛИТНОЙ ЧЕТВЕРКОЙ\n",r"ЛИГИ ПОКЕМОНОВ!$"),
-"ViridianCity_School_Text_TurnThePage": B(r"Перевернуть страницу?$"),
-"ViridianCity_School_Text_HeyDontLookAtMyNotes": B(r"ДЕВОЧКА: Эй!\n",r"Не смотри мои записи!$"),
-"ViridianCity_School_Text_BlackboardListsStatusProblems": B(r"На доске перечислены статусные\n",r"проблемы ПОКЕМОНОВ в бою.$"),
-"ViridianCity_School_Text_ReadWhichTopic": B(r"Какую тему хочешь прочитать?$"),
-"ViridianCity_School_Text_ExplainSleep": B(r"Спящий ПОКЕМОН не может\n",r"атаковать.\p",r"Сон сохраняется даже после боя.\p",r"Используй ПРОБУЖДЕНИЕ,\n",r"чтобы разбудить ПОКЕМОНА.$"),
-"ViridianCity_School_Text_ExplainBurn": B(r"Ожог снижает силу АТАКИ\n",r"и постепенно отнимает HP.\p",r"Ожог остается после боя.\n",r"Используй ЛЕЧЕНИЕ ОЖОГА.$"),
-"ViridianCity_School_Text_ExplainPoison": B(r"При отравлении здоровье ПОКЕМОНА\n",r"постепенно уменьшается.\p",r"Яд остается после боя.\n",r"Используй ПРОТИВОЯДИЕ!$"),
-"ViridianCity_School_Text_ExplainFreeze": B(r"Замороженный ПОКЕМОН не может\n",r"двигаться.\p",r"Он остается замороженным после боя.\p",r"Используй ЛЕЧЕНИЕ ЛЬДА,\n",r"чтобы отогреть ПОКЕМОНА.$"),
-"ViridianCity_School_Text_ExplainParalysis": B(r"Паралич снижает СКОРОСТЬ и может\n",r"помешать ПОКЕМОНУ двигаться.\p",r"Паралич остается после боя.\n",r"Используй ЛЕЧЕНИЕ ПАРАЛИЧА.$"),
+"data/maps/PewterCity_Museum_2F_Frlg/scripts.inc": ("65ed5bdc4838b943242866fc1cda67fe7b67f763", {
+"Text_SeismicTossTeach": B(r"Тайны космоса...\n",r"Загадки Земли...\p",r"Мы так мало знаем\n",r"о стольких вещах.\p",r"Но это повод учиться усерднее,\n",r"а не сдаваться.\p",r"Бросать стоит кое-что другое...\p",r"Например, SEISMIC TOSS.\n",r"Научить этой атаке ПОКЕМОНА?$"),
+"Text_SeismicTossDeclined": B(r"Вот как?\n",r"Уверен, ты еще вернешься.$"),
+"Text_SeismicTossWhichMon": B(r"Какой ПОКЕМОН хочет выучить\n",r"SEISMIC TOSS?$"),
+"Text_SeismicTossTaught": B(r"Надеюсь, ты не сдашься.\n",r"Продолжай в том же духе.$"),
+"PewterCity_Museum_1F_Text_WhatsSpecialAboutMoonStone": B(r"ЛУННЫЙ КАМЕНЬ, значит?\p",r"Что в нем особенного?\n",r"По мне, обычный камень.$"),
+"PewterCity_Museum_1F_Text_BoughtColorTVForMoonLanding": B(r"20 июля 1969 года!\p",r"В тот день человек впервые\n",r"ступил на Луну.\p",r"Я купил цветной телевизор,\n",r"чтобы увидеть эти новости.$"),
+"PewterCity_Museum_1F_Text_RunningSpaceExhibitThisMonth": B(r"В этом месяце у нас проходит\n",r"выставка о космосе.$"),
+"PewterCity_Museum_1F_Text_AskedDaddyToCatchPikachu": B(r"Я хочу PIKACHU!\n",r"Он такой милый!\p",r"Я попросила папу поймать мне его!$"),
+"PewterCity_Museum_1F_Text_PikachuSoonIPromise": B(r"Да, скоро будет PIKACHU, обещаю!$"),
+"PewterCity_Museum_1F_Text_SpaceShuttle": B(r"Космический шаттл$"),
+"PewterCity_Museum_1F_Text_MeteoriteThatFellOnMtMoon": B(r"Метеорит, упавший на MT. MOON.\n",r"Считается ЛУННЫМ КАМНЕМ.$"),
 }),
-"data/maps/ViridianCity_PokemonCenter_1F_Frlg/scripts.inc": ("eb57a4cc12ab8a60ee57972558b1163656091bdf", {
-"ViridianCity_PokemonCenter_1F_Text_FeelFreeToUsePC": B(r"Можешь свободно пользоваться ПК\n",r"в углу.\p",r"Так сказала медсестра.\n",r"Очень мило с ее стороны!$"),
-"ViridianCity_PokemonCenter_1F_Text_PokeCenterInEveryTown": B(r"В каждом городе впереди есть\n",r"ПОКЕМОН-ЦЕНТР.\p",r"Лечение бесплатное, так что\n",r"смело лечи своих ПОКЕМОНОВ.$"),
-"ViridianCity_PokemonCenter_1F_Text_PokeCentersHealMons": B(r"ПОКЕМОН-ЦЕНТРЫ лечат уставших,\n",r"раненых и потерявших сознание.\p",r"Здесь ПОКЕМОНЫ полностью\n",r"восстанавливают здоровье.$"),
+"data/maps/PewterCity_Mart_Frlg/scripts.inc": ("2fa94240bf53a2010e4cfd65f5d9cbc7f2b1385e", {
+"PewterCity_Mart_Text_BoughtWeirdFishFromShadyGuy": B(r"Какой-то мутный старик уговорил\n",r"меня купить странного рыбного ПОКЕМОНА!\p",r"Он совсем слабый и стоил ¥500!$"),
+"PewterCity_Mart_Text_GoodThingsIfRaiseMonsDiligently": B(r"Если усердно растить ПОКЕМОНОВ,\n",r"может случиться что-то хорошее.\p",r"Даже слабые способны удивить,\n",r"если не сдаваться.$"),
 }),
-"data/maps/Route2_ViridianForest_SouthEntrance_Frlg/scripts.inc": ("6df492b7eaa3f0a026c45fe6e8270a3ac60a0271", {
-"Route2_ViridianForest_SouthEntrance_Text_ForestIsMaze": B(r"Идешь в ВИРИДИАНСКИЙ ЛЕС?\n",r"Там настоящий природный лабиринт.\l",r"Смотри не заблудись.$"),
-"Route2_ViridianForest_SouthEntrance_Text_RattataHasWickedBite": B(r"RATTATA мал, но не стоит\n",r"недооценивать его укус.\p",r"Ты уже поймал одного?$"),
+"data/maps/PewterCity_House1_Frlg/scripts.inc": ("c83439961247ea1ec4d03fb0f3383a8e5fe4ff90", {
+"PewterCity_House1_Text_Nidoran": B(r"NIDORAN♂: Гав-гав!$"),
+"PewterCity_House1_Text_NidoranSit": B(r"NIDORAN, сидеть!$"),
+"PewterCity_House1_Text_TradeMonsAreFinicky": B(r"Наш ПОКЕМОН получен обменом,\n",r"поэтому с ним непросто.\p",r"Чужой ПОКЕМОН - тот, которого\n",r"ты получил в обмене.\p",r"Он быстро растет, но может\n",r"не слушаться неопытного ТРЕНЕРА.\p",r"Вот бы у нас были ЗНАЧКИ...$"),
 }),
-"data/maps/Route2_ViridianForest_NorthEntrance_Frlg/scripts.inc": ("1778637c8d6238c3019f2f8ea8212b1d46ae906b", {
-"Route2_ViridianForest_NorthEntrance_Text_ManyMonsOnlyInForests": B(r"Многие ПОКЕМОНЫ живут только\n",r"в лесах и пещерах.\p",r"Будь настойчив и ищи повсюду,\n",r"чтобы находить разные виды.$"),
-"Route2_ViridianForest_NorthEntrance_Text_CanCutSkinnyTrees": B(r"Замечал тонкие деревья у дороги?\p",r"Говорят, их можно срубить\n",r"особой атакой ПОКЕМОНА.$"),
-"Route2_ViridianForest_NorthEntrance_Text_CanCancelEvolution": B(r"Знаешь, как отменить эволюцию?\p",r"Когда ПОКЕМОН эволюционирует,\n",r"процесс можно остановить.\p",r"Так можно растить ПОКЕМОНА,\n",r"не меняя его форму.$"),
+"data/maps/PewterCity_House2_Frlg/scripts.inc": ("dc1a88233531001f8543f86d6383b455582777d7", {
+"PewterCity_House2_Text_MonsLearnTechniquesAsTheyGrow": B(r"По мере роста ПОКЕМОНЫ учат\n",r"новые приемы.\p",r"Но некоторым атакам их должны\n",r"обучать люди.$"),
+"PewterCity_House2_Text_MonsEasierCatchIfStatused": B(r"ПОКЕМОНА легче поймать,\n",r"если у него есть статус.\p",r"Сон, яд, ожог или паралич -\n",r"все это помогает.\p",r"Но поимка ПОКЕМОНА никогда\n",r"не гарантирована!$"),
 }),
-"data/maps/Route2_House_Frlg/scripts.inc": ("d3aab6eb4777e4963cfe24e9d33e21bd03c60469", {
-"Route2_House_Text_FaintedMonsCanUseFieldMoves": B(r"ПОКЕМОН без сознания лишь не может\n",r"продолжать бой.\p",r"Вне боя он все еще может\n",r"использовать атаки вроде CUT.$"),
-}),
-"data/maps/Route2_EastBuilding_Frlg/scripts.inc": ("eed59e03fb00a397e4c6be6b176d1e7244eb4fbf", {
-"Route2_EastBuilding_Text_GiveHM05IfSeen10Mons": B(r"Привет! Помнишь меня?\n",r"Я один из помощников PROF. OAK.\p",r"Если в ПОКЕДЕКСЕ есть данные\n",r"о десяти видах, я должен\l",r"дать тебе награду.\p",r"PROF. OAK доверил мне HM05.\p",r"Итак, {PLAYER}, скажи:\p",r"у тебя есть данные хотя бы\n",r"о десяти видах ПОКЕМОНОВ?$"),
-"Route2_EastBuilding_Text_GreatHereYouGo": B(r"Отлично! У тебя есть данные\n",r"о {STR_VAR_3} видах ПОКЕМОНОВ!\p",r"Поздравляю!\n",r"Держи!$"),
-"Route2_EastBuilding_Text_ReceivedHM05FromAide": B(r"{PLAYER} получает HM05\n",r"от ПОМОЩНИКА.$"),
-"Route2_EastBuilding_Text_ExplainHM05": B(r"В HM05 находится скрытая атака\n",r"FLASH.\p",r"FLASH освещает даже самые темные\n",r"пещеры и подземелья.$"),
-"Route2_EastBuilding_Text_CanGetThroughRockTunnel": B(r"Когда ПОКЕМОН выучит FLASH,\n",r"ты сможешь пройти ROCK TUNNEL.$"),
+"data/maps/PewterCity_PokemonCenter_1F_Frlg/scripts.inc": ("d4a7e9ef7894e4ee171f6a7173a6c5fa4685a53", {
+"PewterCity_PokemonCenter_1F_Text_TeamRocketMtMoonImOnPhone": B(r"Что!?\p",r"КОМАНДА R на MT. MOON?\n",r"Что?\p",r"Я по телефону говорю!\n",r"Отойди!$"),
+"PewterCity_PokemonCenter_1F_Text_Jigglypuff": B(r"JIGGLYPUFF: Пуу-пупуу!$"),
+"PewterCity_PokemonCenter_1F_Text_WhenJiggylypuffSingsMonsGetDrowsy": B(r"Зеваю!\p",r"Когда JIGGLYPUFF поет,\n",r"ПОКЕМОНОВ клонит в сон...\p",r"...Меня тоже...\n",r"Хр-р-р...$"),
+"PewterCity_PokemonCenter_1F_Text_TradingMyClefairyForPikachu": B(r"Я очень хочу PIKACHU,\n",r"поэтому меняю на него CLEFAIRY.$"),
+"PewterCity_PokemonCenter_1F_Text_TradingPikachuWithKid": B(r"Я обмениваюсь ПОКЕМОНАМИ\n",r"с тем парнем.\p",r"У меня два PIKACHU, так что\n",r"одного можно обменять.$"),
 }),
 }
 
@@ -91,7 +96,7 @@ def main() -> int:
     if len(sys.argv) != 2:
         print(f"usage: {Path(sys.argv[0]).name} <pokeemerald-expansion-root>", file=sys.stderr); return 2
     code = load_base()
-    ns = {"__name__":"qarro_ru_early_kanto_v315_base","__file__":str(Path(__file__).resolve())}
+    ns = {"__name__":"qarro_ru_early_kanto_v316_base","__file__":str(Path(__file__).resolve())}
     exec(compile(code, f"{BASE_COMMIT}:{BASE_PATH}", "exec"), ns)
     rc = int(ns["main"]() or 0)
     if rc: return rc
@@ -112,17 +117,18 @@ def main() -> int:
             changed_total += 1
         path.write_text(text, encoding="utf-8")
         audit.setdefault("files", {})[rel] = {"selectedBlocks":len(blocks),"changedThisRun":len(blocks),"sourceBlob":blob}
-        print(f"[ru-early-v316] {rel}: {len(blocks)}/{len(blocks)} blocks changed")
+        print(f"[ru-early-v317] {rel}: {len(blocks)}/{len(blocks)} blocks changed")
     expected_new = sum(len(v[1]) for v in FILES.values())
-    if expected_new != 33 or changed_total != expected_new:
-        raise RuntimeError(f"Viridian/Route2 scope drift: expected 33, got {expected_new}/{changed_total}")
+    if expected_new != 40 or changed_total != expected_new:
+        raise RuntimeError(f"Pewter interior scope drift: expected 40, got {expected_new}/{changed_total}")
     audit.update({
         "previousMarker": BASE_MARKER,
         "marker": MARKER,
         "selectedBlocksLocalized": BASE_COUNT + expected_new,
         "blocksChangedThisRun": int(audit.get("blocksChangedThisRun",0)) + changed_total,
-        "viridianAccessibleInteriorsLocalized": True,
-        "route2BuildingsAndForestGatesLocalized": True,
+        "pewterAccessibleInteriorsLocalized": True,
+        "pewterMuseumLocalized": True,
+        "pewterMartHouseCenterLocalized": True,
         "pokemonSpeciesProperNamesEnglish": True,
         "moveProperNamesEnglish": True,
         "abilityProperNamesEnglish": True,
@@ -132,7 +138,7 @@ def main() -> int:
         "ashCapTouched": False,
     })
     audit_path.write_text(json.dumps(audit, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"[{MARKER}] PASS: base {BASE_COUNT} + {expected_new} interior/gate blocks = {BASE_COUNT + expected_new}")
+    print(f"[{MARKER}] PASS: base {BASE_COUNT} + {expected_new} Pewter interior blocks = {BASE_COUNT + expected_new}")
     return 0
 
 if __name__ == "__main__":
