@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Qarro v3.12 early-Kanto Russian localization continuation.
+"""Qarro v3.13 early-Kanto Russian localization: Pallet starting-zone completion.
 
-Runs the exact CI-verified v3.11 pass (through Pewter Gym/Brock), then
-localizes the full Route 3 text set on the pinned FireRed source. The pass is
-fail-closed: every untouched English block must match exactly once.
+Runs the exact CI-verified v3.12 pass (through Route 3), then closes the
+remaining user-facing text in Pallet Town exterior plus the player's house
+1F/2F. The pass is fail-closed: every untouched English block must match
+exactly once.
 
 Pokemon species, Move and Ability proper names remain English. Gameplay,
 trainer data, Ash Bond and Ash Cap are not modified.
@@ -15,10 +16,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-BASE_COMMIT = "bd347c3158a54679bd8280dacf0d015a0b1600ed"
+BASE_COMMIT = "c39a990197cf866dfde92836c041de2c630c3b89"
 BASE_PATH = "ci/localize_early_kanto_v3_9.py"
-BASE_MARKER = "QARRO_RU_EARLY_KANTO_V3_11"
-MARKER = "QARRO_RU_EARLY_KANTO_V3_12"
+BASE_MARKER = "QARRO_RU_EARLY_KANTO_V3_12"
+MARKER = "QARRO_RU_EARLY_KANTO_V3_13"
 AUDIT_REL = Path("build/qarro_ru_early_kanto_v3_9_audit.json")
 
 
@@ -35,92 +36,279 @@ def load_base() -> str:
 
 
 PATCHES = {
-    "data/maps/Route3_Frlg/scripts.inc": {
-        "Route3_Text_TunnelFromCeruleanTiring": (
-            (r"Whew… I better take a rest…\n", r"Groan…\p", r"That tunnel from CERULEAN takes a\n", r"lot out of you!$"),
-            (r"Уф... Надо немного отдохнуть...\n", r"Ох...\p", r"Тоннель из CERULEAN здорово\n", r"выматывает!$"),
+    "data/maps/PalletTown_Frlg/scripts.inc": {
+        "PalletTown_Text_OakDontGoOut": (
+            (r"OAK: Hey! Wait!\n", r"Don't go out!$"),
+            (r"ОУК: Эй! Стой!\n", r"Не выходи из города!$"),
         ),
-        "Route3_Text_ColtonIntro": (
-            (r"Hey!\n", r"I saw you in VIRIDIAN FOREST!$"),
-            (r"Эй!\n", r"Я видел тебя в VIRIDIAN FOREST!$"),
+        "PalletTown_Text_OakGrassUnsafeNeedMon": (
+            (
+                r"OAK: It's unsafe!\n",
+                r"Wild POKéMON live in tall grass!\p",
+                r"You need your own POKéMON for\n",
+                r"your protection.\p",
+                r"I know!\n",
+                r"Here, come with me!$",
+            ),
+            (
+                r"ОУК: Это опасно!\n",
+                r"В высокой траве живут дикие\n",
+                r"ПОКЕМОНЫ!\p",
+                r"Тебе нужен свой ПОКЕМОН\n",
+                r"для защиты.\p",
+                r"Знаю!\n",
+                r"Иди за мной!$",
+            ),
         ),
-        "Route3_Text_ColtonDefeat": ((r"You beat me again!$",), (r"Ты снова меня победил!$",)),
-        "Route3_Text_ColtonPostBattle": (
-            (r"There are other kinds of POKéMON\n", r"than the ones you find in forests.$"),
-            (r"Есть и другие виды ПОКЕМОНОВ,\n", r"не только лесные.$"),
+        "PalletTown_Text_RaisingMonsToo": (
+            (
+                r"I'm raising POKéMON, too.\p",
+                r"When they get strong, they can\n",
+                r"protect me.$",
+            ),
+            (
+                r"Я тоже выращиваю ПОКЕМОНОВ.\p",
+                r"Когда они станут сильнее,\n",
+                r"они смогут меня защитить.$",
+            ),
         ),
-        "Route3_Text_BenIntro": (
-            (r"Hi!\n", r"I like shorts!\p", r"They're delightfully comfy and\n", r"easy to wear!$"),
-            (r"Привет!\n", r"Я люблю шорты!\p", r"Они такие удобные,\n", r"и носить их легко!$"),
+        "PalletTown_Text_CanStoreItemsAndMonsInPC": (
+            (
+                r"Technology is incredible!\p",
+                r"You can now store and recall items\n",
+                r"and POKéMON as data via PC.$",
+            ),
+            (
+                r"Технологии потрясают!\p",
+                r"Теперь предметы и ПОКЕМОНОВ\n",
+                r"можно хранить в ПК как данные.$",
+            ),
         ),
-        "Route3_Text_BenDefeat": ((r"I don't believe it!$",), (r"Не могу поверить!$",)),
-        "Route3_Text_BenPostBattle": (
-            (r"Are you using a POKéMON CENTER's\n", r"PC for storing your POKéMON?\p", r"Each BOX can hold up to\n", r"30 POKéMON.$"),
-            (r"Ты хранишь ПОКЕМОНОВ в ПК\n", r"ПОКЕМОН-ЦЕНТРА?\p", r"В каждом БОКСЕ помещается\n", r"до 30 ПОКЕМОНОВ.$"),
+        "PalletTown_Text_OakPokemonResearchLab": (
+            (r"OAK POKéMON RESEARCH LAB$",),
+            (r"ЛАБОРАТОРИЯ ПОКЕМОНОВ ОУКА$",),
         ),
-        "Route3_Text_JaniceIntro": (
-            (r"Excuse me!\n", r"You looked at me, didn't you?$"),
-            (r"Эй!\n", r"Ты ведь посмотрел на меня?$"),
+        "PalletTown_Text_PlayersHouse": (
+            (r"{PLAYER}'s house$",),
+            (r"Дом {PLAYER}$",),
         ),
-        "Route3_Text_JaniceDefeat": ((r"You're mean!$",), (r"Ну и вредина!$",)),
-        "Route3_Text_JanicePostBattle": (
-            (r"You shouldn't be staring if you\n", r"don't want to battle!$"),
-            (r"Не смотри на ТРЕНЕРОВ, если\n", r"не хочешь сражаться!$"),
+        "PalletTown_Text_RivalsHouse": (
+            (r"{RIVAL}'s house$",),
+            (r"Дом {RIVAL}$",),
         ),
-        "Route3_Text_GregIntro": (
-            (r"Are you a TRAINER?\n", r"Let's get with it right away!$"),
-            (r"Ты ТРЕНЕР?\n", r"Тогда сразу к делу!$"),
+        "PalletTown_Text_TownSign": (
+            (r"PALLET TOWN\n", r"Shades of your journey await!$"),
+            (r"ПАЛЛЕТ-ТАУН\n", r"Здесь начинается твой путь!$"),
         ),
-        "Route3_Text_GregDefeat": (
-            (r"If I had new POKéMON, I would've\n", r"won!$"),
-            (r"Будь у меня новые ПОКЕМОНЫ,\n", r"я бы победил!$"),
+        "PalletTown_Text_OakLetMeSeePokedex": (
+            (
+                r"OAK: Ah, {PLAYER}!\n",
+                r"You're back, are you?\p",
+                r"How much have you filled in your\n",
+                r"POKéDEX?\p",
+                r"May I see it?\p",
+                r"Let's see…$",
+            ),
+            (
+                r"ОУК: А, {PLAYER}!\n",
+                r"Ты вернулся?\p",
+                r"Насколько ты заполнил\n",
+                r"ПОКЕДЕКС?\p",
+                r"Можно взглянуть?\p",
+                r"Посмотрим...$",
+            ),
         ),
-        "Route3_Text_GregPostBattle": (
-            (r"If a POKéMON BOX on the PC gets\n", r"full, just switch to another BOX.$"),
-            (r"Если БОКС ПОКЕМОНОВ в ПК\n", r"заполнен, выбери другой БОКС.$"),
+        "PalletTown_Text_CaughtXPuttingInHonestEffort": (
+            (
+                r"You've caught {STR_VAR_2}…\p",
+                r"Hm, it looks as if you're putting\n",
+                r"in an honest effort.\p",
+                r"When you manage to fill it some\n",
+                r"more, come show me, please.$",
+            ),
+            (
+                r"Поймано: {STR_VAR_2}...\p",
+                r"Хм, вижу, ты честно стараешься.\p",
+                r"Когда заполнишь его еще\n",
+                r"немного, покажи мне снова.$",
+            ),
         ),
-        "Route3_Text_SallyIntro": (
-            (r"That look you gave me…\n", r"It's so intriguing!$"),
-            (r"Этот твой взгляд...\n", r"Так интригует!$"),
+        "PalletTown_Text_CaughtXImpressiveFollowMe": (
+            (
+                r"You've caught… {STR_VAR_2}!?\n",
+                r"Now, this is impressive!\p",
+                r"There's something I wanted to ask\n",
+                r"of you, {PLAYER}.\p",
+                r"Come.\n",
+                r"Follow me.$",
+            ),
+            (
+                r"Поймано... {STR_VAR_2}!?\n",
+                r"Впечатляет!\p",
+                r"Я хотел кое о чем тебя\n",
+                r"попросить, {PLAYER}.\p",
+                r"Идем.\n",
+                r"Следуй за мной.$",
+            ),
         ),
-        "Route3_Text_SallyDefeat": ((r"Be nice!$",), (r"Будь добрее!$",)),
-        "Route3_Text_SallyPostBattle": (
-            (r"You can avoid battles by not\n", r"letting TRAINERS see you.$"),
-            (r"Можно избегать боёв, если\n", r"не попадаться ТРЕНЕРАМ на глаза.$"),
+        "PalletTown_Text_OakYouEnjoyingTraveling": (
+            (
+                r"OAK: Ah, {PLAYER}!\n",
+                r"You seem to be enjoying traveling.\p",
+                r"Knowing you, {PLAYER}, I can easily\n",
+                r"imagine you going out to even more\l",
+                r"exotic locales.\p",
+                r"Good for you, good for you.\n",
+                r"Hohoho.$",
+            ),
+            (
+                r"ОУК: А, {PLAYER}!\n",
+                r"Похоже, путешествия тебе\n",
+                r"по душе.\p",
+                r"Зная тебя, я уверен:\n",
+                r"ты увидишь еще больше\l",
+                r"далеких мест.\p",
+                r"Так держать!\n",
+                r"Хо-хо-хо.$",
+            ),
         ),
-        "Route3_Text_CalvinIntro": (
-            (r"Hey! You're not wearing shorts!\n", r"What's wrong with you?$"),
-            (r"Эй! Ты не в шортах!\n", r"Что с тобой не так?$"),
+        "PalletTown_Text_HmmIsThatRight": (
+            (r"Hmm…\n", r"Is that right…$"),
+            (r"Хм...\n", r"Вот как...$"),
         ),
-        "Route3_Text_CalvinDefeat": (
-            (r"Lost!\n", r"Lost! Lost!$"),
-            (r"Проиграл!\n", r"Проиграл! Проиграл!$"),
+        "PalletTown_Text_OhLookLook": (
+            (r"Oh!\n", r"Look, look!$"),
+            (r"О!\n", r"Смотри, смотри!$"),
         ),
-        "Route3_Text_CalvinPostBattle": (
-            (r"I always wear shorts, even in\n", r"winter. That's my policy.$"),
-            (r"Я всегда ношу шорты, даже\n", r"зимой. Это мой принцип.$"),
+        "PalletTown_Text_ReadItReadIt": (
+            (r"Read it, read it!$",),
+            (r"Прочитай, прочитай!$",),
         ),
-        "Route3_Text_JamesIntro": (
-            (r"I'll battle you with the POKéMON\n", r"I just caught.$"),
-            (r"Я сражусь ПОКЕМОНОМ,\n", r"которого только что поймал.$"),
+        "PalletTown_Text_PressStartToOpenMenu": (
+            (r"TRAINER TIPS\p", r"Press START to open the MENU!$"),
+            (r"СОВЕТЫ ТРЕНЕРА\p", r"Нажми START, чтобы открыть\n", r"МЕНЮ!$"),
         ),
-        "Route3_Text_JamesDefeat": ((r"Done like dinner!$",), (r"Вот и всё!$",)),
-        "Route3_Text_JamesPostBattle": (
-            (r"Trained POKéMON are stronger than\n", r"the wild ones.$"),
-            (r"Тренированные ПОКЕМОНЫ сильнее\n", r"диких.$"),
+        "PalletTown_Text_SignsAreUsefulArentThey": (
+            (r"Signs are useful, aren't they?$",),
+            (r"Таблички полезны, правда?$",),
         ),
-        "Route3_Text_RobinIntro": (
-            (r"Eek!\n", r"Did you touch me?$"),
-            (r"Ай!\n", r"Ты меня тронул?$"),
+        "PalletTown_Text_LookCopiedTrainerTipsSign": (
+            (
+                r"Look, look!\p",
+                r"I copied what it said on one of\n",
+                r"those TRAINER TIPS signs!$",
+            ),
+            (
+                r"Смотри, смотри!\p",
+                r"Я переписала текст с одной\n",
+                r"таблички СОВЕТОВ ТРЕНЕРА!$",
+            ),
         ),
-        "Route3_Text_RobinDefeat": ((r"That's it?$",), (r"И это всё?$",)),
-        "Route3_Text_RobinPostBattle": (
-            (r"ROUTE 4 is at the foot of\n", r"MT. MOON.$"),
-            (r"МАРШРУТ 4 находится у подножия\n", r"MT. MOON.$"),
+        "PalletTown_Text_PressStartToOpenMenuCopy": (
+            (r"TRAINER TIPS!\p", r"Press START to open the MENU!$"),
+            (r"СОВЕТЫ ТРЕНЕРА!\p", r"Нажми START, чтобы открыть\n", r"МЕНЮ!$"),
         ),
-        "Route3_Text_RouteSign": (
-            (r"ROUTE 3\n", r"MT. MOON AHEAD$"),
-            (r"МАРШРУТ 3\n", r"ВПЕРЕДИ MT. MOON$"),
+    },
+    "data/maps/PalletTown_PlayersHouse_1F_Frlg/scripts.inc": {
+        "PalletTown_PlayersHouse_1F_Text_AllBoysLeaveOakLookingForYou": (
+            (
+                r"MOM: …Right.\n",
+                r"All boys leave home someday.\l",
+                r"It said so on TV.\p",
+                r"Oh, yes. PROF. OAK, next door, was\n",
+                r"looking for you.$",
+            ),
+            (
+                r"МАМА: ...Верно.\n",
+                r"Когда-нибудь все мальчики\l",
+                r"уходят из дома.\p",
+                r"Так сказали по ТВ.\p",
+                r"А, да. ПРОФ. ОУК по соседству\n",
+                r"тебя искал.$",
+            ),
+        ),
+        "PalletTown_PlayersHouse_1F_Text_AllGirlsLeaveOakLookingForYou": (
+            (
+                r"MOM: …Right.\n",
+                r"All girls dream of traveling.\l",
+                r"It said so on TV.\p",
+                r"Oh, yes. PROF. OAK, next door, was\n",
+                r"looking for you.$",
+            ),
+            (
+                r"МАМА: ...Верно.\n",
+                r"Все девочки мечтают\l",
+                r"о путешествиях.\p",
+                r"Так сказали по ТВ.\p",
+                r"А, да. ПРОФ. ОУК по соседству\n",
+                r"тебя искал.$",
+            ),
+        ),
+        "PalletTown_PlayersHouse_1F_Text_YouShouldTakeQuickRest": (
+            (r"MOM: {PLAYER}!\n", r"You should take a quick rest.$"),
+            (r"МАМА: {PLAYER}!\n", r"Тебе стоит немного отдохнуть.$"),
+        ),
+        "PalletTown_PlayersHouse_1F_Text_LookingGreatTakeCare": (
+            (
+                r"MOM: Oh, good! You and your\n",
+                r"POKéMON are looking great.\l",
+                r"Take care now!$",
+            ),
+            (
+                r"МАМА: Вот и хорошо! Ты и твои\n",
+                r"ПОКЕМОНЫ отлично выглядите.\l",
+                r"Береги себя!$",
+            ),
+        ),
+        "PalletTown_PlayersHouse_1F_Text_MovieOnTVFourBoysOnRailroad": (
+            (
+                r"There's a movie on TV.\n",
+                r"Four boys are walking on railroad\l",
+                r"tracks.\p",
+                r"…I better go, too.$",
+            ),
+            (
+                r"По телевизору идет фильм.\n",
+                r"Четверо мальчиков идут вдоль\l",
+                r"железной дороги.\p",
+                r"...Мне тоже пора идти.$",
+            ),
+        ),
+        "PalletTown_PlayersHouse_1F_Text_MovieOnTVGirlOnBrickRoad": (
+            (
+                r"There's a movie on TV.\n",
+                r"A girl with her hair in pigtails is\l",
+                r"walking up a brick road.\p",
+                r"…I better go, too.$",
+            ),
+            (
+                r"По телевизору идет фильм.\n",
+                r"Девочка с косичками идет\l",
+                r"по дороге из кирпича.\p",
+                r"...Мне тоже пора идти.$",
+            ),
+        ),
+        "PalletTown_PlayersHouse_1F_Text_OopsWrongSide": (
+            (r"Oops, wrong side…$",),
+            (r"Ой, не с той стороны...$",),
+        ),
+    },
+    "data/maps/PalletTown_PlayersHouse_2F_Frlg/scripts.inc": {
+        "PalletTown_PlayersHouse_2F_Text_PlayedWithNES": (
+            (r"{PLAYER} played with the NES.\p", r"…Okay!\n", r"It's time to go!$"),
+            (r"{PLAYER} играет в NES.\p", r"...Ладно!\n", r"Пора идти!$"),
+        ),
+        "PalletTown_PlayersHouse_2F_Text_PressLRForHelp": (
+            (
+                r"It's a posted notice…\p",
+                r"If you're confused, ask for HELP!\n",
+                r"Press the L or R Button!$",
+            ),
+            (
+                r"На стене висит записка...\p",
+                r"Если запутался, открой ПОМОЩЬ!\n",
+                r"Нажми кнопку L или R!$",
+            ),
         ),
     },
 }
@@ -159,7 +347,7 @@ def main() -> int:
 
     code = load_base()
     ns = {
-        "__name__": "qarro_ru_early_kanto_v311_base",
+        "__name__": "qarro_ru_early_kanto_v312_base",
         "__file__": str(Path(__file__).resolve()),
     }
     exec(compile(code, f"{BASE_COMMIT}:{BASE_PATH}", "exec"), ns)
@@ -172,10 +360,10 @@ def main() -> int:
     if not audit_path.is_file():
         raise RuntimeError(f"base localization audit missing: {AUDIT_REL}")
     audit = json.loads(audit_path.read_text(encoding="utf-8"))
-    if audit.get("marker") != BASE_MARKER or audit.get("selectedBlocksLocalized") != 106:
+    if audit.get("marker") != BASE_MARKER or audit.get("selectedBlocksLocalized") != 132:
         raise RuntimeError(
             "base localization audit drift: expected marker "
-            f"{BASE_MARKER!r} and 106 blocks, got "
+            f"{BASE_MARKER!r} and 132 blocks, got "
             f"{audit.get('marker')!r}/{audit.get('selectedBlocksLocalized')!r}"
         )
 
@@ -190,11 +378,11 @@ def main() -> int:
             "selectedBlocks": len(blocks),
             "changedThisRun": changed,
         }
-        print(f"[ru-early-v312] {rel}: {changed}/{len(blocks)} blocks changed")
+        print(f"[ru-early-v313] {rel}: {changed}/{len(blocks)} blocks changed")
 
-    expected_new = 26
+    expected_new = 28
     if sum(len(v) for v in PATCHES.values()) != expected_new:
-        raise RuntimeError("Route 3 localization scope drift")
+        raise RuntimeError("Pallet starting-zone localization scope drift")
     if changed_total != expected_new:
         raise RuntimeError(
             f"fresh pinned checkout should change all {expected_new} new blocks; got {changed_total}"
@@ -202,11 +390,10 @@ def main() -> int:
 
     audit["previousMarker"] = BASE_MARKER
     audit["marker"] = MARKER
-    audit["selectedBlocksLocalized"] = 106 + expected_new
+    audit["selectedBlocksLocalized"] = 132 + expected_new
     audit["blocksChangedThisRun"] = int(audit.get("blocksChangedThisRun", 0)) + changed_total
-    audit["route3Localized"] = True
-    audit["route3TrainerDialogueLocalized"] = True
-    audit["route3SignLocalized"] = True
+    audit["palletTownExteriorLocalized"] = True
+    audit["palletPlayersHouseLocalized"] = True
     audit["pokemonSpeciesNamesEnglish"] = True
     audit["moveNamesEnglish"] = True
     audit["abilityNamesEnglish"] = True
@@ -218,7 +405,8 @@ def main() -> int:
 
     print(
         f"[{MARKER}] PASS: base {BASE_MARKER} preserved; "
-        f"localized {changed_total} Route 3 blocks; total={audit['selectedBlocksLocalized']}"
+        f"localized {changed_total} Pallet starting-zone blocks; "
+        f"total={audit['selectedBlocksLocalized']}"
     )
     return 0
 
