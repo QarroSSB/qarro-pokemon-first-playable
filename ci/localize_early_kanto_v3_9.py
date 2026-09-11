@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Qarro v3.23: localize Route 25.
+"""Qarro v3.24: start Cerulean City exterior localization.
 
-Runs CI-green v3.22 first, then localizes all remaining user-facing FireRed
-text blocks in Route25_Frlg/scripts.inc. Pokemon species, Move and Ability
+Runs CI-green v3.23 first, then localizes the rival and Team Rocket story
+sequence in CeruleanCity_Frlg/scripts.inc. Pokemon species, Move and Ability
 proper names stay English. Gameplay, trainer data, Ash Bond and Ash Cap are
 not modified.
 """
@@ -10,106 +10,77 @@ from __future__ import annotations
 import json, re, subprocess, sys
 from pathlib import Path
 
-BASE_COMMIT = "d4c4a8de52cde2f5cdb53d36ce1159f4e654562e"
+BASE_COMMIT = "28fd5e05d596f4db06b03728b0c6eb6a3f5d52bd"
 BASE_PATH = "ci/localize_early_kanto_v3_9.py"
-BASE_MARKER = "QARRO_RU_EARLY_KANTO_V3_22"
-BASE_COUNT = 334
-MARKER = "QARRO_RU_EARLY_KANTO_V3_23"
+BASE_MARKER = "QARRO_RU_EARLY_KANTO_V3_23"
+BASE_COUNT = 364
+MARKER = "QARRO_RU_EARLY_KANTO_V3_24"
 AUDIT_REL = Path("build/qarro_ru_early_kanto_v3_9_audit.json")
-REL = Path("data/maps/Route25_Frlg/scripts.inc")
-SOURCE_BLOB = "a16819121433c92dca1dd8efecb6d4cfec85e620"
+REL = Path("data/maps/CeruleanCity_Frlg/scripts.inc")
+SOURCE_BLOB = "dae271fa54770716838b62d66b3b78a4fc785fbc"
 
 def B(*lines: str) -> tuple[str, ...]: return lines
 
 BLOCKS = {
-"Route25_Text_JoeyIntro": B(
-    r"Местные ТРЕНЕРЫ приходят сюда\n",
-    r"тренироваться.$"),
-"Route25_Text_JoeyDefeat": B(
-    r"Ты неплох.$"),
-"Route25_Text_JoeyPostBattle": B(
-    r"У всех POKéMON есть слабости.\n",
-    r"Даже у самых сильных.\p",
-    r"Поэтому лучше растить POKéMON\n",
-    r"разных типов.$"),
-"Route25_Text_DanIntro": B(
-    r"Папа водил меня на отличную\n",
-    r"вечеринку на S.S. ANNE в VERMILION CITY.$"),
-"Route25_Text_DanDefeat": B(
-    r"Я не злюсь!$"),
-"Route25_Text_DanPostBattle": B(
-    r"На S.S. ANNE я видел ТРЕНЕРОВ\n",
-    r"со всего мира.$"),
-"Route25_Text_FlintIntro": B(
-    r"Я крутой парень.\n",
-    r"У меня есть девушка!$"),
-"Route25_Text_FlintDefeat": B(
-    r"Вот досада...$"),
-"Route25_Text_FlintPostBattle": B(
-    r"Ну и ладно.\n",
-    r"Моя девушка меня подбодрит.$"),
-"Route25_Text_KelseyIntro": B(
-    r"Привет!\n",
-    r"Мой парень крутой!$"),
-"Route25_Text_KelseyDefeat": B(
-    r"Моя форма не лучшая...$"),
-"Route25_Text_KelseyPostBattle": B(
-    r"Вот бы мой парень был так же\n",
-    r"хорош, как ты.$"),
-"Route25_Text_ChadIntro": B(
-    r"У меня было предчувствие...\n",
-    r"Я знал, что должен сразиться с тобой!$"),
-"Route25_Text_ChadDefeat": B(
-    r"Я знал, что проиграю!$"),
-"Route25_Text_ChadPostBattle": B(
-    r"Если твой POKéMON запутался,\n",
-    r"замени его.\p",
-    r"Это хорошая тактика.$"),
-"Route25_Text_HaleyIntro": B(
-    r"У моей подруги много милых POKéMON.\n",
-    r"Я так завидую!$"),
-"Route25_Text_HaleyDefeat": B(
-    r"Теперь я не так завидую!$"),
-"Route25_Text_HaleyPostBattle": B(
-    r"Ты пришел с MT. MOON?\n",
-    r"Можно мне CLEFAIRY?$"),
-"Route25_Text_FranklinIntro": B(
-    r"Я только что спустился с MT. MOON,\n",
-    r"но сил у меня еще полно!$"),
-"Route25_Text_FranklinDefeat": B(
-    r"Ты отлично постарался!$"),
-"Route25_Text_FranklinPostBattle": B(
-    r"Черт!\n",
-    r"В той пещере меня укусил ZUBAT.$"),
-"Route25_Text_NobIntro": B(
-    r"Я иду посмотреть коллекцию\n",
-    r"POKéMANIAC на мысе.$"),
-"Route25_Text_NobDefeat": B(
-    r"Ты меня здорово уделал!$"),
-"Route25_Text_NobPostBattle": B(
-    r"POKéMANIAC полностью оправдывает\n",
-    r"свое имя.\p",
-    r"В его коллекции много редких\n",
-    r"видов POKéMON.$"),
-"Route25_Text_WayneIntro": B(
-    r"Идешь к BILL?\n",
-    r"Сначала сразись со мной!$"),
-"Route25_Text_WayneDefeat": B(
-    r"А ты хорош.$"),
-"Route25_Text_WaynePostBattle": B(
-    r"Тропа внизу - короткий путь\n",
-    r"в CERULEAN CITY.$"),
-"Route25_Text_SeaCottageSign": B(
-    r"МОРСКОЙ ДОМ\n",
-    r"Здесь живет BILL!$"),
-"Route25_Text_MistyHighHopesAboutThisPlace": B(
-    r"Этот мыс - известное место для свиданий.\p",
-    r"MISTY, ЛИДЕР ЗАЛА, возлагает\n",
-    r"на это место большие надежды.$"),
-"Route25_Text_AreYouHereAlone": B(
-    r"Привет, ты здесь один?\p",
-    r"Если уж пришел на мыс CERULEAN...\n",
-    r"Лучше приходить сюда вдвоем.$"),
+"CeruleanCity_Text_RivalIntro": B(
+    r"{RIVAL}: Эй, {PLAYER}!\p",
+    r"Ты все еще плетешься где-то\n",
+    r"позади?\p",
+    r"А у меня все отлично! Я поймал\n",
+    r"кучу сильных и умных POKéMON!\p",
+    r"Ну-ка покажи, кого поймал ты,\n",
+    r"{PLAYER}!$"),
+"CeruleanCity_Text_RivalDefeat": B(
+    r"Эй!\n",
+    r"Полегче!\l",
+    r"Ты уже победил!$"),
+"CeruleanCity_Text_RivalPostBattle": B(
+    r"{RIVAL}: Эй, знаешь что?\p",
+    r"Я был у BILL, и он показал мне\n",
+    r"своих редких POKéMON.\p",
+    r"Мой POKéDEX сразу пополнился\n",
+    r"множеством новых страниц!\p",
+    r"Все-таки BILL известен во всем\n",
+    r"мире как настоящий POKéMANIAC.\p",
+    r"Он еще и создал систему хранения\n",
+    r"POKéMON на PC.\p",
+    r"Раз уж ты пользуешься его системой,\n",
+    r"стоит сходить и поблагодарить его.\p",
+    r"Ладно, мне пора!\n",
+    r"Еще увидимся!$"),
+"CeruleanCity_Text_OhRightLittlePresentAsFavor": B(
+    r"А, да, точно.\p",
+    r"Мне тебя даже жаль. Серьезно.\n",
+    r"Ты вечно отстаешь от меня.\p",
+    r"Так что держи небольшой подарок\n",
+    r"от меня.$"),
+"CeruleanCity_Text_ExplainFameCheckerSmellYa": B(
+    r"Для такого любителя болтать, как ты,\n",
+    r"эта штука подойдет идеально.\p",
+    r"Мне она не нужна - чужие дела\n",
+    r"меня вообще не волнуют.\p",
+    r"Ладно, теперь я правда ухожу.\n",
+    r"Увидимся!$"),
+"CeruleanCity_Text_GruntIntro": B(
+    r"Эй! Не лезь сюда!\n",
+    r"Это не твой двор!\p",
+    r"...А?\n",
+    r"Я?\p",
+    r"Я просто невинный прохожий!\n",
+    r"Не веришь?{PLAY_BGM}{MUS_RG_ENCOUNTER_ROCKET}$"),
+"CeruleanCity_Text_GruntDefeat": B(
+    r"GRUNT: Стой! Я сдаюсь!\n",
+    r"Я уйду без шума!$"),
+"CeruleanCity_Text_OkayIllReturnStolenTM": B(
+    r"Ладно! Верну украденный TM!$"),
+"CeruleanCity_Text_RecoveredTM28FromGrunt": B(
+    r"{PLAYER} вернул TM28 у GRUNT.$"),
+"CeruleanCity_Text_BetterGetMovingBye": B(
+    r"Мне лучше убираться отсюда!\n",
+    r"Пока!$"),
+"CeruleanCity_Text_MakeRoomForThisCantRun": B(
+    r"Освободи место для этого!\n",
+    r"Мне некуда бежать!$"),
 }
 
 def load_base() -> str:
@@ -135,7 +106,7 @@ def main() -> int:
         print(f"usage: {Path(sys.argv[0]).name} <pokeemerald-expansion-root>", file=sys.stderr)
         return 2
     code = load_base()
-    ns = {"__name__": "qarro_ru_early_kanto_v322_base", "__file__": str(Path(__file__).resolve())}
+    ns = {"__name__": "qarro_ru_early_kanto_v323_base", "__file__": str(Path(__file__).resolve())}
     exec(compile(code, f"{BASE_COMMIT}:{BASE_PATH}", "exec"), ns)
     rc = int(ns["main"]() or 0)
     if rc:
@@ -157,15 +128,15 @@ def main() -> int:
     path.write_text(text, encoding="utf-8")
 
     changed = len(BLOCKS)
-    if changed != 30:
-        raise RuntimeError(f"Route 25 scope drift: expected 30 blocks, got {changed}")
+    if changed != 11:
+        raise RuntimeError(f"Cerulean City story scope drift: expected 11 blocks, got {changed}")
     audit.setdefault("files", {})[str(REL)] = {"selectedBlocks": changed, "changedThisRun": changed, "sourceBlob": SOURCE_BLOB}
     audit.update({
         "previousMarker": BASE_MARKER,
         "marker": MARKER,
         "selectedBlocksLocalized": BASE_COUNT + changed,
         "blocksChangedThisRun": int(audit.get("blocksChangedThisRun", 0)) + changed,
-        "route25Localized": True,
+        "ceruleanCityStoryLocalized": True,
         "pokemonSpeciesProperNamesEnglish": True,
         "moveProperNamesEnglish": True,
         "abilityProperNamesEnglish": True,
@@ -175,7 +146,7 @@ def main() -> int:
         "ashCapTouched": False,
     })
     audit_path.write_text(json.dumps(audit, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"[{MARKER}] PASS: base {BASE_COUNT} + {changed} Route 25 blocks = {BASE_COUNT + changed}")
+    print(f"[{MARKER}] PASS: base {BASE_COUNT} + {changed} Cerulean City story blocks = {BASE_COUNT + changed}")
     return 0
 
 if __name__ == "__main__":
