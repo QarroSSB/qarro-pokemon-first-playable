@@ -9,6 +9,7 @@ not referenced or changed.
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -128,6 +129,9 @@ def main() -> int:
         "ashCapTouched": False,
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"[{MARKER}] PASS: translated {len(applied)} mandatory Misty runtime blocks; Ash Bond/Ash Cap untouched")
+
+    rival_script = Path(__file__).with_name("localize_cerulean_rival_v3_23.py")
+    subprocess.run([sys.executable, str(rival_script), str(root)], check=True)
     return 0
 
 
