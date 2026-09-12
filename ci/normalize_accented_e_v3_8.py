@@ -6,12 +6,11 @@ only after all localization passes have completed, so exact English anchors
 used by the localization scripts remain valid during their own execution.
 
 This pass also applies evidence-driven Russian runtime increments for Brock's
-mandatory Pewter Gym flow: battle intro, badge-victory dialogue, TM39 handoff,
-TM39 explanation, and the immediate post-battle direction to Cerulean. The
-exact pinned FireRed source blocks are required. A prior localization pass may
-already have normalized literal é/É to e/E, so every anchor accepts exactly
-one of the pinned source block or its mechanically normalized equivalent and
-otherwise fails closed.
+mandatory Pewter Gym flow and the mandatory Running Shoes handoff immediately
+after Brock. Exact pinned FireRed source blocks are required. A prior
+localization pass may already have normalized literal é/É to e/E, so every
+anchor accepts exactly one of the pinned source block or its mechanically
+normalized equivalent and otherwise fails closed.
 
 Charmap/font tables are deliberately excluded; the legacy FireRed slot stays
 untouched but no authored game text should reference it after this pass.
@@ -161,14 +160,95 @@ BROCK_PATCHES = (
     ),
 )
 
+PEWTER_FILE = "data/maps/PewterCity_Frlg/scripts.inc"
+PEWTER_RUNNING_SHOES_PATCHES = (
+    (
+        "PewterCity_Text_OhPlayer",
+        '''PewterCity_Text_OhPlayer::
+\t.string "Oh, {PLAYER}{KUN}!$"''',
+        '''PewterCity_Text_OhPlayer::
+\t.string "О, {PLAYER}{KUN}!$"''',
+    ),
+    (
+        "PewterCity_Text_AskedToDeliverThis",
+        '''PewterCity_Text_AskedToDeliverThis::
+\t.string "I'm glad I caught up to you.\\n"
+\t.string "I'm PROF. OAK's AIDE.\\p"
+\t.string "I've been asked to deliver this,\\n"
+\t.string "so here you go.$"''',
+        '''PewterCity_Text_AskedToDeliverThis::
+\t.string "Рад, что догнал тебя.\\n"
+\t.string "Я ПОМОЩНИК ПРОФ. ОУКА.\\p"
+\t.string "Меня попросили передать это,\\n"
+\t.string "так что держи.$"''',
+    ),
+    (
+        "PewterCity_Text_ReceivedRunningShoesFromAide",
+        '''PewterCity_Text_ReceivedRunningShoesFromAide::
+\t.string "{PLAYER} received the\\n"
+\t.string "RUNNING SHOES from the AIDE.$"''',
+        '''PewterCity_Text_ReceivedRunningShoesFromAide::
+\t.string "{PLAYER} получил\\n"
+\t.string "БЕГОВЫЕ КРОССОВКИ от ПОМОЩНИКА.$"''',
+    ),
+    (
+        "PewterCity_Text_SwitchedShoesWithRunningShoes",
+        '''PewterCity_Text_SwitchedShoesWithRunningShoes::
+\t.string "{PLAYER} switched shoes with the\\n"
+\t.string "RUNNING SHOES.$"''',
+        '''PewterCity_Text_SwitchedShoesWithRunningShoes::
+\t.string "{PLAYER} сменил обувь на\\n"
+\t.string "БЕГОВЫЕ КРОССОВКИ.$"''',
+    ),
+    (
+        "PewterCity_Text_ExplainRunningShoes",
+        '''PewterCity_Text_ExplainRunningShoes::
+\t.string "Press the B Button to run.\\n"
+\t.string "But only where there's room to run!$"''',
+        '''PewterCity_Text_ExplainRunningShoes::
+\t.string "Нажми кнопку B, чтобы бежать.\\n"
+\t.string "Но только там, где есть место!$"''',
+    ),
+    (
+        "PewterCity_Text_MustBeGoingBackToLab",
+        '''PewterCity_Text_MustBeGoingBackToLab::
+\t.string "Well, I must be going back to\\n"
+\t.string "the LAB.\\p"
+\t.string "Bye-bye!$"''',
+        '''PewterCity_Text_MustBeGoingBackToLab::
+\t.string "Мне пора возвращаться\\n"
+\t.string "в ЛАБОРАТОРИЮ.\\p"
+\t.string "Пока!$"''',
+    ),
+    (
+        "PewterCity_Text_RunningShoesLetterFromMom",
+        '''PewterCity_Text_RunningShoesLetterFromMom::
+\t.string "There's a letter attached…\\p"
+\t.string "Dear {PLAYER},\\p"
+\t.string "Here is a pair of RUNNING SHOES\\n"
+\t.string "for my beloved challenger.\\p"
+\t.string "Remember, I'll always cheer for\\n"
+\t.string "you! Don't ever give up!\\p"
+\t.string "From Mom$"''',
+        '''PewterCity_Text_RunningShoesLetterFromMom::
+\t.string "К ним прикреплено письмо…\\p"
+\t.string "Привет, {PLAYER}!\\p"
+\t.string "Вот тебе БЕГОВЫЕ КРОССОВКИ\\n"
+\t.string "для дальнейшего пути.\\p"
+\t.string "Помни, я всегда буду болеть\\n"
+\t.string "за тебя! Никогда не сдавайся!\\p"
+\t.string "Мама$"''',
+    ),
+)
 
-def apply_brock_runtime_localization(root: Path) -> list[str]:
-    path = root / BROCK_FILE
+
+def apply_verified_patches(root: Path, relative_path: str, patches: tuple[tuple[str, str, str], ...]) -> list[str]:
+    path = root / relative_path
     if not path.is_file():
-        raise RuntimeError(f"missing Brock runtime source: {path}")
+        raise RuntimeError(f"missing runtime source: {path}")
     text = path.read_text(encoding="utf-8")
     applied: list[str] = []
-    for label, old, new in BROCK_PATCHES:
+    for label, old, new in patches:
         if new in text:
             applied.append(f"{label}:already")
             continue
@@ -197,7 +277,8 @@ def main() -> int:
         return 2
 
     root = Path(sys.argv[1]).resolve()
-    brock_localization = apply_brock_runtime_localization(root)
+    brock_localization = apply_verified_patches(root, BROCK_FILE, BROCK_PATCHES)
+    pewter_running_shoes = apply_verified_patches(root, PEWTER_FILE, PEWTER_RUNNING_SHOES_PATCHES)
     changed_files: list[str] = []
     replaced = 0
 
@@ -247,6 +328,11 @@ def main() -> int:
             "labels": brock_localization,
             "blocks": len(BROCK_PATCHES),
         },
+        "pewterRunningShoesLocalization": {
+            "file": PEWTER_FILE,
+            "labels": pewter_running_shoes,
+            "blocks": len(PEWTER_RUNNING_SHOES_PATCHES),
+        },
         "charmapTouched": False,
         "fontTablesTouched": False,
         "ashBondTouched": False,
@@ -256,8 +342,9 @@ def main() -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(audit, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
+    total_runtime_blocks = len(BROCK_PATCHES) + len(PEWTER_RUNNING_SHOES_PATCHES)
     print(
-        f"[{MARKER}] PASS: localized {len(BROCK_PATCHES)} verified Brock runtime blocks; "
+        f"[{MARKER}] PASS: localized {total_runtime_blocks} verified early-Kanto runtime blocks; "
         f"normalized {replaced} accented-e literals in {len(changed_files)} authored source files; "
         "charmap/font/Ash untouched"
     )
