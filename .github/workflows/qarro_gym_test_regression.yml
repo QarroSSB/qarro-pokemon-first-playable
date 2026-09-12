@@ -11,9 +11,9 @@ permissions:
   actions: read
 
 env:
-  BASELINE_RUN: "34653223047"
-  BASELINE_ARTIFACT: "Qarro-FIRST-PLAYABLE-v3.8-303"
-  EXPECTED_ROM_SHA256: "9db853feced23206eaafb997d60d837b9afc04b30da9325377dc65641386f19d"
+  BASELINE_RUN: "34663914135"
+  BASELINE_ARTIFACT: "Qarro-FIRST-PLAYABLE-v3.8-307"
+  EXPECTED_ROM_SHA256: "40feae9cf1c0b022246780eb2db7efdd2e130346ba77253527491c219263a304"
 
 jobs:
   gym-test-regression:
@@ -52,7 +52,7 @@ jobs:
 
           root = Path('baseline')
           rom_path = root / 'Qarro_FIRST_PLAYABLE_v3_8.gba'
-          expected_sha = '9db853feced23206eaafb997d60d837b9afc04b30da9325377dc65641386f19d'
+          expected_sha = '40feae9cf1c0b022246780eb2db7efdd2e130346ba77253527491c219263a304'
 
           leaders = {
               'BROCK': ('Regirock -> Rhyperior', 'Ace=Tyranitar'),
@@ -90,6 +90,16 @@ jobs:
                   assert marker in balance_log, marker
                   assert replacement in balance_log, replacement
                   assert ace in balance_log, ace
+
+              # Latest approved Kanto Mythical exceptions are layered after the
+              # no-legend pool construction and must keep the protected Aces.
+              assert '[QARRO_GYM_MYTHICAL_V3_27] TRAINER_LEADER_ERIKA: Roserade -> Celebi' in balance_log
+              assert 'protected Ace=Venusaur' in balance_log
+              assert '[QARRO_GYM_MYTHICAL_V3_27] TRAINER_LEADER_SABRINA: Gallade -> Mew' in balance_log
+              assert 'protected Ace=Alakazam' in balance_log
+              assert '[QARRO_GYM_MYTHICAL_V3_27] PASS:' in balance_log
+              assert 'old Legendary anchors=0' in balance_log
+              assert 'approved Mythicals=Erika/Celebi + Sabrina/Mew' in balance_log
 
               assert '[QARRO_EXP_SHARE_V3_22] PASS:' in qol_log
               assert 'party-wide toggle ON by default' in qol_log
@@ -131,7 +141,7 @@ jobs:
               assert protected['protectedPathHits'] == 0
               assert protected['protectedDiffLineHits'] == 0
 
-              print(f'PASS Gym regression {n}: {sha[:16]}...; 8 no-legend pools + protected Aces + EXP Share + QoL + Ash protection evidence OK')
+              print(f'PASS Gym regression {n}: {sha[:16]}...; 8 Kanto pools + approved Mew/Celebi exceptions + protected Aces + EXP Share + QoL + Ash protection evidence OK')
 
           for i in range(1, 6):
               one_pass(i)
@@ -177,13 +187,13 @@ jobs:
           import json
           out = Path('regression_out')
           report = {
-              'marker': 'QARRO_GYM_TEST_REGRESSION_20260912',
-              'baselineRun': 34653223047,
-              'baselineCommit': 'ac674e62bec17c2bdc9025e95dd4757f3055a8eb',
-              'romSha256': '9db853feced23206eaafb997d60d837b9afc04b30da9325377dc65641386f19d',
+              'marker': 'QARRO_GYM_TEST_REGRESSION_20260912_MYTHICAL',
+              'baselineRun': 34663914135,
+              'baselineCommit': '92580cddee24d135e38172f1ab73a69d4954694a',
+              'romSha256': '40feae9cf1c0b022246780eb2db7efdd2e130346ba77253527491c219263a304',
               'staticPassesRequested': 5,
               'emulatorBootPassesRequested': 5,
-              'scope': 'exact #303 artifact + 8 Gym no-legend/Ace/save-stable evidence + EXP Share/QoL/protected evidence + mGBA boot smoke',
+              'scope': 'exact #307 artifact + 8 Kanto save-stable 5-of-6 pools + Erika/Celebi + Sabrina/Mew approved Mythical exceptions + protected Aces + EXP Share/QoL/protected evidence + mGBA boot smoke',
               'note': 'This proves compiled evidence and boot stability of the isolated Gym test ROM. It does not yet automate controller input through a full Gym battle or save/reload sequence.'
           }
           out.mkdir(exist_ok=True)
