@@ -8,6 +8,7 @@ Cap are not referenced or changed.
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -79,6 +80,9 @@ def main() -> int:
         "ashCapTouched": False,
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"[{MARKER}] PASS: translated {len(applied)} mandatory Pokemon Tower Mr. Fuji runtime block; Ash Bond/Ash Cap untouched")
+
+    flute_script = Path(__file__).with_name("localize_lavender_poke_flute_v3_32.py")
+    subprocess.run([sys.executable, str(flute_script), str(root)], check=True)
     return 0
 
 
