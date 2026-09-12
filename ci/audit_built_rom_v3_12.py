@@ -2,9 +2,10 @@
 """Post-build integrity gate for the Qarro FireRed artifact.
 
 Read-only: verifies the produced ROM is a plausible 32 MiB FireRed BPRE image,
-its recorded SHA-256 matches the actual bytes, and all prerequisite regression
-reports that gated the build are present. No gameplay/source data is modified;
-Ash Bond and Ash Cap are not touched.
+its recorded SHA-256 matches the actual bytes, all prerequisite regression
+reports are present, and the RU+EN font/localization foundation evidence is
+actually healthy rather than merely present. No gameplay/source data is
+modified; Ash Bond and Ash Cap are never touched.
 """
 from __future__ import annotations
 
@@ -23,6 +24,19 @@ REQUIRED_AUDITS = {
     "qarro_protected_features_v3_13_audit.json": "QARRO_PROTECTED_FEATURES_V3_13",
 }
 RU_AUDIT = "qarro_ru_foundation_v3_9_audit.json"
+EXPECTED_FONT_ATLASES = {
+    "latin_small_narrow.png",
+    "latin_small.png",
+    "latin_normal.png",
+    "latin_short.png",
+    "latin_narrow.png",
+    "latin_narrower.png",
+    "latin_small_narrower.png",
+    "latin_short_narrow.png",
+    "latin_short_narrower.png",
+}
+EXPECTED_EARLY_MARKERS = {"Привет", "ПОКЕМОН", "ПАЛЛЕТ", "ОУК", "МАМА", "Пора идти"}
+EXPECTED_CYRILLIC_GLYPHS = 66
 
 
 def require(condition: bool, message: str) -> None:
@@ -38,6 +52,61 @@ def load_json(path: Path) -> dict:
         raise RuntimeError(f"invalid audit evidence: {path.name}") from exc
     require(isinstance(data, dict), f"unexpected audit root: {path.name}")
     return data
+
+
+def verify_ru_foundation(ru: dict) -> dict:
+    policy = ru.get("policy", "")
+    require(
+        "FireRed" in policy and "Expansion 1.17.0" in policy and "Gen I-V" in policy,
+        "RU policy evidence drift",
+    )
+    require(
+        ru.get("cyrillic_glyph_count") == EXPECTED_CYRILLIC_GLYPHS,
+        f"unexpected Cyrillic glyph count: {ru.get('cyrillic_glyph_count')!r}",
+    )
+
+    fonts = ru.get("fonts")
+    require(isinstance(fonts, dict), "missing RU font-atlas evidence")
+    require(set(fonts) == EXPECTED_FONT_ATLASES, "RU font-atlas set drift")
+    for name in sorted(EXPECTED_FONT_ATLASES):
+        evidence = fonts.get(name)
+        require(isinstance(evidence, dict), f"invalid font evidence: {name}")
+        require(
+            evidence.get("cyrillic_nonempty") == EXPECTED_CYRILLIC_GLYPHS,
+            f"{name}: not all Cyrillic glyphs are non-empty",
+        )
+        require(
+            evidence.get("advance_raster_matches") == EXPECTED_CYRILLIC_GLYPHS,
+            f"{name}: raster/advance mismatch evidence",
+        )
+        require(int(evidence.get("min_ink_pixels", 0)) > 0, f"{name}: empty glyph ink evidence")
+        require(4 <= int(evidence.get("min_advance", 0)) <= 16, f"{name}: invalid min advance")
+        require(4 <= int(evidence.get("max_advance", 99)) <= 16, f"{name}: invalid max advance")
+
+    text = ru.get("text")
+    require(isinstance(text, dict), "missing Russian text audit evidence")
+    require(int(text.get("scanned_text_files", 0)) >= 1000, "RU audit scanned too few text files")
+    require(int(text.get("files_with_cyrillic", 0)) >= 10, "Russian localization coverage unexpectedly sparse")
+    require(int(text.get("cyrillic_characters", 0)) >= 5000, "Russian localization character count unexpectedly sparse")
+
+    hits = text.get("early_marker_hits")
+    require(isinstance(hits, dict), "missing early-game Russian marker evidence")
+    require(EXPECTED_EARLY_MARKERS.issubset(hits), "early-game Russian marker set drift")
+    for marker in EXPECTED_EARLY_MARKERS:
+        require(int(hits.get(marker, 0)) > 0, f"missing localized early-game marker: {marker}")
+
+    require(int(text.get("accented_e_file_count", -1)) == 0, "unsupported accented-e remains in source text")
+    require(text.get("files_still_containing_accented_e") == [], "accented-e file list is not empty")
+
+    return {
+        "cyrillicGlyphs": EXPECTED_CYRILLIC_GLYPHS,
+        "fontAtlases": len(EXPECTED_FONT_ATLASES),
+        "scannedTextFiles": int(text["scanned_text_files"]),
+        "filesWithCyrillic": int(text["files_with_cyrillic"]),
+        "cyrillicCharacters": int(text["cyrillic_characters"]),
+        "earlyMarkers": len(EXPECTED_EARLY_MARKERS),
+        "accentedEFiles": 0,
+    }
 
 
 def main() -> int:
@@ -66,10 +135,7 @@ def main() -> int:
         data = load_json(out / name)
         require(data.get("marker") == marker, f"audit marker drift: {name}")
 
-    ru = load_json(out / RU_AUDIT)
-    policy = ru.get("policy", "")
-    require("FireRed" in policy and "Expansion 1.17.0" in policy and "Gen I-V" in policy,
-            "RU policy evidence drift")
+    ru_summary = verify_ru_foundation(load_json(out / RU_AUDIT))
 
     report = {
         "marker": MARKER,
@@ -78,12 +144,17 @@ def main() -> int:
         "gameCode": game_code,
         "sha256": actual_sha,
         "requiredAuditEvidence": sorted([*REQUIRED_AUDITS, RU_AUDIT]),
+        "ruFoundation": ru_summary,
         "ashBondTouched": False,
         "ashCapTouched": False,
     }
     report_path = out / "qarro_built_rom_v3_12_audit.json"
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"[{MARKER}] PASS: 32 MiB BPRE ROM + SHA-256 + regression evidence verified")
+    print(
+        f"[{MARKER}] PASS: 32 MiB BPRE ROM + SHA-256 + regression evidence + "
+        f"{ru_summary['cyrillicGlyphs']} Cyrillic glyphs across {ru_summary['fontAtlases']} font atlases + "
+        f"Russian text coverage verified"
+    )
     print(f"audit: {report_path}")
     return 0
 
