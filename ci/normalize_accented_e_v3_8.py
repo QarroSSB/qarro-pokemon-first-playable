@@ -5,6 +5,11 @@ User choice: do not use a dedicated é glyph. Convert source text é/É to e/E
 only after all localization passes have completed, so exact English anchors
 used by the localization scripts remain valid during their own execution.
 
+This pass also applies the next evidence-driven Russian runtime increment:
+Brock's mandatory Pewter Gym intro and badge-victory dialogue. The exact pinned
+FireRed source blocks are required, so the patch fails closed if upstream or an
+earlier pass changes them unexpectedly.
+
 Charmap/font tables are deliberately excluded; the legacy FireRed slot stays
 untouched but no authored game text should reference it after this pass.
 After normalization, run the read-only RU font/localization foundation audit,
@@ -21,6 +26,95 @@ MARKER = "QARRO_NORMALIZE_E_V3_8"
 ROOTS = ("data", "src", "include")
 SUFFIXES = {".c", ".h", ".inc", ".s"}
 
+BROCK_FILE = "data/maps/PewterCity_Gym_Frlg/scripts.inc"
+BROCK_PATCHES = (
+    (
+        "PewterCity_Gym_Text_BrockIntro",
+        '''PewterCity_Gym_Text_BrockIntro::
+\t.string "So, you're here. I'm BROCK.\\n"
+\t.string "I'm PEWTER's GYM LEADER.\\p"
+\t.string "My rock-hard willpower is evident\\n"
+\t.string "even in my POKéMON.\\p"
+\t.string "My POKéMON are all rock hard, and\\n"
+\t.string "have true-grit determination.\\p"
+\t.string "That's right - my POKéMON are all\\n"
+\t.string "the ROCK type!\\p"
+\t.string "Fuhaha! You're going to challenge\\n"
+\t.string "me knowing that you'll lose?\\p"
+\t.string "That's the TRAINER's honor that\\n"
+\t.string "compels you to challenge me.\\p"
+\t.string "Fine, then!\\n"
+\t.string "Show me your best!{PLAY_BGM}{MUS_RG_ENCOUNTER_GYM_LEADER}$"''',
+        '''PewterCity_Gym_Text_BrockIntro::
+\t.string "Итак, ты пришёл.\\n"
+\t.string "Я БРОК, ЛИДЕР ГИМА ПЬЮТЕРА.\\p"
+\t.string "Моя воля крепка, как скала,\\n"
+\t.string "и это видно по ПОКЕМОНАМ.\\p"
+\t.string "Мои ПОКЕМОНЫ стойкие\\n"
+\t.string "и полны решимости.\\p"
+\t.string "Верно - все мои ПОКЕМОНЫ\\n"
+\t.string "относятся к типу ROCK!\\p"
+\t.string "Ха-ха! Ты бросаешь мне вызов,\\n"
+\t.string "хотя знаешь, что проиграешь?\\p"
+\t.string "Такова честь ТРЕНЕРА -\\n"
+\t.string "всегда принимать вызов.\\p"
+\t.string "Ну что ж!\\n"
+\t.string "Покажи всё, на что способен!{PLAY_BGM}{MUS_RG_ENCOUNTER_GYM_LEADER}$"''',
+    ),
+    (
+        "PewterCity_Gym_Text_BrockDefeat",
+        '''PewterCity_Gym_Text_BrockDefeat::
+\t.string "I took you for granted, and so\\n"
+\t.string "I lost.\\p"
+\t.string "As proof of your victory, I confer\\n"
+\t.string "on you this…the official POKéMON\\l"
+\t.string "LEAGUE BOULDERBADGE.\\p"
+\t.string "{FONT_NORMAL}{PLAYER} received the BOULDERBADGE\\n"
+\t.string "from BROCK!{PAUSE_MUSIC}{PLAY_BGM}{MUS_OBTAIN_BADGE}{PAUSE 0xFE}{PAUSE 0x56}{RESUME_MUSIC}\\p"
+\t.string "{FONT_MALE}Just having the BOULDERBADGE makes\\n"
+\t.string "your POKéMON more powerful.\\p"
+\t.string "It also enables the use of the\\n"
+\t.string "move FLASH outside of battle.\\p"
+\t.string "Of course, a POKéMON must know the\\n"
+\t.string "move FLASH to use it.$"''',
+        '''PewterCity_Gym_Text_BrockDefeat::
+\t.string "Я недооценил тебя,\\n"
+\t.string "поэтому и проиграл.\\p"
+\t.string "В знак твоей победы\\n"
+\t.string "вручаю тебе официальный\\l"
+\t.string "ЗНАЧОК БУЛДЕРА ЛИГИ.\\p"
+\t.string "{FONT_NORMAL}{PLAYER} получил ЗНАЧОК БУЛДЕРА\\n"
+\t.string "от БРОКА!{PAUSE_MUSIC}{PLAY_BGM}{MUS_OBTAIN_BADGE}{PAUSE 0xFE}{PAUSE 0x56}{RESUME_MUSIC}\\p"
+\t.string "{FONT_MALE}ЗНАЧОК БУЛДЕРА сделает\\n"
+\t.string "твоих ПОКЕМОНОВ сильнее.\\p"
+\t.string "Он также позволяет применять\\n"
+\t.string "FLASH вне боя.\\p"
+\t.string "Но ПОКЕМОН должен знать\\n"
+\t.string "атаку FLASH, чтобы её применять.$"''',
+    ),
+)
+
+
+def apply_brock_runtime_localization(root: Path) -> list[str]:
+    path = root / BROCK_FILE
+    if not path.is_file():
+        raise RuntimeError(f"missing Brock runtime source: {path}")
+    text = path.read_text(encoding="utf-8")
+    applied: list[str] = []
+    for label, old, new in BROCK_PATCHES:
+        if new in text:
+            applied.append(f"{label}:already")
+            continue
+        count = text.count(old)
+        if count != 1:
+            raise RuntimeError(
+                f"{label}: expected exactly one pinned English block, found {count}"
+            )
+        text = text.replace(old, new, 1)
+        applied.append(f"{label}:applied")
+    path.write_text(text, encoding="utf-8")
+    return applied
+
 
 def main() -> int:
     if len(sys.argv) != 2:
@@ -28,6 +122,7 @@ def main() -> int:
         return 2
 
     root = Path(sys.argv[1]).resolve()
+    brock_localization = apply_brock_runtime_localization(root)
     changed_files: list[str] = []
     replaced = 0
 
@@ -72,6 +167,11 @@ def main() -> int:
         "replacements": replaced,
         "changedFiles": len(changed_files),
         "sampleFiles": changed_files[:50],
+        "runtimeLocalizationIncrement": {
+            "file": BROCK_FILE,
+            "labels": brock_localization,
+            "blocks": len(BROCK_PATCHES),
+        },
         "charmapTouched": False,
         "fontTablesTouched": False,
         "ashBondTouched": False,
@@ -82,8 +182,9 @@ def main() -> int:
     out.write_text(json.dumps(audit, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     print(
-        f"[{MARKER}] PASS: normalized {replaced} accented-e literals in "
-        f"{len(changed_files)} authored source files; charmap/font/Ash untouched"
+        f"[{MARKER}] PASS: localized {len(BROCK_PATCHES)} verified Brock runtime blocks; "
+        f"normalized {replaced} accented-e literals in {len(changed_files)} authored source files; "
+        "charmap/font/Ash untouched"
     )
 
     here = Path(__file__).resolve().parent
