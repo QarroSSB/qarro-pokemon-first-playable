@@ -1,0 +1,144 @@
+name: Qarro Boss Expansion 1.17.0 audit
+
+on:
+  push:
+    branches: [test/boss-expansion-117-audit-20260912]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PINNED: e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7
+
+jobs:
+  boss-legality-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout Qarro audit branch
+        uses: actions/checkout@v4
+        with:
+          path: qarro-repo
+
+      - name: Checkout exact Expansion 1.17.0
+        uses: actions/checkout@v4
+        with:
+          repository: rh-hideout/pokeemerald-expansion
+          ref: e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7
+          path: upstream
+
+      - name: Verify exact pinned upstream
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C upstream rev-parse HEAD)" = "$PINNED"
+          echo "Pinned upstream: $(git -C upstream rev-parse HEAD)"
+
+      - name: Install FireRed ARM build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential binutils-arm-none-eabi gcc-arm-none-eabi \
+            libnewlib-arm-none-eabi libpng-dev python3 python3-pil
+
+      - name: Structural + Gen I-V learnset + ability audit
+        id: preaudit
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p boss_audit_out/logs
+          python3 qarro-repo/ci/validate_boss_expansion_117.py \
+            qarro-repo/ci/qarro_boss_manifest_342.zlib.b64 upstream boss_audit_out \
+            2>&1 | tee boss_audit_out/logs/precompile_audit.log
+          exit ${PIPESTATUS[0]}
+
+      - name: Build pinned trainerproc
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C upstream/tools/trainerproc clean
+          make -C upstream/tools/trainerproc
+
+      - name: Parse all 342 builds with pinned trainerproc
+        id: trainerproc
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          upstream/tools/trainerproc/trainerproc \
+            -o boss_audit_out/qarro_boss_342.generated.h \
+            boss_audit_out/qarro_boss_342.party \
+            2>&1 | tee boss_audit_out/logs/trainerproc.log
+          exit ${PIPESTATUS[0]}
+
+      - name: Inject synthetic boss pool for full FireRed compile
+        if: steps.trainerproc.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp boss_audit_out/qarro_boss_342.party upstream/src/data/trainers_frlg.party
+          rm -f upstream/src/data/trainers_frlg.h
+
+      - name: Full make firered against exact Expansion 1.17.0
+        if: steps.trainerproc.outcome == 'success'
+        id: fullbuild
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          make -C upstream clean 2>&1 | tee boss_audit_out/logs/make_clean.log
+          make -C upstream -j4 -O firered 2>&1 | tee boss_audit_out/logs/make_firered.log
+          exit ${PIPESTATUS[0]}
+
+      - name: Summarize audit gates
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Qarro boss Expansion 1.17.0 audit"
+            echo "- pinned: $PINNED"
+            echo "- preaudit: ${{ steps.preaudit.outcome }}"
+            echo "- trainerproc: ${{ steps.trainerproc.outcome }}"
+            echo "- make firered: ${{ steps.fullbuild.outcome }}"
+            if [[ -f boss_audit_out/qarro_boss_117_precompile_audit.json ]]; then
+              python3 - <<'PY'
+          import json
+          p='boss_audit_out/qarro_boss_117_precompile_audit.json'
+          d=json.load(open(p))
+          print(f"- builds: {d['builds']}")
+          print(f"- move issues: {d['move_issue_count']}")
+          print(f"- ability issues: {d['ability_issue_count']}")
+          PY
+            fi
+            echo
+            echo '### trainerproc tail'
+            echo '```text'
+            tail -n 80 boss_audit_out/logs/trainerproc.log 2>/dev/null || true
+            echo '```'
+            echo '### make tail'
+            echo '```text'
+            tail -n 120 boss_audit_out/logs/make_firered.log 2>/dev/null || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload exact audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Qarro-Boss-Expansion-1.17.0-${{ github.run_number }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: boss_audit_out/**
+
+      - name: Enforce all gates
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ steps.preaudit.outcome }}" = "success"
+          test "${{ steps.trainerproc.outcome }}" = "success"
+          test "${{ steps.fullbuild.outcome }}" = "success"
