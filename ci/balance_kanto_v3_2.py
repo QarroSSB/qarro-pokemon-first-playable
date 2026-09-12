@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """Qarro Kanto Gym integration wrapper.
 
-Runs the original Kanto balance pass, then the isolated save-stable 5-of-6
-Gym implementation, then applies the two explicitly approved Kanto Mythical
-exceptions:
+Runs the proven Kanto balance + save-stable 5-of-6 wrapper, then applies the
+explicitly approved Kanto Mythical exceptions:
   * Erika: Celebi (Venusaur remains the protected Ace)
   * Sabrina: Mew (Alakazam remains the protected Ace)
 
-This file lives only on the isolated Gym test branch. Main is untouched.
-Ash Bond / Ash Cap are never touched here.
+This file is scoped to the isolated Gym test branch. Main, Ash Bond and Ash Cap
+are not touched.
 """
 from __future__ import annotations
 
@@ -61,10 +60,6 @@ def die(msg: str) -> None:
     raise SystemExit(f"[{MARKER}] ERROR: {msg}")
 
 
-def run(script: str, root: Path) -> None:
-    subprocess.run([sys.executable, str(HERE / script), str(root)], check=True)
-
-
 def trainer_block(text: str, trainer: str) -> tuple[int, int, str]:
     token = f"=== {trainer} ==="
     start = text.find(token)
@@ -92,7 +87,10 @@ def replace_candidate(block: str, old: str, new: str, build: str) -> str:
         die(f"could not locate {old}")
     chunk_end = block.find("\n\n", m.end())
     if chunk_end < 0:
-        chunk_end = len(block)
+        # Final candidate in a trainer block: leave one trailing newline here.
+        # text[end:] starts with another newline before the next === TRAINER ===,
+        # yielding the empty separator line required by trainerproc.
+        return block[:m.start()] + build.rstrip() + "\n"
     return block[:m.start()] + build.rstrip() + block[chunk_end:]
 
 
@@ -150,18 +148,14 @@ def apply_exceptions(root: Path) -> None:
 def verify(root: Path) -> None:
     text = (root / "src/data/trainers_frlg.party").read_text(encoding="utf-8")
     forbidden = ("Regirock", "Suicune", "Zapdos", "Virizion", "Darkrai", "Mewtwo", "Moltres", "Groudon")
-    allowed = {"Celebi", "Mew"}
 
-    target_blocks = []
     for cfg in EXCEPTIONS:
         _, _, block = trainer_block(text, cfg["trainer"])
-        target_blocks.append(block)
         if species_count(block, cfg["new"]) != 1:
             die(f"{cfg['trainer']}: approved Mythical absent after write")
         if species_count(block, cfg["ace"]) != 1:
             die(f"{cfg['trainer']}: protected Ace absent after write")
 
-    # All eight old Kanto Legendary/Mythical anchors must remain absent.
     for trainer in (
         "TRAINER_LEADER_BROCK", "TRAINER_LEADER_MISTY", "TRAINER_LEADER_LT_SURGE",
         "TRAINER_LEADER_ERIKA", "TRAINER_LEADER_KOGA", "TRAINER_LEADER_SABRINA",
@@ -184,9 +178,9 @@ def main() -> int:
         return 2
     root = Path(sys.argv[1]).resolve()
 
-    # Preserve the original balance behavior exactly, then layer the isolated Gym test.
-    run("balance_kanto_v3_2_base.py", root)
-    run("gym_five_v3_26_base.py", root)
+    # This preserved wrapper already runs the original Kanto balance pass and
+    # ci/gym_five_v3_25.py exactly once.
+    subprocess.run([sys.executable, str(HERE / "balance_kanto_v3_2_base.py"), str(root)], check=True)
     apply_exceptions(root)
     verify(root)
     return 0
