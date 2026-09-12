@@ -110,6 +110,8 @@ def main() -> int:
     subprocess.run([sys.executable, str(surge_script), str(root)], check=True)
     erika_script = Path(__file__).with_name("localize_celadon_erika_v3_29.py")
     subprocess.run([sys.executable, str(erika_script), str(root)], check=True)
+    giovanni_script = Path(__file__).with_name("localize_rocket_hideout_giovanni_v3_30.py")
+    subprocess.run([sys.executable, str(giovanni_script), str(root)], check=True)
     return 0
 
 
