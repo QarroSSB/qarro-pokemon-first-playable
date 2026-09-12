@@ -89,6 +89,9 @@ jobs:
           python3 -m py_compile \
             kit/Source_Migration/v3_0/tools/install_first_playable_v3_0.py \
             qarro-repo/ci/content_pass_v3_1.py \
+            qarro-repo/ci/runtime_content_v3_3.py \
+            qarro-repo/ci/qol_v3_5.py \
+            qarro-repo/ci/exp_share_v3_22.py \
             qarro-repo/ci/install_cyrillic_v3_3.py \
             qarro-repo/ci/localization_ru_core_v3_3.py \
             qarro-repo/ci/localize_early_kanto_v3_9.py \
@@ -104,6 +107,15 @@ jobs:
           mkdir -p audit_out/logs
           python3 kit/Source_Migration/v3_0/tools/install_first_playable_v3_0.py upstream 2>&1 | tee audit_out/logs/install_preflight.log
           python3 qarro-repo/ci/content_pass_v3_1.py upstream 2>&1 | tee audit_out/logs/content_pass_v3_1.log
+
+      - name: Reproduce QoL regression prerequisites used by FireRed build
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 qarro-repo/ci/runtime_content_v3_3.py upstream 2>&1 | tee audit_out/logs/runtime_content_v3_3.log
+          python3 qarro-repo/ci/qol_v3_5.py upstream 2>&1 | tee audit_out/logs/qol_v3_5.log
+          test -f upstream/build/qarro_ground_items_v3_23_audit.json
+          test -f upstream/build/qarro_qol_regression_v3_10_audit.json
 
       - name: Reproduce current Cyrillic font state
         shell: bash
