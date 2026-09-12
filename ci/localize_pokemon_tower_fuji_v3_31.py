@@ -83,6 +83,8 @@ def main() -> int:
 
     flute_script = Path(__file__).with_name("localize_lavender_poke_flute_v3_32.py")
     subprocess.run([sys.executable, str(flute_script), str(root)], check=True)
+    koga_script = Path(__file__).with_name("localize_fuchsia_koga_v3_33.py")
+    subprocess.run([sys.executable, str(koga_script), str(root)], check=True)
     return 0
 
 
