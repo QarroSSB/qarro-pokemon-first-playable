@@ -132,6 +132,8 @@ def main() -> int:
 
     rival_script = Path(__file__).with_name("localize_cerulean_rival_v3_23.py")
     subprocess.run([sys.executable, str(rival_script), str(root)], check=True)
+    rocket_script = Path(__file__).with_name("localize_cerulean_rocket_tm28_v3_25.py")
+    subprocess.run([sys.executable, str(rocket_script), str(root)], check=True)
     return 0
 
 
