@@ -95,6 +95,7 @@ jobs:
             qarro-repo/ci/install_cyrillic_v3_3.py \
             qarro-repo/ci/localization_ru_core_v3_3.py \
             qarro-repo/ci/localize_early_kanto_v3_9.py \
+            qarro-repo/ci/localize_cerulean_misty_v3_22.py \
             qarro-repo/ci/localize_oaks_lab_starter_v3_5.py \
             qarro-repo/ci/sanitize_ru_quotes_v3_18.py \
             qarro-repo/ci/normalize_accented_e_v3_8.py \
@@ -129,6 +130,7 @@ jobs:
           set -euo pipefail
           python3 qarro-repo/ci/localization_ru_core_v3_3.py upstream 2>&1 | tee audit_out/logs/localization_ru_core_v3_3.log
           python3 qarro-repo/ci/localize_early_kanto_v3_9.py upstream 2>&1 | tee audit_out/logs/localize_early_kanto_v3_9.log
+          python3 qarro-repo/ci/localize_cerulean_misty_v3_22.py upstream 2>&1 | tee audit_out/logs/localize_cerulean_misty_v3_22.log
           python3 qarro-repo/ci/localize_oaks_lab_starter_v3_5.py upstream 2>&1 | tee audit_out/logs/localization_oaks_lab_starter_v3_5.log
           python3 qarro-repo/ci/sanitize_ru_quotes_v3_18.py upstream 2>&1 | tee audit_out/logs/sanitize_ru_quotes_v3_18.log
           python3 qarro-repo/ci/normalize_accented_e_v3_8.py upstream 2>&1 | tee audit_out/logs/normalize_accented_e_v3_8.log
@@ -139,6 +141,7 @@ jobs:
           set -euo pipefail
           python3 qarro-repo/ci/audit_ru_runtime_surface_v3_21.py upstream 2>&1 | tee audit_out/logs/ru_runtime_surface_v3_21.log
           cp upstream/build/qarro_ru_runtime_surface_v3_21_audit.json audit_out/
+          cp upstream/build/qarro_ru_cerulean_misty_v3_22_audit.json audit_out/
 
       - name: Protect forbidden Ash integration paths
         shell: bash
