@@ -1,0 +1,80 @@
+name: Qarro RU runtime surface audit
+
+on:
+  push:
+    branches:
+      - test/gym-5of6-rework-20260911
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PINNED: e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7
+
+jobs:
+  ru-runtime-surface-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout isolated Qarro test branch
+        uses: actions/checkout@v4
+        with:
+          path: qarro-repo
+
+      - name: Checkout exact Expansion 1.17.0
+        uses: actions/checkout@v4
+        with:
+          repository: rh-hideout/pokeemerald-expansion
+          ref: e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7
+          path: upstream
+
+      - name: Compile localization audit scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            qarro-repo/ci/localization_ru_core_v3_3.py \
+            qarro-repo/ci/localize_early_kanto_v3_9.py \
+            qarro-repo/ci/localize_oaks_lab_starter_v3_5.py \
+            qarro-repo/ci/sanitize_ru_quotes_v3_18.py \
+            qarro-repo/ci/normalize_accented_e_v3_8.py \
+            qarro-repo/ci/audit_ru_runtime_surface_v3_21.py
+
+      - name: Reproduce current Russian text passes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p audit_out/logs
+          python3 qarro-repo/ci/localization_ru_core_v3_3.py upstream 2>&1 | tee audit_out/logs/localization_ru_core_v3_3.log
+          python3 qarro-repo/ci/localize_early_kanto_v3_9.py upstream 2>&1 | tee audit_out/logs/localize_early_kanto_v3_9.log
+          python3 qarro-repo/ci/localize_oaks_lab_starter_v3_5.py upstream 2>&1 | tee audit_out/logs/localization_oaks_lab_starter_v3_5.log
+          python3 qarro-repo/ci/sanitize_ru_quotes_v3_18.py upstream 2>&1 | tee audit_out/logs/sanitize_ru_quotes_v3_18.log
+          python3 qarro-repo/ci/normalize_accented_e_v3_8.py upstream 2>&1 | tee audit_out/logs/normalize_accented_e_v3_8.log
+
+      - name: Inventory remaining English FireRed runtime text
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 qarro-repo/ci/audit_ru_runtime_surface_v3_21.py upstream 2>&1 | tee audit_out/logs/ru_runtime_surface_v3_21.log
+          cp upstream/build/qarro_ru_runtime_surface_v3_21_audit.json audit_out/
+
+      - name: Protect forbidden Ash integration paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C upstream diff --name-only > audit_out/changed_paths.txt
+          if grep -Eqi 'ash.?bond|ash.?cap' audit_out/changed_paths.txt; then
+            echo 'Forbidden Ash Bond/Ash Cap path touched by localization audit' >&2
+            cat audit_out/changed_paths.txt >&2
+            exit 1
+          fi
+          echo 'PASS: Ash Bond/Ash Cap paths untouched'
+
+      - name: Upload RU runtime surface evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Qarro-ru-runtime-surface-${{ github.run_number }}
+          retention-days: 30
+          path: audit_out/**
