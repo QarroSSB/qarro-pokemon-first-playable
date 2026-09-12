@@ -5,12 +5,13 @@ User choice: do not use a dedicated é glyph. Convert source text é/É to e/E
 only after all localization passes have completed, so exact English anchors
 used by the localization scripts remain valid during their own execution.
 
-This pass also applies the next evidence-driven Russian runtime increment:
-Brock's mandatory Pewter Gym intro and badge-victory dialogue. The exact pinned
-FireRed source blocks are required. A prior localization pass may already have
-normalized literal é/É to e/E, so each Brock anchor accepts exactly one of the
-pinned source block or its mechanically normalized equivalent and otherwise
-fails closed.
+This pass also applies evidence-driven Russian runtime increments for Brock's
+mandatory Pewter Gym flow: battle intro, badge-victory dialogue, TM39 handoff,
+TM39 explanation, and the immediate post-battle direction to Cerulean. The
+exact pinned FireRed source blocks are required. A prior localization pass may
+already have normalized literal é/É to e/E, so every anchor accepts exactly
+one of the pinned source block or its mechanically normalized equivalent and
+otherwise fails closed.
 
 Charmap/font tables are deliberately excluded; the legacy FireRed slot stays
 untouched but no authored game text should reference it after this pass.
@@ -93,6 +94,70 @@ BROCK_PATCHES = (
 \t.string "FLASH вне боя.\\p"
 \t.string "Но ПОКЕМОН должен знать\\n"
 \t.string "атаку FLASH, чтобы её применять.$"''',
+    ),
+    (
+        "PewterCity_Gym_Text_TakeThisWithYou",
+        '''PewterCity_Gym_Text_TakeThisWithYou::
+\t.string "Wait!\\n"
+\t.string "Take this with you.$"''',
+        '''PewterCity_Gym_Text_TakeThisWithYou::
+\t.string "Постой!\\n"
+\t.string "Возьми это с собой.$"''',
+    ),
+    (
+        "PewterCity_Gym_Text_ReceivedTM39FromBrock",
+        '''PewterCity_Gym_Text_ReceivedTM39FromBrock::
+\t.string "{PLAYER} received TM39\\n"
+\t.string "from BROCK.$"''',
+        '''PewterCity_Gym_Text_ReceivedTM39FromBrock::
+\t.string "{PLAYER} получил TM39\\n"
+\t.string "от БРОКА.$"''',
+    ),
+    (
+        "PewterCity_Gym_Text_ExplainTM39",
+        '''PewterCity_Gym_Text_ExplainTM39::
+\t.string "A TM, Technical Machine, contains a\\n"
+\t.string "technique for POKéMON.\\p"
+\t.string "Using a TM teaches the move it\\n"
+\t.string "contains to a POKéMON.\\p"
+\t.string "A TM is good for only one use.\\p"
+\t.string "So, when you use one, pick the\\n"
+\t.string "POKéMON carefully.\\p"
+\t.string "Anyways…\\n"
+\t.string "TM39 contains ROCK TOMB.\\p"
+\t.string "It hurls boulders at the foe and\\n"
+\t.string "lowers its SPEED.$"''',
+        '''PewterCity_Gym_Text_ExplainTM39::
+\t.string "TM, Техническая Машина, содержит\\n"
+\t.string "приём для ПОКЕМОНА.\\p"
+\t.string "Использовав TM, ты обучишь\\n"
+\t.string "ПОКЕМОНА содержащейся атаке.\\p"
+\t.string "Каждую TM можно применить лишь раз.\\p"
+\t.string "Поэтому выбирай ПОКЕМОНА\\n"
+\t.string "внимательно.\\p"
+\t.string "Кстати…\\n"
+\t.string "В TM39 находится ROCK TOMB.\\p"
+\t.string "Камни бьют противника\\n"
+\t.string "и снижают его SPEED.$"''',
+    ),
+    (
+        "PewterCity_Gym_Text_BrockPostBattle",
+        '''PewterCity_Gym_Text_BrockPostBattle::
+\t.string "There are all kinds of TRAINERS in\\n"
+\t.string "this huge world of ours.\\p"
+\t.string "You appear to be very gifted as a\\n"
+\t.string "POKéMON TRAINER.\\p"
+\t.string "So let me make a suggestion.\\p"
+\t.string "Go to the GYM in CERULEAN and test\\n"
+\t.string "your abilities.$"''',
+        '''PewterCity_Gym_Text_BrockPostBattle::
+\t.string "В нашем огромном мире живут\\n"
+\t.string "самые разные ТРЕНЕРЫ.\\p"
+\t.string "Похоже, у тебя настоящий талант\\n"
+\t.string "ТРЕНЕРА ПОКЕМОНОВ.\\p"
+\t.string "Поэтому дам тебе совет.\\p"
+\t.string "Иди в ГИМ СЕРУЛИНА и проверь\\n"
+\t.string "там свои силы.$"''',
     ),
 )
 
