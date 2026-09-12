@@ -111,6 +111,7 @@ jobs:
             qarro-repo/ci/localization_ru_core_v3_3.py \
             qarro-repo/ci/localize_oaks_lab_starter_v3_5.py \
             qarro-repo/ci/localize_early_kanto_v3_9.py \
+            qarro-repo/ci/localize_cerulean_misty_v3_22.py \
             qarro-repo/ci/sanitize_ru_quotes_v3_18.py \
             qarro-repo/ci/normalize_accented_e_v3_8.py
 
@@ -184,6 +185,13 @@ jobs:
           python3 qarro-repo/ci/localize_early_kanto_v3_9.py upstream \
             2>&1 | tee qarro_ci_out_v3_8/logs/localize_early_kanto_v3_9.log
 
+      - name: Apply mandatory Cerulean Misty Russian localization
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 qarro-repo/ci/localize_cerulean_misty_v3_22.py upstream \
+            2>&1 | tee qarro_ci_out_v3_8/logs/localize_cerulean_misty_v3_22.log
+
       - name: Apply Oak lab starter localization
         shell: bash
         run: |
@@ -245,6 +253,7 @@ jobs:
           if [[ -f upstream/build/qarro_qol_v3_5_audit.json ]]; then cp upstream/build/qarro_qol_v3_5_audit.json qarro_ci_out_v3_8/; fi
           if [[ -f upstream/build/qarro_ru_oak_lab_starter_v3_5_audit.json ]]; then cp upstream/build/qarro_ru_oak_lab_starter_v3_5_audit.json qarro_ci_out_v3_8/; fi
           if [[ -f upstream/build/qarro_ru_early_kanto_v3_9_audit.json ]]; then cp upstream/build/qarro_ru_early_kanto_v3_9_audit.json qarro_ci_out_v3_8/; fi
+          if [[ -f upstream/build/qarro_ru_cerulean_misty_v3_22_audit.json ]]; then cp upstream/build/qarro_ru_cerulean_misty_v3_22_audit.json qarro_ci_out_v3_8/; fi
           if [[ -f upstream/build/qarro_ru_quotes_v3_18_audit.json ]]; then cp upstream/build/qarro_ru_quotes_v3_18_audit.json qarro_ci_out_v3_8/; fi
           if [[ -f upstream/build/qarro_normalize_e_v3_8_audit.json ]]; then cp upstream/build/qarro_normalize_e_v3_8_audit.json qarro_ci_out_v3_8/; fi
           if [[ -f upstream/build/qarro_font_variant2_v3_17_audit.json ]]; then cp upstream/build/qarro_font_variant2_v3_17_audit.json qarro_ci_out_v3_8/; fi
