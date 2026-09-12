@@ -15,6 +15,10 @@ import sys
 from pathlib import Path
 
 MARKER = "QARRO_REGRESSION_BUNDLE_V3_11"
+EXPECTED_RU_SCANNED_FILES = 1471
+EXPECTED_RU_FILES_WITH_CYRILLIC = 16
+EXPECTED_RU_CYRILLIC_CHARACTERS = 9480
+EXPECTED_RU_EARLY_MARKERS = {"Привет", "ПОКЕМОН", "ПАЛЛЕТ", "ОУК", "МАМА", "Пора идти"}
 
 
 def load(path: Path) -> dict:
@@ -73,10 +77,23 @@ def main() -> int:
     for name, stats in fonts.items():
         require(stats.get("cyrillic_nonempty", 0) >= 66, f"Cyrillic glyph regression in {name}")
         require(stats.get("min_ink_pixels", 0) > 0, f"empty Cyrillic ink regression in {name}")
+        require(stats.get("advance_raster_matches", 0) >= 66,
+                f"Cyrillic raster/advance regression in {name}")
+
     text = ru.get("text", {})
-    require(text.get("files_with_cyrillic", 0) >= 4, "Russian localization file-count regression")
-    require(text.get("cyrillic_characters", 0) >= 100, "Russian localization character-count regression")
+    require(text.get("scanned_text_files", 0) >= EXPECTED_RU_SCANNED_FILES,
+            "Russian localization scan coverage regression")
+    require(text.get("files_with_cyrillic", 0) >= EXPECTED_RU_FILES_WITH_CYRILLIC,
+            "Russian localization file-count regression")
+    require(text.get("cyrillic_characters", 0) >= EXPECTED_RU_CYRILLIC_CHARACTERS,
+            "Russian localization character-count regression")
+    marker_hits = text.get("early_marker_hits", {})
+    require(isinstance(marker_hits, dict), "missing Russian early-marker evidence")
+    require(EXPECTED_RU_EARLY_MARKERS.issubset(marker_hits), "Russian early-marker set regression")
+    require(all(int(marker_hits.get(marker, 0)) > 0 for marker in EXPECTED_RU_EARLY_MARKERS),
+            "Russian early-game marker regression")
     require(text.get("accented_e_file_count") == 0, "accented-e normalization regression")
+    require(text.get("files_still_containing_accented_e") == [], "accented-e file-list regression")
 
     require(ground.get("marker") == "QARRO_GROUND_ITEMS_V3_23", "ground-item audit marker drift")
     require(ground.get("preViridianHiddenRemoved") == 1,
@@ -96,6 +113,13 @@ def main() -> int:
         "policy": "FireRed / Expansion 1.17.0 / Gen I-V",
         "qolRegression": "PASS",
         "ruFoundation": "PASS",
+        "ruBaseline": {
+            "scannedTextFilesAtLeast": EXPECTED_RU_SCANNED_FILES,
+            "filesWithCyrillicAtLeast": EXPECTED_RU_FILES_WITH_CYRILLIC,
+            "cyrillicCharactersAtLeast": EXPECTED_RU_CYRILLIC_CHARACTERS,
+            "earlyMarkersRequired": sorted(EXPECTED_RU_EARLY_MARKERS),
+            "accentedEFiles": 0,
+        },
         "groundItems": "PASS",
         "ashBondTouched": False,
         "ashCapTouched": False,
@@ -120,7 +144,10 @@ def main() -> int:
             (ci_out / name).write_bytes(src.read_bytes())
         print(f"[{MARKER}] preserved 4 regression audit reports in {ci_out}")
 
-    print(f"[{MARKER}] PASS: QoL + RU foundation + ground-item policies remain internally consistent")
+    print(
+        f"[{MARKER}] PASS: QoL + RU foundation + ground-item policies remain internally consistent; "
+        f"RU baseline >= {EXPECTED_RU_FILES_WITH_CYRILLIC} files / {EXPECTED_RU_CYRILLIC_CHARACTERS} chars"
+    )
     print(f"audit: {out}")
     return 0
 
