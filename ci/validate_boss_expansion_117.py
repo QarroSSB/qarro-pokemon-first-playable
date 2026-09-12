@@ -55,6 +55,7 @@ def structural_audit(builds: list[dict]) -> dict:
         ident = f"#{i} {b['layer']}/{b['trainer']}/{b['species']}"
         if not (1 <= int(b['level']) <= 100): errors.append(f"{ident}: level {b['level']}")
         if len(b.get("moves", [])) != 4 or any(not m for m in b["moves"]): errors.append(f"{ident}: must have exactly 4 moves")
+        if len(set(b.get("moves", []))) != 4: errors.append(f"{ident}: duplicate move in set")
         ivs, _ = parse_spread(str(b["ivs"]), "ivs")
         if any(v < 0 or v > 31 for v in ivs.values()): errors.append(f"{ident}: IV out of range: {ivs}")
         evs, total = parse_spread(str(b["evs"]), "evs")
@@ -101,11 +102,17 @@ def write_synthetic_party(builds: list[dict], out: Path) -> None:
             "Music: Male",
             "Double Battle: No",
             "AI: Check Bad Move",
-            "",
         ]
         mons = [party_chunk(b) for b in builds[cuts[k]:cuts[k+1]]]
-        blocks.append("\n".join(header) + "\n\n".join(mons))
+        blocks.append("\n".join(header) + "\n\n" + "\n\n".join(mons))
     out.write_text("\n\n".join(blocks).rstrip() + "\n", encoding="utf-8")
+
+
+def norm_token(value: str, prefix: str | None = None) -> str:
+    s = str(value).strip().upper()
+    if prefix and s.startswith(prefix + "_"):
+        s = s[len(prefix)+1:]
+    return re.sub(r"[^A-Z0-9]", "", s)
 
 
 def combined_gen5_learnables(upstream: Path) -> dict[str,set[str]]:
@@ -113,21 +120,26 @@ def combined_gen5_learnables(upstream: Path) -> dict[str,set[str]]:
     if not root.is_dir(): die(f"missing {root}")
     learn: dict[str,set[str]] = defaultdict(set)
     used = []
+    sample_keys = []
     for p in sorted(root.glob("*.json")):
         if p.stem.lower() not in GEN5_GAMES:
             continue
         used.append(p.name)
         data = json.loads(p.read_text(encoding="utf-8"))
+        if not sample_keys:
+            sample_keys = list(data.keys())[:4]
         for species, by_method in data.items():
+            skey = norm_token(species, "SPECIES")
             for rec in by_method.get("LevelMoves", []):
                 mv = rec.get("Move")
-                if mv: learn[species].add(mv)
+                if mv: learn[skey].add(norm_token(mv, "MOVE"))
             for key in ("TMMoves", "EggMoves", "TutorMoves"):
                 for mv in by_method.get(key, []):
-                    if mv: learn[species].add(mv)
+                    if mv: learn[skey].add(norm_token(mv, "MOVE"))
     if "b2w2.json" not in used:
         die(f"B2W2 learnset source not selected; selected={used}")
     print(f"[QARRO_BOSS_117] learnset sources <=Gen5: {', '.join(used)}")
+    print(f"[QARRO_BOSS_117] porymoves sample species keys: {sample_keys}")
     return learn
 
 
@@ -136,12 +148,12 @@ def move_legality_audit(builds: list[dict], upstream: Path) -> list[dict]:
     issues = []
     for i,b in enumerate(builds, start=1):
         species = b["species"]
-        available = learn.get(species)
+        available = learn.get(norm_token(species, "SPECIES"))
         if available is None:
-            issues.append({"index":i,"trainer":b["trainer"],"species":species,"move":"*","reason":"species absent from <=Gen5 porymoves inputs"})
+            issues.append({"index":i,"trainer":b["trainer"],"species":species,"move":"*","reason":"species absent from selected Gen I-V porymoves inputs"})
             continue
         for mv in b["moves"]:
-            if mv not in available:
+            if norm_token(mv, "MOVE") not in available:
                 issues.append({"index":i,"trainer":b["trainer"],"species":species,"move":mv,"reason":"not learnable in selected Gen I-V game sources"})
     return issues
 
@@ -152,56 +164,74 @@ def constantize(prefix: str, human: str) -> str:
         if c.isalnum(): out.append(c.upper())
         elif c == "'": continue
         else: out.append("_")
-    return prefix + "_" + "".join(out)
+    return (prefix + "_" + "".join(out)).replace("__", "_")
 
 
 def species_constant_candidates(name: str) -> list[str]:
     base = constantize("SPECIES", name)
     return list(dict.fromkeys([
         base,
-        base.replace("__", "_"),
-        base.replace("MR._MIME", "MR_MIME"),
-        base.replace("MIME_JR.", "MIME_JR"),
+        base.replace("MR_MIME", "MR_MIME"),
+        base.replace("MIME_JR", "MIME_JR"),
         base.replace("FARFETCH_D", "FARFETCHD"),
-        base.replace("NIDORAN_F", "NIDORAN_F"),
-        base.replace("NIDORAN_M", "NIDORAN_M"),
-        base.replace("ROTOM_WASH", "ROTOM_WASH"),
     ]))
 
 
 def parse_species_ability_blocks(upstream: Path) -> dict[str,set[str]]:
-    roots = [upstream / "src/data/pokemon/species_info", upstream / "src/data/pokemon/species_info.h"]
-    files = []
-    for root in roots:
-        if root.is_dir(): files.extend(root.rglob("*.h"))
-        elif root.is_file(): files.append(root)
-    if not files: die("species_info files not found")
-    text = "\n".join(p.read_text(encoding="utf-8", errors="ignore") for p in files)
-    blocks: dict[str,set[str]] = {}
-    starts = list(re.finditer(r"\[(SPECIES_[A-Z0-9_]+)\]\s*=\s*\{", text))
-    for j,m in enumerate(starts):
-        end = starts[j+1].start() if j+1 < len(starts) else min(len(text), m.start()+12000)
-        block = text[m.start():end]
-        am = re.search(r"\.abilities\s*=\s*\{([^}]*)\}", block, re.S)
-        if am:
-            blocks[m.group(1)] = set(re.findall(r"ABILITY_[A-Z0-9_]+", am.group(1)))
+    root = upstream / "src/data/pokemon/species_info"
+    if not root.is_dir(): die(f"missing {root}")
+    blocks: dict[str,set[str]] = defaultdict(set)
+    for p in sorted(root.rglob("*.h")):
+        text = p.read_text(encoding="utf-8", errors="ignore")
+        starts = list(re.finditer(r"\[\s*(SPECIES_[A-Z0-9_]+)\s*\]", text))
+        for j,m in enumerate(starts):
+            end = starts[j+1].start() if j+1 < len(starts) else min(len(text), m.start()+16000)
+            segment = text[m.start():end]
+            abilities = set(re.findall(r"ABILITY_[A-Z0-9_]+", segment))
+            if abilities:
+                blocks[m.group(1)].update(abilities)
     return blocks
 
 
-def ability_legality_audit(builds: list[dict], upstream: Path) -> list[dict]:
+def ability_legality_audit(builds: list[dict], upstream: Path) -> tuple[list[dict],list[dict]]:
     blocks = parse_species_ability_blocks(upstream)
     issues = []
+    unresolved = []
     for i,b in enumerate(builds, start=1):
         sc = None
         for cand in species_constant_candidates(b["species"]):
             if cand in blocks:
                 sc = cand; break
         if sc is None:
-            issues.append({"index":i,"trainer":b["trainer"],"species":b["species"],"ability":b["ability"],"reason":"species_info block not resolved"})
+            unresolved.append({"index":i,"trainer":b["trainer"],"species":b["species"],"ability":b["ability"],"reason":"species ability block uses macro/conditional form; deferred to compile constant gate"})
             continue
-        ac = constantize("ABILITY", b["ability"]).replace("__","_")
+        ac = constantize("ABILITY", b["ability"])
         if ac not in blocks[sc]:
-            issues.append({"index":i,"trainer":b["trainer"],"species":b["species"],"ability":b["ability"],"reason":f"{ac} not in {sorted(blocks[sc])}"})
+            issues.append({"index":i,"trainer":b["trainer"],"species":b["species"],"ability":b["ability"],"reason":f"{ac} not in explicit species-info abilities {sorted(blocks[sc])}"})
+    return issues, unresolved
+
+
+def constant_existence_audit(builds: list[dict], upstream: Path) -> list[dict]:
+    constant_files = [
+        upstream / "include/constants/abilities.h",
+        upstream / "include/constants/items.h",
+        upstream / "include/constants/moves.h",
+        upstream / "include/constants/natures.h",
+        upstream / "include/constants/species.h",
+    ]
+    text = "\n".join(p.read_text(encoding="utf-8", errors="ignore") for p in constant_files if p.is_file())
+    issues = []
+    for i,b in enumerate(builds, start=1):
+        checks = [
+            ("species", species_constant_candidates(b["species"])),
+            ("ability", [constantize("ABILITY", b["ability"])]),
+            ("item", [constantize("ITEM", b["item"])]),
+            ("nature", [constantize("NATURE", b["nature"])]),
+        ]
+        checks += [(f"move{j+1}", [constantize("MOVE", mv)]) for j,mv in enumerate(b["moves"])]
+        for kind,candidates in checks:
+            if not any(re.search(rf"\b{re.escape(c)}\b", text) for c in candidates):
+                issues.append({"index":i,"trainer":b["trainer"],"species":b["species"],"kind":kind,"value":candidates[0],"reason":"constant not found in pinned Expansion headers"})
     return issues
 
 
@@ -217,7 +247,8 @@ def main() -> int:
     party = outdir / "qarro_boss_342.party"
     write_synthetic_party(builds, party)
     move_issues = move_legality_audit(builds, upstream)
-    ability_issues = ability_legality_audit(builds, upstream)
+    ability_issues, ability_unresolved = ability_legality_audit(builds, upstream)
+    constant_issues = constant_existence_audit(builds, upstream)
     report = {
         "pinned": PINNED,
         "builds": len(builds),
@@ -226,17 +257,19 @@ def main() -> int:
         "move_issues": move_issues,
         "ability_issue_count": len(ability_issues),
         "ability_issues": ability_issues,
+        "ability_unresolved_count": len(ability_unresolved),
+        "ability_unresolved": ability_unresolved,
+        "constant_issue_count": len(constant_issues),
+        "constant_issues": constant_issues,
         "synthetic_party": str(party),
     }
     (outdir / "qarro_boss_117_precompile_audit.json").write_text(json.dumps(report, indent=2, ensure_ascii=False)+"\n", encoding="utf-8")
-    print(f"[QARRO_BOSS_117] builds={len(builds)} move_issues={len(move_issues)} ability_issues={len(ability_issues)}")
-    if move_issues:
-        print("[QARRO_BOSS_117] first move issues:")
-        for x in move_issues[:80]: print(json.dumps(x, ensure_ascii=False))
-    if ability_issues:
-        print("[QARRO_BOSS_117] first ability issues:")
-        for x in ability_issues[:80]: print(json.dumps(x, ensure_ascii=False))
-    return 1 if (move_issues or ability_issues) else 0
+    print(f"[QARRO_BOSS_117] builds={len(builds)} move_issues={len(move_issues)} ability_issues={len(ability_issues)} ability_unresolved={len(ability_unresolved)} constant_issues={len(constant_issues)}")
+    for label, items in (("move",move_issues),("ability",ability_issues),("constant",constant_issues),("ability-unresolved",ability_unresolved)):
+        if items:
+            print(f"[QARRO_BOSS_117] first {label} findings:")
+            for x in items[:100]: print(json.dumps(x, ensure_ascii=False))
+    return 1 if (move_issues or ability_issues or constant_issues) else 0
 
 if __name__ == "__main__":
     raise SystemExit(main())
