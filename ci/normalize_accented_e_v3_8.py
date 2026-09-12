@@ -7,8 +7,10 @@ used by the localization scripts remain valid during their own execution.
 
 This pass also applies the next evidence-driven Russian runtime increment:
 Brock's mandatory Pewter Gym intro and badge-victory dialogue. The exact pinned
-FireRed source blocks are required, so the patch fails closed if upstream or an
-earlier pass changes them unexpectedly.
+FireRed source blocks are required. A prior localization pass may already have
+normalized literal é/É to e/E, so each Brock anchor accepts exactly one of the
+pinned source block or its mechanically normalized equivalent and otherwise
+fails closed.
 
 Charmap/font tables are deliberately excluded; the legacy FireRed slot stays
 untouched but no authored game text should reference it after this pass.
@@ -105,12 +107,20 @@ def apply_brock_runtime_localization(root: Path) -> list[str]:
         if new in text:
             applied.append(f"{label}:already")
             continue
-        count = text.count(old)
-        if count != 1:
+
+        normalized_old = old.replace("é", "e").replace("É", "E")
+        candidates = [old]
+        if normalized_old != old:
+            candidates.append(normalized_old)
+        matches = [(candidate, text.count(candidate)) for candidate in candidates]
+        total = sum(count for _, count in matches)
+        if total != 1:
             raise RuntimeError(
-                f"{label}: expected exactly one pinned English block, found {count}"
+                f"{label}: expected exactly one pinned English block or normalized equivalent, "
+                f"found {total} ({[count for _, count in matches]})"
             )
-        text = text.replace(old, new, 1)
+        matched = next(candidate for candidate, count in matches if count == 1)
+        text = text.replace(matched, new, 1)
         applied.append(f"{label}:applied")
     path.write_text(text, encoding="utf-8")
     return applied
@@ -203,9 +213,6 @@ def main() -> int:
         raise RuntimeError(f"missing protected-feature audit: {protected_audit}")
     subprocess.run([sys.executable, str(protected_audit), str(root)], check=True)
 
-    # Preserve the exact protected-feature proof alongside the GREEN ROM.
-    # The consolidated bundle is copied earlier, but this report is generated
-    # only after that bundle completes, so mirror it here once it exists.
     protected_report = root / "build/qarro_protected_features_v3_13_audit.json"
     if not protected_report.is_file():
         raise RuntimeError(f"protected-feature audit did not produce evidence: {protected_report}")
