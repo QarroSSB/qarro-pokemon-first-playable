@@ -76,6 +76,12 @@ jobs:
           ref: e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7
           path: upstream
 
+      - name: Install localization audit dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check --no-cache-dir Pillow
+
       - name: Compile localization audit scripts
         shell: bash
         run: |
