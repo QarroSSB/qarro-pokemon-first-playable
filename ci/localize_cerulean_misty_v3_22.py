@@ -136,6 +136,8 @@ def main() -> int:
     subprocess.run([sys.executable, str(rocket_script), str(root)], check=True)
     captain_script = Path(__file__).with_name("localize_ssanne_captain_v3_26.py")
     subprocess.run([sys.executable, str(captain_script), str(root)], check=True)
+    ssanne_rival_script = Path(__file__).with_name("localize_ssanne_rival_v3_27.py")
+    subprocess.run([sys.executable, str(ssanne_rival_script), str(root)], check=True)
     return 0
 
 
