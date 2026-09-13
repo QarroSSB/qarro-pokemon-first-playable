@@ -111,6 +111,8 @@ def main() -> int:
     subprocess.run([sys.executable, str(sevii_entry_script), str(root)], check=True)
     two_island_lostelle_script = Path(__file__).with_name("localize_two_island_lostelle_quest_v3_46.py")
     subprocess.run([sys.executable, str(two_island_lostelle_script), str(root)], check=True)
+    three_island_biker_intro_script = Path(__file__).with_name("localize_three_island_biker_intro_v3_47.py")
+    subprocess.run([sys.executable, str(three_island_biker_intro_script), str(root)], check=True)
     return 0
 
 
