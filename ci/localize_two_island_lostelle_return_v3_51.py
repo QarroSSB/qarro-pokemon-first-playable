@@ -4,13 +4,14 @@
 Translates only the verified forced post-rescue scene that runs when the player
 returns with Lostelle to the Joyful Game Corner: her father's thanks and
 Lostelle's reply. Meteorite handoff, Moon Stone reward, optional NPC/game-corner
-text, and later Sevii postgame remain untouched. Pokemon species / move /
-ability proper names remain English. Ash Bond / Ash Cap are not referenced or
-changed.
+text, and later Sevii postgame remain untouched by this pass. Pokemon species /
+move / ability proper names remain English. Ash Bond / Ash Cap are not
+referenced or changed.
 """
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -82,6 +83,9 @@ def main() -> int:
         "ashCapTouched": False,
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"[{MARKER}] PASS: translated {len(applied)} forced Two Island Lostelle return blocks; Ash Bond/Ash Cap untouched")
+
+    meteorite_script = Path(__file__).with_name("localize_two_island_meteorite_handoff_v3_52.py")
+    subprocess.run([sys.executable, str(meteorite_script), str(root)], check=True)
     return 0
 
 
