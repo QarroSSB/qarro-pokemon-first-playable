@@ -9,6 +9,7 @@ proper names remain English. Ash Bond / Ash Cap are not referenced or changed.
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -70,6 +71,9 @@ def main() -> int:
         "ashCapTouched": False,
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"[{MARKER}] PASS: translated mandatory Lostelle/Bond Bridge hint; Ash Bond/Ash Cap untouched")
+
+    lostelle_rescue_script = Path(__file__).with_name("localize_berry_forest_lostelle_rescue_v3_50.py")
+    subprocess.run([sys.executable, str(lostelle_rescue_script), str(root)], check=True)
     return 0
 
 
