@@ -87,6 +87,8 @@ def main() -> int:
     subprocess.run([sys.executable, str(koga_script), str(root)], check=True)
     sabrina_script = Path(__file__).with_name("localize_saffron_sabrina_v3_34.py")
     subprocess.run([sys.executable, str(sabrina_script), str(root)], check=True)
+    blaine_script = Path(__file__).with_name("localize_cinnabar_blaine_v3_35.py")
+    subprocess.run([sys.executable, str(blaine_script), str(root)], check=True)
     return 0
 
 
