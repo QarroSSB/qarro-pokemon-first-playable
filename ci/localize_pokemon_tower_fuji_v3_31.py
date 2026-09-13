@@ -91,6 +91,8 @@ def main() -> int:
     subprocess.run([sys.executable, str(blaine_script), str(root)], check=True)
     viridian_script = Path(__file__).with_name("localize_viridian_giovanni_v3_36.py")
     subprocess.run([sys.executable, str(viridian_script), str(root)], check=True)
+    route22_script = Path(__file__).with_name("localize_route22_late_rival_v3_37.py")
+    subprocess.run([sys.executable, str(route22_script), str(root)], check=True)
     return 0
 
 
