@@ -41,7 +41,7 @@ PATCHES = {
         "ru": '''MtEmber_Exterior_Text_FirstPasswordGoldeen::
 \t.string "Что, забыл пароль?\\n"
 \t.string "Вообще-то их два.\\p"
-\t.string "Первый — “GOLDEEN need log.”\\p"
+\t.string "Первый - “GOLDEEN need log.”\\p"
 \t.string "А второй — это…$"
 ''',
     },
