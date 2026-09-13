@@ -10,6 +10,7 @@ proper names remain English. Ash Bond / Ash Cap are not referenced or changed.
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -173,6 +174,9 @@ def main() -> int:
         "ashCapTouched": False,
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"[{MARKER}] PASS: translated {len(applied)} mandatory Three Island biker intro runtime blocks; Ash Bond/Ash Cap untouched")
+
+    biker_battles_script = Path(__file__).with_name("localize_three_island_biker_battles_v3_48.py")
+    subprocess.run([sys.executable, str(biker_battles_script), str(root)], check=True)
     return 0
 
 
