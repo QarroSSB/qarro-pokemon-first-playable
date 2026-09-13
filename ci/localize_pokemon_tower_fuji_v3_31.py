@@ -105,6 +105,8 @@ def main() -> int:
     subprocess.run([sys.executable, str(champion_script), str(root)], check=True)
     rematches_script = Path(__file__).with_name("localize_pokemon_league_rematches_v3_43.py")
     subprocess.run([sys.executable, str(rematches_script), str(root)], check=True)
+    hall_of_fame_script = Path(__file__).with_name("localize_pokemon_league_hall_of_fame_v3_44.py")
+    subprocess.run([sys.executable, str(hall_of_fame_script), str(root)], check=True)
     return 0
 
 
