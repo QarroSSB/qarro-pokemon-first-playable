@@ -38,7 +38,7 @@ PATCHES = {
     ),
     "SaffronCity_Gym_Text_ExplainTM04": (
         "SaffronCity_Gym_Text_ExplainTM04::\n\t.string \"TM04 is CALM MIND.\\p\"\n\t.string \"It makes the POKéMON concentrate\\n\"\n\t.string \"to raise both SP. ATK and SP. DEF.$\"\n",
-        "SaffronCity_Gym_Text_ExplainTM04::\n\t.string \"TM04 — это CALM MIND.\\p\"\n\t.string \"Он помогает ПОКЕМОНУ сосредоточиться,\\n\"\n\t.string \"повышая SP. ATK и SP. DEF.$\"\n",
+        "SaffronCity_Gym_Text_ExplainTM04::\n\t.string \"TM04 - это CALM MIND.\\p\"\n\t.string \"Он помогает ПОКЕМОНУ сосредоточиться,\\n\"\n\t.string \"повышая SP. ATK и SP. DEF.$\"\n",
     ),
     "SaffronCity_Gym_Text_BagFullOfOtherItems": (
         "SaffronCity_Gym_Text_BagFullOfOtherItems::\n\t.string \"Your BAG is full of other items.$\"\n",
