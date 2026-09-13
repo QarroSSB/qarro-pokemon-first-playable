@@ -10,6 +10,7 @@ names remain English. Ash Bond / Ash Cap are not referenced or changed.
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -133,6 +134,9 @@ def main() -> int:
         "ashCapTouched": False,
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"[{MARKER}] PASS: translated {len(applied)} Berry Forest Lostelle rescue runtime blocks; Ash Bond/Ash Cap untouched")
+
+    return_scene_script = Path(__file__).with_name("localize_two_island_lostelle_return_v3_51.py")
+    subprocess.run([sys.executable, str(return_scene_script), str(root)], check=True)
     return 0
 
 
