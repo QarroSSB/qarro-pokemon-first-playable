@@ -42,7 +42,7 @@ PATCHES = {
 \t.string "Что, забыл пароль?\\n"
 \t.string "Вообще-то их два.\\p"
 \t.string "Первый - “GOLDEEN need log.”\\p"
-\t.string "А второй — это…$"
+\t.string "А второй - это…$"
 ''',
     },
     "MtEmber_Exterior_Text_SnoopsBeenListeningIn": {
