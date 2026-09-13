@@ -95,6 +95,8 @@ def main() -> int:
     subprocess.run([sys.executable, str(route22_script), str(root)], check=True)
     lorelei_script = Path(__file__).with_name("localize_pokemon_league_lorelei_v3_38.py")
     subprocess.run([sys.executable, str(lorelei_script), str(root)], check=True)
+    bruno_script = Path(__file__).with_name("localize_pokemon_league_bruno_v3_39.py")
+    subprocess.run([sys.executable, str(bruno_script), str(root)], check=True)
     return 0
 
 
