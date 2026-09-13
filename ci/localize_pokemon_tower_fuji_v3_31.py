@@ -89,6 +89,8 @@ def main() -> int:
     subprocess.run([sys.executable, str(sabrina_script), str(root)], check=True)
     blaine_script = Path(__file__).with_name("localize_cinnabar_blaine_v3_35.py")
     subprocess.run([sys.executable, str(blaine_script), str(root)], check=True)
+    viridian_script = Path(__file__).with_name("localize_viridian_giovanni_v3_36.py")
+    subprocess.run([sys.executable, str(viridian_script), str(root)], check=True)
     return 0
 
 
