@@ -87,7 +87,7 @@ PATCHES = {
 ''',
     },
     "PalletTown_ProfessorOaksLab_Text_RivalIllCompleteThePokedex": {
-        "needles": ("Gramps, calm down", "complete the POKéDEX", "ONE ISLAND"),
+        "needles": ("Gramps, calm down", "POKéDEX completed", "ONE ISLAND"),
         "ru": '''PalletTown_ProfessorOaksLab_Text_RivalIllCompleteThePokedex::
 \t.string "{RIVAL}: Дед, успокойся.\\n"
 \t.string "Не волнуйся так.\\p"
