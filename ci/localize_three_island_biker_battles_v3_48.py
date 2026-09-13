@@ -3,13 +3,14 @@
 
 Translates only the verified pinned battle prompt plus Biker 1/2/3 and Paxton
 intro/defeat/post-battle runtime text that gates Three Island progression.
-Reward, Lostelle/Bond Bridge hint, optional NPC dialogue, and later Sevii
-postgame text are intentionally untouched. Pokemon species / move / ability
-proper names remain English. Ash Bond / Ash Cap are not referenced or changed.
+Reward, optional NPC dialogue, and later Sevii postgame text are intentionally
+untouched. Pokemon species / move / ability proper names remain English.
+Ash Bond / Ash Cap are not referenced or changed.
 """
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -211,6 +212,9 @@ def main() -> int:
         "ashCapTouched": False,
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"[{MARKER}] PASS: translated {len(applied)} Three Island biker battle runtime blocks; Ash Bond/Ash Cap untouched")
+
+    lostelle_hint_script = Path(__file__).with_name("localize_three_island_lostelle_hint_v3_49.py")
+    subprocess.run([sys.executable, str(lostelle_hint_script), str(root)], check=True)
     return 0
 
 
