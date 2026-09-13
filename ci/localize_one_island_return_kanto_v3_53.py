@@ -10,6 +10,7 @@ proper names remain English. Ash Bond / Ash Cap are not referenced or changed.
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -143,6 +144,9 @@ def main() -> int:
         "ashCapTouched": False,
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"[{MARKER}] PASS: translated {len(applied)} One Island return-to-Kanto blocks; Ash Bond/Ash Cap untouched")
+
+    next_script = Path(__file__).with_name("localize_pallet_oak_rating_v3_54.py")
+    subprocess.run([sys.executable, str(next_script), str(root)], check=True)
     return 0
 
 
