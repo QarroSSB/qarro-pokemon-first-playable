@@ -46,11 +46,11 @@ RU = '''FourIsland_Text_RivalAlreadyGotEggBeSmellingYa::
 \t.string "здесь торчать.\\p"
 \t.string "Ещё увидимся!$"
 '''
-LABEL_RE = re.compile(r"(?m)^([A-Za-z0-9_]+)::\\s*$")
+LABEL_RE = re.compile(r"(?m)^([A-Za-z0-9_]+)::\s*$")
 
 
 def replace_label_block(text: str) -> str:
-    matches = list(re.finditer(rf"(?m)^{re.escape(LABEL)}::\\s*$", text))
+    matches = list(re.finditer(rf"(?m)^{re.escape(LABEL)}::\s*$", text))
     if len(matches) != 1:
         raise SystemExit(f"{MARKER}: {LABEL}: expected exactly one label, found {len(matches)}")
     start = matches[0].start()
