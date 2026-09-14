@@ -28,7 +28,7 @@ PATCHES = {
 ''',
     },
     "FourIsland_IcefallCave_Back_Text_ShutItLadyLeaveUsBe": {
-        "needles": ("shut it, lady", "leave us be", "glasses get all", "steamed up"),
+        "needles": ("shut it, lady", "leave", "us be", "glasses get all", "steamed up"),
         "ru": '''FourIsland_IcefallCave_Back_Text_ShutItLadyLeaveUsBe::
 \t.string "Да заткнись ты, дамочка,\\n"
 \t.string "и оставь нас в покое.\\p"
