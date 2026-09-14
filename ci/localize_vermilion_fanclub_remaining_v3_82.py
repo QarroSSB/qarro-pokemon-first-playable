@@ -36,7 +36,7 @@ REPLACEMENTS = {
 \t.string "Я просто обожаю моего SEEL!\\n"
 \t.string "Он такой милый!\\p"
 \t.string "Когда я его обнимаю, он пищит:\\n"
-\t.string "«Кьююю!»$"
+\t.string "“Кьююю!”$"
 '''),
     "VermilionCity_PokemonFanClub_Text_SeelFarMoreAttractive": (
         ("Oh, dear!", "My SEEL is far more attractive."),
