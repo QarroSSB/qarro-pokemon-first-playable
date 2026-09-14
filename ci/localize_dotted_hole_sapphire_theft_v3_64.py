@@ -44,7 +44,7 @@ PATCHES = {
 \t.string "Я даже скажу один пароль от\\n"
 \t.string "СКЛАДА КОМАНДЫ ROCKET.\\p"
 \t.string "Пароль, который я знаю:\\n"
-\t.string "«Да, нет, CHANSEY».\\p"
+\t.string "“Да, нет, CHANSEY”.\\p"
 \t.string "Всё. Не держи на меня зла!$"
 ''',
     },
