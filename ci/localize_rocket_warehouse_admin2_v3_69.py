@@ -53,7 +53,7 @@ PATCHES = {
 \t.string "Я найду GIOVANNI.\\n"
 \t.string "И возрожу TEAM ROCKET!\\l"
 \t.string "Я обязательно...\\p"
-\t.string "А пока — прощай!$"
+\t.string "А пока - прощай!$"
 ''',
     },
 }
