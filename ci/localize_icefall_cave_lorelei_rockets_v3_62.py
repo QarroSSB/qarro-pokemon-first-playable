@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -169,6 +170,9 @@ def main() -> int:
         "ashCapTouched": False,
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"[{MARKER}] PASS: translated {len(applied)} forced Icefall Lorelei/Rocket blocks; Ash Bond/Ash Cap untouched")
+
+    next_script = Path(__file__).with_name("localize_ruin_valley_dotted_hole_door_v3_63.py")
+    subprocess.run([sys.executable, str(next_script), str(root)], check=True)
     return 0
 
 
