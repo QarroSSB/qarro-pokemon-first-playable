@@ -1,45 +1,40 @@
 #!/usr/bin/env python3
-"""Qarro v3.65 mandatory Rocket Warehouse first Grunt localization.
+"""Qarro v3.66 mandatory Rocket Warehouse second Grunt localization.
 
-Translates only the verified first mandatory Rocket Grunt battle encountered on
-the required Five Island Rocket Warehouse path toward recovering the Sapphire.
-Later Grunts, both Admins, Gideon, optional signs/items, Ash Bond, and Ash Cap
-remain untouched. Pokemon species / move / ability proper names remain English.
+Translates only the verified Grunt2 trainer dialogue in Five Island Rocket
+Warehouse. Grunt3, both Admins, Gideon, optional signs/items, Ash Bond, and
+Ash Cap remain untouched. Pokemon species / move / ability proper names remain
+English.
 """
 from __future__ import annotations
 
 import json
 import re
-import subprocess
 import sys
 from pathlib import Path
 
-MARKER = "QARRO_RU_ROCKET_WAREHOUSE_GRUNT1_V3_65"
+MARKER = "QARRO_RU_ROCKET_WAREHOUSE_GRUNT2_V3_66"
 REL = Path("data/maps/FiveIsland_RocketWarehouse_Frlg/scripts.inc")
 
 PATCHES = {
-    "FiveIsland_RocketWarehouse_Text_Grunt1Intro": {
-        "needles": ("Oh, now your POKéMON look strong.", "You're willing to sell them?", "You wanted to battle?"),
-        "ru": '''FiveIsland_RocketWarehouse_Text_Grunt1Intro::
-\t.string "Теперь твои ПОКЕМОНЫ\\n"
-\t.string "выглядят сильными.\\p"
-\t.string "Хочешь продать их?\\p"
-\t.string "А?\\n"
-\t.string "Ты пришёл сражаться?$"
+    "FiveIsland_RocketWarehouse_Text_Grunt2Intro": {
+        "needles": ("Did you come here knowing it's", "TEAM ROCKET's WAREHOUSE?"),
+        "ru": '''FiveIsland_RocketWarehouse_Text_Grunt2Intro::
+\t.string "Ты пришёл сюда, зная, что это\\n"
+\t.string "СКЛАД TEAM ROCKET?$"
 ''',
     },
-    "FiveIsland_RocketWarehouse_Text_Grunt1Defeat": {
-        "needles": ("Oh, but", "Too much!"),
-        "ru": '''FiveIsland_RocketWarehouse_Text_Grunt1Defeat::
-\t.string "Ох, но...\\n"
-\t.string "Это слишком!$"
+    "FiveIsland_RocketWarehouse_Text_Grunt2Defeat": {
+        "needles": ("What do you think you're doing?!",),
+        "ru": '''FiveIsland_RocketWarehouse_Text_Grunt2Defeat::
+\t.string "Что ты творишь?!$"
 ''',
     },
-    "FiveIsland_RocketWarehouse_Text_Grunt1PostBattle": {
-        "needles": ("We can give you a great price.", "Sell us your POKéMON!"),
-        "ru": '''FiveIsland_RocketWarehouse_Text_Grunt1PostBattle::
-\t.string "Мы дадим отличную цену.\\n"
-\t.string "Продай нам своих ПОКЕМОНОВ!$"
+    "FiveIsland_RocketWarehouse_Text_Grunt2PostBattle": {
+        "needles": ("TEAM ROCKET broke up?", "What planet are you from?"),
+        "ru": '''FiveIsland_RocketWarehouse_Text_Grunt2PostBattle::
+\t.string "TEAM ROCKET распалась?\\n"
+\t.string "Ты с какой планеты?$"
 ''',
     },
 }
@@ -65,7 +60,7 @@ def replace_label_block(text: str, label: str, needles: tuple[str, ...], replace
 
 def main() -> int:
     if len(sys.argv) != 2:
-        raise SystemExit("usage: localize_rocket_warehouse_grunt1_v3_65.py <upstream-root>")
+        raise SystemExit("usage: localize_rocket_warehouse_grunt2_v3_66.py <upstream-root>")
     root = Path(sys.argv[1])
     path = root / REL
     text = path.read_text(encoding="utf-8")
@@ -76,22 +71,19 @@ def main() -> int:
         applied.append(label)
 
     path.write_text(text, encoding="utf-8")
-    out = root / "build" / "qarro_ru_rocket_warehouse_grunt1_v3_65_audit.json"
+    out = root / "build" / "qarro_ru_rocket_warehouse_grunt2_v3_66_audit.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({
         "marker": MARKER,
         "file": str(REL),
         "translatedBlocks": applied,
         "translatedBlockCount": len(applied),
-        "scope": "mandatory first Rocket Warehouse Grunt battle on Sapphire recovery path",
+        "scope": "Rocket Warehouse Grunt2 trainer dialogue on Sapphire recovery route",
         "policy": "FireRed / Expansion 1.17.0 / Gen I-V; Pokemon+Move+Ability proper names remain English",
         "ashBondTouched": False,
         "ashCapTouched": False,
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"[{MARKER}] PASS: translated {len(applied)} first Rocket Warehouse Grunt blocks; Ash Bond/Ash Cap untouched")
-
-    next_script = Path(__file__).with_name("localize_rocket_warehouse_grunt2_v3_66.py")
-    subprocess.run([sys.executable, str(next_script), str(root)], check=True)
+    print(f"[{MARKER}] PASS: translated {len(applied)} Rocket Warehouse Grunt2 blocks; Ash Bond/Ash Cap untouched")
     return 0
 
 
