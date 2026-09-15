@@ -91,6 +91,7 @@ SCRIPTS = [
     "fix_bulk_localization_escapes_v3_92.py",
     "localize_routes3_9_16_v3_93.py",
     "localize_route10_rocktunnel_viridianforest_v3_94.py",
+    "localize_kindleroad_patternbush_v3_95.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
