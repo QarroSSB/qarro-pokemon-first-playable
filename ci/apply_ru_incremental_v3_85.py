@@ -112,6 +112,7 @@ SCRIPTS = [
     "localize_pc_mart_residuals_v3_115.py",
     "localize_route4_bikeshop_celadon3f_v3_116.py",
     "localize_celadon_service_ember_spa_v3_117.py",
+    "localize_safe_mart_npcs_v3_118.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
