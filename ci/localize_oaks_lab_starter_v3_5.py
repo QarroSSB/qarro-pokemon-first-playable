@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Qarro v3.7 Oak-lab localization wrapper + accented-e normalization.
+"""Qarro v3.7 Oak-lab localization wrapper + incremental RU passes + e normalization.
 
 Runs the exact previously-green Oak lab localization from commit 0ddb5e3,
-then, only after all core/Oak localization anchors have been consumed,
-normalizes literal é/É in game source to ordinary e/E.
+then applies every completed incremental Russian localization pass through the
+single ordered v3.85 manifest, and only after all localization anchors have
+been consumed normalizes literal é/É in game source to ordinary e/E.
 
-This ordering is intentional: earlier localization passes still match the
-pinned FireRed source text containing POKéMON, while the final built ROM no
-longer requests a dedicated é glyph.
+This ordering is intentional: localization passes still match the pinned
+FireRed source text containing POKéMON, while the final built ROM no longer
+requests a dedicated é glyph.
 
 Ash Bond / Ash Cap are untouched.
 """
@@ -21,6 +22,7 @@ from pathlib import Path
 BASE_COMMIT = "0ddb5e33c653bc4550cecb18d5e0440232df7a8a"
 BASE_PATH = "ci/localize_oaks_lab_starter_v3_5.py"
 MARKER = "QARRO_POST_LOCALIZATION_E_V3_7"
+INCREMENTAL_RUNNER = "apply_ru_incremental_v3_85.py"
 
 
 def load_base(repo: Path) -> dict:
@@ -38,6 +40,13 @@ def load_base(repo: Path) -> dict:
     }
     exec(compile(code, f"{BASE_COMMIT}:{BASE_PATH}", "exec"), ns)
     return ns
+
+
+def apply_incremental_localization(root: Path) -> None:
+    runner = Path(__file__).resolve().with_name(INCREMENTAL_RUNNER)
+    if not runner.is_file():
+        raise FileNotFoundError(f"incremental localization runner missing: {runner}")
+    subprocess.run([sys.executable, str(runner), str(root)], check=True)
 
 
 def normalize_accented_e(root: Path) -> tuple[int, int]:
@@ -83,6 +92,11 @@ def main() -> int:
         return 2
 
     root = Path(sys.argv[1]).resolve()
+
+    # Apply all completed translation passes before accented-e normalization,
+    # otherwise exact FireRed anchors containing POKéMON would no longer match.
+    apply_incremental_localization(root)
+
     replacements, changed_files = normalize_accented_e(root)
 
     leftovers = []
@@ -112,6 +126,8 @@ def main() -> int:
         audit = json.loads(audit_path.read_text(encoding="utf-8"))
     audit.update(
         {
+            "incrementalLocalizationManifest": INCREMENTAL_RUNNER,
+            "incrementalLocalizationApplied": True,
             "postLocalizationAccentedENormalized": True,
             "accentedEReplacements": replacements,
             "accentedEChangedFiles": changed_files,
@@ -124,7 +140,8 @@ def main() -> int:
     )
 
     print(
-        f"[{MARKER}] PASS: {replacements} literal é/É -> e/E replacements "
+        f"[{MARKER}] PASS: incremental RU passes applied; "
+        f"{replacements} literal é/É -> e/E replacements "
         f"in {changed_files} files after localization; Ash code untouched"
     )
     return 0
