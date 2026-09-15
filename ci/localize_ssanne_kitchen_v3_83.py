@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -97,6 +98,8 @@ def main() -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({"marker": MARKER, "file": str(REL), "translatedBlocks": list(REPLACEMENTS), "translatedBlockCount": len(REPLACEMENTS), "scope": "pinned-upstream S.S. Anne Kitchen runtime text only", "policy": "FireRed / Expansion 1.17.0 / Gen I-V; Pokemon+Move+Ability proper names remain English", "ashBondTouched": False, "ashCapTouched": False}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"[{MARKER}] PASS: translated {len(REPLACEMENTS)} S.S. Anne Kitchen blocks; Ash Bond/Ash Cap untouched")
+    next_script = Path(__file__).with_name("localize_ssanne_deck_v3_84.py")
+    subprocess.run([sys.executable, str(next_script), str(root)], check=True)
     return 0
 
 if __name__ == "__main__":
