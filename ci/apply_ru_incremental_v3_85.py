@@ -94,6 +94,7 @@ SCRIPTS = [
     "localize_kindleroad_patternbush_v3_95.py",
     "localize_fanclub_gamecorner_v3_96.py",
     "localize_sevault_canyon_v3_97.py",
+    "localize_sevii_dojo_v3_99.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
