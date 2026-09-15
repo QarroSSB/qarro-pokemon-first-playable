@@ -101,6 +101,7 @@ SCRIPTS = [
     "localize_resort_fuchsia_cerulean_v3_104.py",
     "localize_memorial_silph6_outcast_v3_105.py",
     "localize_tower_vermilion_victory_v3_106.py",
+    "localize_oneisland_silph5_celadonroof_v3_107.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
