@@ -90,6 +90,7 @@ SCRIPTS = [
     "localize_routes11_12_20_v3_91.py",
     "fix_bulk_localization_escapes_v3_92.py",
     "localize_routes3_9_16_v3_93.py",
+    "localize_route10_rocktunnel_viridianforest_v3_94.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
