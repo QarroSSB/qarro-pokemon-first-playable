@@ -2,12 +2,14 @@
 """Apply every completed Russian localization pass after Misty v3.22.
 
 This is the single ordered manifest for the incremental FireRed translation
-passes.  The build and runtime-surface audit both reach this runner through
+passes. The build and runtime-surface audit both reach this runner through
 localize_oaks_lab_starter_v3_5.py, so a translation cannot silently exist in
 the repository without also being applied to the built ROM.
 
-Order is intentional and follows the versioned localization sequence.  The
+Order is intentional and follows the versioned localization sequence. The
 runner is fail-closed: a missing script or any failed pass stops the build.
+After all passes, known unsupported Unicode dash characters are normalized to
+the FireRed-safe ASCII hyphen before the normal quote/e sanitizers run.
 Pokemon, Move and Ability proper names stay English by project canon.
 Ash Bond / Ash Cap are not touched.
 """
@@ -97,6 +99,29 @@ def apply_all(root: Path) -> None:
         subprocess.run([sys.executable, str(script), str(root)], check=True)
 
 
+def sanitize_unsupported_dashes(root: Path) -> tuple[int, int]:
+    changed_files = 0
+    replacements = 0
+    suffixes = {".c", ".h", ".inc", ".s", ".txt"}
+    for base in (root / "src", root / "data", root / "include"):
+        if not base.exists():
+            continue
+        for path in base.rglob("*"):
+            if not path.is_file() or path.suffix.lower() not in suffixes:
+                continue
+            try:
+                text = path.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                continue
+            count = text.count("—") + text.count("–")
+            if not count:
+                continue
+            path.write_text(text.replace("—", "-").replace("–", "-"), encoding="utf-8")
+            changed_files += 1
+            replacements += count
+    return replacements, changed_files
+
+
 def main() -> int:
     if len(sys.argv) != 2:
         print(f"usage: {Path(sys.argv[0]).name} <upstream-root>", file=sys.stderr)
@@ -104,7 +129,11 @@ def main() -> int:
 
     root = Path(sys.argv[1]).resolve()
     apply_all(root)
-    print(f"[{MARKER}] PASS: applied {len(SCRIPTS)} ordered localization passes")
+    dash_count, dash_files = sanitize_unsupported_dashes(root)
+    print(
+        f"[{MARKER}] PASS: applied {len(SCRIPTS)} ordered localization passes; "
+        f"normalized {dash_count} unsupported dash characters in {dash_files} files"
+    )
     return 0
 
 
