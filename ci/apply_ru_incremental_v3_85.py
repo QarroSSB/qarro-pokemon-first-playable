@@ -115,6 +115,7 @@ SCRIPTS = [
     "localize_safe_mart_npcs_v3_118.py",
     "localize_silph_2f_8f_9f_v3_119.py",
     "localize_silph_3f_4f_10f_v3_120.py",
+    "localize_pokemon_tower_3f_4f_6f_7f_v3_121.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
