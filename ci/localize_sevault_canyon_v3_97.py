@@ -77,7 +77,9 @@ FILES = {
 def render(label: str, lines: list[str]) -> str:
     out = [f"{label}::"]
     for line in lines:
-        escaped = line.replace("\\", "\\\\").replace('"', '\\"')
+        # FireRed control codes are already represented as a single literal backslash
+        # in the runtime string value; only quotes require escaping here.
+        escaped = line.replace('"', '\\"')
         out.append(f'\t.string "{escaped}"')
     return "\n".join(out) + "\n"
 
