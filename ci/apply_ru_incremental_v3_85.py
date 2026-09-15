@@ -98,6 +98,7 @@ SCRIPTS = [
     "localize_gyms_route25_v3_100.py",
     "localize_saffron_silph_v3_101.py",
     "localize_celadon_mtmoon_route21_v3_102.py",
+    "localize_resort_fuchsia_cerulean_v3_104.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
