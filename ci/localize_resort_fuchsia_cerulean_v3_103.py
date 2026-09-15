@@ -80,7 +80,7 @@ FILES: dict[Path, dict[str, str]] = {
         "CeruleanCity_Text_SlowbroPayAttention": "SLOWBRO, соберись!$",
         "CeruleanCity_Text_SlowbroPunch": "SLOWBRO, ударь!$",
         "CeruleanCity_Text_NoYouBlewItAgain": "Нет!\nОпять не получилось!$",
-        "CeruleanCity_Text_SlowbroWithdraw": "SLOWBRO, WITHDRAW!$",
+        "CeruleanCity_Text_SlowbroWithdraw": "SLOWBRO, используй WITHDRAW!$",
         "CeruleanCity_Text_HardToControlMonsObedience": "Нет! Не так!\nПОКЕМОНАМИ трудно управлять!\pИх послушание зависит\nот навыка ТРЕНЕРА.$",
         "CeruleanCity_Text_SlowbroTookSnooze": "SLOWBRO задремал...$",
         "CeruleanCity_Text_SlowbroLoafingAround": "SLOWBRO бездельничает...$",
