@@ -109,6 +109,7 @@ SCRIPTS = [
     "localize_daycare_victory2_school_v3_112.py",
     "localize_safari_tower_mtmoon_v3_113.py",
     "localize_oak_aides_gatehouses_v3_114.py",
+    "localize_pc_mart_residuals_v3_115.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
