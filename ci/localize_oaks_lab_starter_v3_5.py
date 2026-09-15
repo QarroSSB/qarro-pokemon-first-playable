@@ -4,7 +4,8 @@
 Runs the exact previously-green Oak lab localization from commit 0ddb5e3,
 applies every completed incremental Russian localization pass through the
 single ordered v3.85 manifest, installs the current-canon Kanto 6v6 Variant A
-test rosters, and only then normalizes literal é/É to ordinary e/E.
+test rosters, removes the historical 5-of-6 runtime interception, and only
+then normalizes literal é/É to ordinary e/E.
 
 The ordering keeps FireRed POKéMON anchors intact until all localization passes
 have consumed them. Ash Bond / Ash Cap are untouched.
@@ -21,6 +22,7 @@ BASE_PATH = "ci/localize_oaks_lab_starter_v3_5.py"
 MARKER = "QARRO_POST_LOCALIZATION_E_V3_7"
 INCREMENTAL_RUNNER = "apply_ru_incremental_v3_85.py"
 GYM_SIX_RUNNER = "gym_six_variant_a_v3_86.py"
+GYM_SIX_FINALIZER = "gym_six_finalize_v3_88.py"
 
 
 def load_base(repo: Path) -> dict:
@@ -94,10 +96,9 @@ def main() -> int:
     # Apply translations while original POKéMON anchors still exist.
     run_ci_pass(root, INCREMENTAL_RUNNER)
 
-    # Install the first executable final-canon 6v6 leader data path.  This is
-    # Variant A only for the current compile/play-test; A/B/C save-fixed
-    # selection is the next trainer-system step after this path is green.
+    # Establish a real six-Pokemon battle path before adding final A/B/C state.
     run_ci_pass(root, GYM_SIX_RUNNER)
+    run_ci_pass(root, GYM_SIX_FINALIZER)
 
     replacements, changed_files = normalize_accented_e(root)
 
@@ -131,7 +132,9 @@ def main() -> int:
             "incrementalLocalizationManifest": INCREMENTAL_RUNNER,
             "incrementalLocalizationApplied": True,
             "gymSixPass": GYM_SIX_RUNNER,
+            "gymSixFinalizer": GYM_SIX_FINALIZER,
             "gymSixVariantATestApplied": True,
+            "legacyFiveOfSixRemoved": True,
             "postLocalizationAccentedENormalized": True,
             "accentedEReplacements": replacements,
             "accentedEChangedFiles": changed_files,
@@ -144,8 +147,8 @@ def main() -> int:
     )
 
     print(
-        f"[{MARKER}] PASS: incremental RU + Kanto 6v6 Variant A applied; "
-        f"{replacements} literal é/É -> e/E replacements "
+        f"[{MARKER}] PASS: incremental RU + true Kanto 6v6 Variant A applied; "
+        f"legacy 5-of-6 removed; {replacements} literal é/É -> e/E replacements "
         f"in {changed_files} files; Ash code untouched"
     )
     return 0
