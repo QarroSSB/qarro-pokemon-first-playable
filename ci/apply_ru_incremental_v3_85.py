@@ -87,6 +87,7 @@ SCRIPTS = [
     "localize_routes8_14_v3_87.py",
     "localize_routes15_19_v3_89.py",
     "localize_routes13_17_v3_90.py",
+    "localize_routes11_12_20_v3_91.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
