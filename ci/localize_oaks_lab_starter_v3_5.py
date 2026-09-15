@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
-"""Qarro v3.7 Oak-lab localization wrapper + incremental RU passes + e normalization.
+"""Qarro integration wrapper: Oak localization + current RU passes + 6v6 test + e normalization.
 
 Runs the exact previously-green Oak lab localization from commit 0ddb5e3,
-then applies every completed incremental Russian localization pass through the
-single ordered v3.85 manifest, and only after all localization anchors have
-been consumed normalizes literal é/É in game source to ordinary e/E.
+applies every completed incremental Russian localization pass through the
+single ordered v3.85 manifest, installs the current-canon Kanto 6v6 Variant A
+test rosters, and only then normalizes literal é/É to ordinary e/E.
 
-This ordering is intentional: localization passes still match the pinned
-FireRed source text containing POKéMON, while the final built ROM no longer
-requests a dedicated é glyph.
-
-Ash Bond / Ash Cap are untouched.
+The ordering keeps FireRed POKéMON anchors intact until all localization passes
+have consumed them. Ash Bond / Ash Cap are untouched.
 """
 from __future__ import annotations
 
@@ -23,6 +20,7 @@ BASE_COMMIT = "0ddb5e33c653bc4550cecb18d5e0440232df7a8a"
 BASE_PATH = "ci/localize_oaks_lab_starter_v3_5.py"
 MARKER = "QARRO_POST_LOCALIZATION_E_V3_7"
 INCREMENTAL_RUNNER = "apply_ru_incremental_v3_85.py"
+GYM_SIX_RUNNER = "gym_six_variant_a_v3_86.py"
 
 
 def load_base(repo: Path) -> dict:
@@ -42,11 +40,11 @@ def load_base(repo: Path) -> dict:
     return ns
 
 
-def apply_incremental_localization(root: Path) -> None:
-    runner = Path(__file__).resolve().with_name(INCREMENTAL_RUNNER)
-    if not runner.is_file():
-        raise FileNotFoundError(f"incremental localization runner missing: {runner}")
-    subprocess.run([sys.executable, str(runner), str(root)], check=True)
+def run_ci_pass(root: Path, filename: str) -> None:
+    script = Path(__file__).resolve().with_name(filename)
+    if not script.is_file():
+        raise FileNotFoundError(f"required Qarro pass missing: {script}")
+    subprocess.run([sys.executable, str(script), str(root)], check=True)
 
 
 def normalize_accented_e(root: Path) -> tuple[int, int]:
@@ -93,9 +91,13 @@ def main() -> int:
 
     root = Path(sys.argv[1]).resolve()
 
-    # Apply all completed translation passes before accented-e normalization,
-    # otherwise exact FireRed anchors containing POKéMON would no longer match.
-    apply_incremental_localization(root)
+    # Apply translations while original POKéMON anchors still exist.
+    run_ci_pass(root, INCREMENTAL_RUNNER)
+
+    # Install the first executable final-canon 6v6 leader data path.  This is
+    # Variant A only for the current compile/play-test; A/B/C save-fixed
+    # selection is the next trainer-system step after this path is green.
+    run_ci_pass(root, GYM_SIX_RUNNER)
 
     replacements, changed_files = normalize_accented_e(root)
 
@@ -128,6 +130,8 @@ def main() -> int:
         {
             "incrementalLocalizationManifest": INCREMENTAL_RUNNER,
             "incrementalLocalizationApplied": True,
+            "gymSixPass": GYM_SIX_RUNNER,
+            "gymSixVariantATestApplied": True,
             "postLocalizationAccentedENormalized": True,
             "accentedEReplacements": replacements,
             "accentedEChangedFiles": changed_files,
@@ -140,9 +144,9 @@ def main() -> int:
     )
 
     print(
-        f"[{MARKER}] PASS: incremental RU passes applied; "
+        f"[{MARKER}] PASS: incremental RU + Kanto 6v6 Variant A applied; "
         f"{replacements} literal é/É -> e/E replacements "
-        f"in {changed_files} files after localization; Ash code untouched"
+        f"in {changed_files} files; Ash code untouched"
     )
     return 0
 
