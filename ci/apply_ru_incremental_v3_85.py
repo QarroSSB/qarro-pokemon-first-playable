@@ -2,12 +2,11 @@
 """Apply every completed Russian localization pass after Misty v3.22.
 
 This is the single ordered manifest for the incremental FireRed translation
-passes. The build and runtime-surface audit both reach this runner through
-localize_oaks_lab_starter_v3_5.py, so a translation cannot silently exist in
-the repository without also being applied to the built ROM.
+passes. Some historical localization scripts chain the next pass themselves;
+therefore this runner checks the build audit marker for each version and skips
+a pass that an earlier script has already applied. This prevents double-patch
+failures while keeping the sequence fail-closed for genuinely missing anchors.
 
-Order is intentional and follows the versioned localization sequence. The
-runner is fail-closed: a missing script or any failed pass stops the build.
 After all passes, known unsupported Unicode dash characters are normalized to
 the FireRed-safe ASCII hyphen before the normal quote/e sanitizers run.
 Pokemon, Move and Ability proper names stay English by project canon.
@@ -15,6 +14,7 @@ Ash Bond / Ash Cap are not touched.
 """
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -86,17 +86,35 @@ SCRIPTS = [
     "localize_ssanne_deck_v3_84.py",
 ]
 
+VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
 
-def apply_all(root: Path) -> None:
+
+def already_applied(root: Path, name: str) -> bool:
+    match = VERSION_RE.search(name)
+    if not match:
+        return False
+    version = match.group(1)
+    return any((root / "build").glob(f"*v3_{version}_audit.json"))
+
+
+def apply_all(root: Path) -> tuple[int, int]:
     ci_dir = Path(__file__).resolve().parent
     missing = [name for name in SCRIPTS if not (ci_dir / name).is_file()]
     if missing:
         raise FileNotFoundError(f"missing localization scripts: {missing}")
 
+    applied = 0
+    skipped = 0
     for index, name in enumerate(SCRIPTS, start=1):
+        if already_applied(root, name):
+            skipped += 1
+            print(f"[{MARKER}] {index:02d}/{len(SCRIPTS):02d} SKIP already applied {name}", flush=True)
+            continue
         script = ci_dir / name
-        print(f"[{MARKER}] {index:02d}/{len(SCRIPTS):02d} {name}", flush=True)
+        print(f"[{MARKER}] {index:02d}/{len(SCRIPTS):02d} APPLY {name}", flush=True)
         subprocess.run([sys.executable, str(script), str(root)], check=True)
+        applied += 1
+    return applied, skipped
 
 
 def sanitize_unsupported_dashes(root: Path) -> tuple[int, int]:
@@ -128,10 +146,10 @@ def main() -> int:
         return 2
 
     root = Path(sys.argv[1]).resolve()
-    apply_all(root)
+    applied, skipped = apply_all(root)
     dash_count, dash_files = sanitize_unsupported_dashes(root)
     print(
-        f"[{MARKER}] PASS: applied {len(SCRIPTS)} ordered localization passes; "
+        f"[{MARKER}] PASS: applied {applied}, skipped {skipped} already-applied passes; "
         f"normalized {dash_count} unsupported dash characters in {dash_files} files"
     )
     return 0
