@@ -10,101 +10,144 @@ permissions:
   contents: read
   actions: read
 
-env:
-  BASELINE_RUN: "34663914135"
-  BASELINE_ARTIFACT: "Qarro-FIRST-PLAYABLE-v3.8-307"
-  EXPECTED_ROM_SHA256: "40feae9cf1c0b022246780eb2db7efdd2e130346ba77253527491c219263a304"
-
 jobs:
   gym-test-regression:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
-      - name: Checkout isolated Gym test branch
+      - name: Checkout current Gym test branch
         uses: actions/checkout@v4
 
-      - name: Download exact green Gym test artifact
+      - name: Wait for exact same-commit FireRed build
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mkdir -p baseline regression_out
-          gh run download "$BASELINE_RUN" \
+          build_run=""
+          for attempt in $(seq 1 60); do
+            runs="$(gh api \
+              -H 'Accept: application/vnd.github+json' \
+              "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$GITHUB_SHA&branch=$GITHUB_REF_NAME&event=push&per_page=20")"
+            build_run="$(printf '%s' "$runs" | jq -r '.workflow_runs[] | select(.path == ".github/workflows/qarro_first_playable_build.yml") | .id' | head -n1)"
+            if [[ -n "$build_run" && "$build_run" != "null" ]]; then
+              status="$(printf '%s' "$runs" | jq -r --argjson id "$build_run" '.workflow_runs[] | select(.id == $id) | .status')"
+              conclusion="$(printf '%s' "$runs" | jq -r --argjson id "$build_run" '.workflow_runs[] | select(.id == $id) | (.conclusion // "")')"
+              echo "same-commit build run=$build_run status=$status conclusion=$conclusion"
+              if [[ "$status" == "completed" ]]; then
+                [[ "$conclusion" == "success" ]] || { echo "Exact same-commit FireRed build failed: $conclusion"; exit 1; }
+                break
+              fi
+            else
+              echo "Waiting for FireRed build for exact commit $GITHUB_SHA (attempt $attempt/60)"
+            fi
+            sleep 10
+          done
+          [[ -n "$build_run" && "$build_run" != "null" ]] || { echo "No FireRed build found for exact commit $GITHUB_SHA"; exit 1; }
+          status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$build_run" --jq '.status')"
+          conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$build_run" --jq '.conclusion // ""')"
+          [[ "$status" == "completed" && "$conclusion" == "success" ]] || { echo "FireRed build did not complete successfully"; exit 1; }
+          echo "BUILD_RUN_ID=$build_run" >> "$GITHUB_ENV"
+
+      - name: Download exact same-commit build artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          artifact_name="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN_ID/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.name | startswith("Qarro-FIRST-PLAYABLE-v3.8-")) | .name' | head -n1)"
+          [[ -n "$artifact_name" ]] || { echo "Current build artifact not found for run $BUILD_RUN_ID"; exit 1; }
+          echo "Using current artifact: $artifact_name"
+          gh run download "$BUILD_RUN_ID" \
             --repo "$GITHUB_REPOSITORY" \
-            --name "$BASELINE_ARTIFACT" \
+            --name "$artifact_name" \
             --dir baseline
           test -f baseline/Qarro_FIRST_PLAYABLE_v3_8.gba
-          test -f baseline/logs/balance_kanto_v3_2.log
-          test -f baseline/logs/qol_v3_5.log
+          test -f baseline/trainers_frlg.generated.h
           test -f baseline/qarro_built_rom_v3_12_audit.json
           test -f baseline/qarro_qol_regression_v3_10_audit.json
           test -f baseline/qarro_regression_bundle_v3_11_audit.json
           test -f baseline/qarro_protected_features_v3_13_audit.json
+          test -f baseline/qarro_applied_diff_v3_8.patch
+          echo "BUILD_ARTIFACT=$artifact_name" >> "$GITHUB_ENV"
 
-      - name: Five independent Gym and QoL evidence passes
+      - name: Five independent current 6v6 and QoL evidence passes
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY' | tee regression_out/static_regression.log
           from pathlib import Path
-          import hashlib, json
+          import hashlib, json, re
 
           root = Path('baseline')
           rom_path = root / 'Qarro_FIRST_PLAYABLE_v3_8.gba'
-          expected_sha = '40feae9cf1c0b022246780eb2db7efdd2e130346ba77253527491c219263a304'
+          trainers_path = root / 'trainers_frlg.generated.h'
+          diff_path = root / 'qarro_applied_diff_v3_8.patch'
 
           leaders = {
-              'BROCK': ('Regirock -> Rhyperior', 'Ace=Tyranitar'),
-              'MISTY': ('Suicune -> Milotic', 'Ace=Starmie'),
-              'LT_SURGE': ('Zapdos -> Eelektross', 'Ace=Electivire'),
-              'ERIKA': ('Virizion -> Roserade', 'Ace=Venusaur'),
-              'KOGA': ('Darkrai -> Drapion', 'Ace=Crobat'),
-              'SABRINA': ('Mewtwo -> Gallade', 'Ace=Alakazam'),
-              'BLAINE': ('Moltres -> Chandelure', 'Ace=Arcanine'),
-              'GIOVANNI': ('Groudon -> Hippowdon', 'Ace=Nidoking'),
+              'TRAINER_LEADER_BROCK': ['GOLEM', 'AERODACTYL', 'TYRANITAR', 'OMASTAR', 'CRADILY', 'KABUTOPS'],
+              'TRAINER_LEADER_MISTY': ['POLITOED', 'LAPRAS', 'STARMIE', 'VAPOREON', 'LANTURN', 'SLOWBRO'],
+              'TRAINER_LEADER_LT_SURGE': ['ELECTRODE', 'RAICHU', 'JOLTEON', 'MAGNETON', 'ELECTIVIRE', 'AMPHAROS'],
+              'TRAINER_LEADER_ERIKA': ['NINETALES', 'VENUSAUR', 'VICTREEBEL', 'VILEPLUME', 'JUMPLUFF', 'CELEBI'],
+              'TRAINER_LEADER_KOGA': ['CROBAT', 'WEEZING', 'MUK', 'VENOMOTH', 'TENTACRUEL', 'QWILFISH'],
+              'TRAINER_LEADER_SABRINA': ['ALAKAZAM', 'ESPEON', 'MR_MIME', 'EXEGGUTOR', 'SLOWKING', 'MEW'],
+              'TRAINER_LEADER_BLAINE': ['NINETALES', 'ARCANINE', 'RAPIDASH', 'MAGMAR', 'HOUNDOOM', 'MAGCARGO'],
+              'TRAINER_LEADER_GIOVANNI': ['NIDOKING', 'NIDOQUEEN', 'RHYDON', 'DUGTRIO', 'DONPHAN', 'HIPPOWDON'],
           }
+          banned = {'REGIROCK', 'SUICUNE', 'ZAPDOS', 'VIRIZION', 'DARKRAI', 'MEWTWO', 'MOLTRES', 'GROUDON'}
+          approved_mythical = {'CELEBI', 'MEW'}
 
           def load(name):
               return json.loads((root / name).read_text(encoding='utf-8'))
 
-          balance_log = (root / 'logs/balance_kanto_v3_2.log').read_text(encoding='utf-8')
-          qol_log = (root / 'logs/qol_v3_5.log').read_text(encoding='utf-8')
+          def trainer_blocks(text):
+              matches = list(re.finditer(r'^\s*\[(TRAINER_[A-Z0-9_]+)\]\s*=\s*$', text, re.M))
+              out = {}
+              for i, match in enumerate(matches):
+                  end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+                  out[match.group(1)] = text[match.start():end]
+              return out
+
+          generated = trainers_path.read_text(encoding='utf-8')
+          blocks = trainer_blocks(generated)
+          diff = diff_path.read_text(encoding='utf-8', errors='replace')
+          built = load('qarro_built_rom_v3_12_audit.json')
+          expected_sha = built['sha256']
 
           def one_pass(n):
               rom = rom_path.read_bytes()
               assert len(rom) == 32 * 1024 * 1024, len(rom)
               sha = hashlib.sha256(rom).hexdigest()
-              assert sha == expected_sha, sha
+              assert sha == expected_sha, (sha, expected_sha)
               assert rom[0xAC:0xB0] == b'BPRE', rom[0xAC:0xB0]
               assert rom[0xB2] == 0x96, hex(rom[0xB2])
               calc = (-(sum(rom[0xA0:0xBD]) + 0x19)) & 0xFF
               assert calc == rom[0xBD], (hex(calc), hex(rom[0xBD]))
 
-              assert '[QARRO_GYM_FIVE_V3_26] PASS:' in balance_log
-              assert 'save-stable five' in balance_log
-              assert 'designated Ace always present' in balance_log
-              assert '[QARRO_BALANCE_GYM_V3_25] PASS:' in balance_log
-              for leader, (replacement, ace) in leaders.items():
-                  marker = f'TRAINER_LEADER_{leader}'
-                  assert marker in balance_log, marker
-                  assert replacement in balance_log, replacement
-                  assert ace in balance_log, ace
+              for trainer, expected_species in leaders.items():
+                  assert trainer in blocks, trainer
+                  block = blocks[trainer]
+                  assert '.partySize = 6,' in block, trainer
+                  assert 'AI_FLAG_CHECK_BAD_MOVE' in block, trainer
+                  assert 'AI_FLAG_TRY_TO_FAINT' in block, trainer
+                  assert 'AI_FLAG_CHECK_VIABILITY' in block, trainer
+                  species = re.findall(r'\.species\s*=\s*SPECIES_([A-Z0-9_]+)', block)
+                  assert species == expected_species, (trainer, species, expected_species)
+                  assert not (set(species) & banned), (trainer, set(species) & banned)
+                  mythicals = set(species) & approved_mythical
+                  if trainer == 'TRAINER_LEADER_ERIKA':
+                      assert mythicals == {'CELEBI'}, mythicals
+                  elif trainer == 'TRAINER_LEADER_SABRINA':
+                      assert mythicals == {'MEW'}, mythicals
+                  else:
+                      assert not mythicals, (trainer, mythicals)
 
-              # Latest approved Kanto Mythical exceptions are layered after the
-              # no-legend pool construction and must keep the protected Aces.
-              assert '[QARRO_GYM_MYTHICAL_V3_27] TRAINER_LEADER_ERIKA: Roserade -> Celebi' in balance_log
-              assert 'protected Ace=Venusaur' in balance_log
-              assert '[QARRO_GYM_MYTHICAL_V3_27] TRAINER_LEADER_SABRINA: Gallade -> Mew' in balance_log
-              assert 'protected Ace=Alakazam' in balance_log
-              assert '[QARRO_GYM_MYTHICAL_V3_27] PASS:' in balance_log
-              assert 'old Legendary anchors=0' in balance_log
-              assert 'approved Mythicals=Erika/Celebi + Sabrina/Mew' in balance_log
-
-              assert '[QARRO_EXP_SHARE_V3_22] PASS:' in qol_log
-              assert 'party-wide toggle ON by default' in qol_log
-              assert 'switch it OFF/ON' in qol_log
-              assert 'Gen I-V content policy' in qol_log
+              # Final source state must not retain the historical runtime interception.
+              assert 'TryCreateQarroFiveOfSixGymParty' not in diff
+              assert 'QARRO_GYM_FIVE_V3_26_BEGIN' not in diff
+              assert 'QARRO_GYM_FIVE_V3_26_END' not in diff
 
               qol = load('qarro_qol_regression_v3_10_audit.json')
               assert qol['money']['removeMoneyCalls'] == 0
@@ -128,7 +171,6 @@ jobs:
               assert bundle['ashBondTouched'] is False
               assert bundle['ashCapTouched'] is False
 
-              built = load('qarro_built_rom_v3_12_audit.json')
               assert built['sizeBytes'] == 33554432
               assert built['gameCode'] == 'BPRE'
               assert built['sha256'] == expected_sha
@@ -141,7 +183,7 @@ jobs:
               assert protected['protectedPathHits'] == 0
               assert protected['protectedDiffLineHits'] == 0
 
-              print(f'PASS Gym regression {n}: {sha[:16]}...; 8 Kanto pools + approved Mew/Celebi exceptions + protected Aces + EXP Share + QoL + Ash protection evidence OK')
+              print(f'PASS current Gym regression {n}: {sha[:16]}...; exact same-commit ROM + 8 Variant-A 6v6 rosters + honest AI flags + QoL + Ash protection OK')
 
           for i in range(1, 6):
               one_pass(i)
@@ -157,7 +199,7 @@ jobs:
           command -v mgba-qt || test -x /usr/games/mgba-qt
           (mgba-qt --version || /usr/games/mgba-qt --version) 2>&1 | tee regression_out/mgba_version.log
 
-      - name: Five fresh emulator boot smoke runs
+      - name: Five fresh emulator boot smoke runs on current ROM
         shell: bash
         run: |
           set -euo pipefail
@@ -175,32 +217,35 @@ jobs:
               cat "$log"
               exit 1
             fi
-            echo "PASS emulator boot smoke $i: Gym test ROM remained running for 12s" | tee -a regression_out/runtime_summary.log
+            echo "PASS emulator boot smoke $i: current same-commit 6v6 ROM remained running for 12s" | tee -a regression_out/runtime_summary.log
           done
 
-      - name: Write Gym test regression report
+      - name: Write current Gym regression report
         if: always()
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import json
+          import hashlib, json, os
           out = Path('regression_out')
+          rom = Path('baseline/Qarro_FIRST_PLAYABLE_v3_8.gba')
           report = {
-              'marker': 'QARRO_GYM_TEST_REGRESSION_20260912_MYTHICAL',
-              'baselineRun': 34663914135,
-              'baselineCommit': '92580cddee24d135e38172f1ab73a69d4954694a',
-              'romSha256': '40feae9cf1c0b022246780eb2db7efdd2e130346ba77253527491c219263a304',
+              'marker': 'QARRO_GYM_TEST_REGRESSION_CURRENT_6V6_20260915',
+              'sourceCommit': os.environ.get('GITHUB_SHA'),
+              'sourceBuildRun': int(os.environ['BUILD_RUN_ID']) if os.environ.get('BUILD_RUN_ID') else None,
+              'sourceArtifact': os.environ.get('BUILD_ARTIFACT'),
+              'romSha256': hashlib.sha256(rom.read_bytes()).hexdigest() if rom.is_file() else None,
               'staticPassesRequested': 5,
               'emulatorBootPassesRequested': 5,
-              'scope': 'exact #307 artifact + 8 Kanto save-stable 5-of-6 pools + Erika/Celebi + Sabrina/Mew approved Mythical exceptions + protected Aces + EXP Share/QoL/protected evidence + mGBA boot smoke',
-              'note': 'This proves compiled evidence and boot stability of the isolated Gym test ROM. It does not yet automate controller input through a full Gym battle or save/reload sequence.'
+              'scope': 'exact same-commit FireRed build artifact + 8 Kanto Variant-A 6v6 rosters + current generated trainer data + honest AI flags + QoL/protected evidence + mGBA boot smoke',
+              'legacyFiveOfSixBaseline': False,
+              'note': 'This validates the exact current compiled ROM and generated 6v6 trainer data. Controller-driven full Gym battles and save-fixed A/B/C selection remain separate future runtime tests.'
           }
           out.mkdir(exist_ok=True)
           (out / 'gym_test_regression_report.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
           PY
 
-      - name: Upload Gym regression evidence
+      - name: Upload current Gym regression evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
