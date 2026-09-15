@@ -119,6 +119,7 @@ SCRIPTS = [
     "localize_tanoby_meadow_v3_122.py",
     "localize_cerulean_houses_warden_v3_123.py",
     "localize_route18_name_rater_v3_124.py",
+    "localize_lavender_fishing_v3_125.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
