@@ -69,7 +69,7 @@ REPLACEMENTS = {
 
 
 def block_bounds(text: str, label: str) -> tuple[int, int, str]:
-    matches = list(re.finditer(rf"(?m)^{re.escape(label)}::\\s*$", text))
+    matches = list(re.finditer(rf"(?m)^{re.escape(label)}::\s*$", text))
     if len(matches) != 1:
         raise SystemExit(f"{MARKER}: {label}: expected exactly one label, found {len(matches)}")
     start = matches[0].start()
