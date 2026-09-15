@@ -25,7 +25,7 @@ FILES = {
         "CeladonCity_Condominiums_1F_Text_TryThisDrinkInstead": "Не стоит тратить все деньги\\nна напитки.\\pПопробуй лучше это.$",
         "CeladonCity_Condominiums_1F_Text_NothingBeatsThirstLikeTea": "Нет ничего лучше горячего\\nЧАЯ, когда мучает жажда.\\pОн и правда лучший.$",
         "CeladonCity_Condominiums_1F_Text_MyDearMonsKeepMeCompany": "Мои дорогие ПОКЕМОНЫ\\nсоставляют мне компанию.\\pMEOWTH даже приносит домой деньги!$",
-        "CeladonCity_Condominiums_1F_Text_DaisyComesToBuyTea": "О, здравствуй, дорогой.\\nТебе понравился мой ЧАЙ?\\pКстати, ты случайно\\nне из ПАЛЛЕТ-ТАУНА?\\pДевушка оттуда, DAISY,\\nпьёт ЧАЙ каждый день.\\pОна приходит в УНИВЕРМАГ CELADON,\\nчтобы купить ЧАЙ.$",
+        "CeladonCity_Condominiums_1F_Text_DaisyComesToBuyTea": "О, здравствуй.\\nТебе понравился мой ЧАЙ?\\pКстати, ты случайно\\nне из ПАЛЛЕТ-ТАУНА?\\pДевушка оттуда, DAISY,\\nпьёт ЧАЙ каждый день.\\pОна приходит в УНИВЕРМАГ CELADON,\\nчтобы купить ЧАЙ.$",
         "CeladonCity_Condominiums_1F_Text_Clefairy": "CLEFAIRY: Пи-пиппиппи!$",
         "CeladonCity_Condominiums_1F_Text_Nidoran": "NIDORAN♀: Кя-кяу!$",
         "CeladonCity_Condominiums_1F_Text_ManagersSuite": "ОСОБНЯК CELADON\\nКомната управляющего$",
