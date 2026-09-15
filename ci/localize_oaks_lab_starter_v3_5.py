@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Qarro integration wrapper: Oak localization + current RU passes + 6v6 test + e normalization.
+"""Qarro integration wrapper: Oak localization + current RU passes + 6v6 test + story bosses + e normalization.
 
 Runs the exact previously-green Oak lab localization from commit 0ddb5e3,
 applies every completed incremental Russian localization pass through the
 single ordered v3.85 manifest, installs the current-canon Kanto 6v6 Variant A
-test rosters, removes the historical 5-of-6 runtime interception, and only
-then normalizes literal é/É to ordinary e/E.
+test rosters, removes the historical 5-of-6 runtime interception, applies the
+two implementation-derived pre-Gym Giovanni story boss teams, and only then
+normalizes literal é/É to ordinary e/E.
 
 The ordering keeps FireRed POKéMON anchors intact until all localization passes
 have consumed them. Ash Bond / Ash Cap are untouched.
@@ -23,6 +24,7 @@ MARKER = "QARRO_POST_LOCALIZATION_E_V3_7"
 INCREMENTAL_RUNNER = "apply_ru_incremental_v3_85.py"
 GYM_SIX_RUNNER = "gym_six_variant_a_v3_86.py"
 GYM_SIX_FINALIZER = "gym_six_finalize_v3_88.py"
+ROCKET_BOSS_RUNNER = "rocket_boss_giovanni_v3_98.py"
 
 
 def load_base(repo: Path) -> dict:
@@ -100,6 +102,11 @@ def main() -> int:
     run_ci_pass(root, GYM_SIX_RUNNER)
     run_ci_pass(root, GYM_SIX_FINALIZER)
 
+    # Strengthen only the two story Giovanni battles. Exact rosters are
+    # implementation-derived; final Gym Giovanni and ordinary Rocket trainers
+    # remain outside this pass.
+    run_ci_pass(root, ROCKET_BOSS_RUNNER)
+
     replacements, changed_files = normalize_accented_e(root)
 
     leftovers = []
@@ -135,6 +142,8 @@ def main() -> int:
             "gymSixFinalizer": GYM_SIX_FINALIZER,
             "gymSixVariantATestApplied": True,
             "legacyFiveOfSixRemoved": True,
+            "rocketBossPass": ROCKET_BOSS_RUNNER,
+            "storyGiovanniImplementationDerived": True,
             "postLocalizationAccentedENormalized": True,
             "accentedEReplacements": replacements,
             "accentedEChangedFiles": changed_files,
@@ -147,7 +156,7 @@ def main() -> int:
     )
 
     print(
-        f"[{MARKER}] PASS: incremental RU + true Kanto 6v6 Variant A applied; "
+        f"[{MARKER}] PASS: incremental RU + true Kanto 6v6 Variant A + story Giovanni bosses applied; "
         f"legacy 5-of-6 removed; {replacements} literal é/É -> e/E replacements "
         f"in {changed_files} files; Ash code untouched"
     )
