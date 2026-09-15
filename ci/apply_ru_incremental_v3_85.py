@@ -84,6 +84,7 @@ SCRIPTS = [
     "localize_vermilion_fanclub_remaining_v3_82.py",
     "localize_ssanne_kitchen_v3_83.py",
     "localize_ssanne_deck_v3_84.py",
+    "localize_routes8_14_v3_87.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
