@@ -73,7 +73,7 @@ jobs:
           test -f baseline/qarro_applied_diff_v3_8.patch
           echo "BUILD_ARTIFACT=$artifact_name" >> "$GITHUB_ENV"
 
-      - name: Five independent current 6v6 and QoL evidence passes
+      - name: Five independent current trainer and QoL evidence passes
         shell: bash
         run: |
           set -euo pipefail
@@ -96,6 +96,10 @@ jobs:
               'TRAINER_LEADER_BLAINE': ['NINETALES', 'ARCANINE', 'RAPIDASH', 'MAGMAR', 'HOUNDOOM', 'MAGCARGO'],
               'TRAINER_LEADER_GIOVANNI': ['NIDOKING', 'NIDOQUEEN', 'RHYDON', 'DUGTRIO', 'DONPHAN', 'HIPPOWDON'],
           }
+          story_giovanni = {
+              'TRAINER_BOSS_GIOVANNI': (4, ['NIDORINO', 'RHYHORN', 'KANGASKHAN', 'NIDOKING']),
+              'TRAINER_BOSS_GIOVANNI_2': (5, ['DUGTRIO', 'NIDOQUEEN', 'RHYDON', 'KANGASKHAN', 'NIDOKING']),
+          }
           banned = {'REGIROCK', 'SUICUNE', 'ZAPDOS', 'VIRIZION', 'DARKRAI', 'MEWTWO', 'MOLTRES', 'GROUDON'}
           approved_mythical = {'CELEBI', 'MEW'}
 
@@ -103,7 +107,12 @@ jobs:
               return json.loads((root / name).read_text(encoding='utf-8'))
 
           def trainer_blocks(text):
-              matches = list(re.finditer(r'^\s*\[(TRAINER_[A-Z0-9_]+)\]\s*=\s*$', text, re.M))
+              # trainerproc currently emits e.g.
+              # [DIFFICULTY_NORMAL][TRAINER_LEADER_BROCK] =
+              # Keep the optional difficulty prefix so the check also survives
+              # older single-dimension generated layouts.
+              rx = re.compile(r'^\s*(?:\[DIFFICULTY_[A-Z0-9_]+\])?\[(TRAINER_[A-Z0-9_]+)\]\s*=\s*$', re.M)
+              matches = list(rx.finditer(text))
               out = {}
               for i, match in enumerate(matches):
                   end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
@@ -115,6 +124,14 @@ jobs:
           diff = diff_path.read_text(encoding='utf-8', errors='replace')
           built = load('qarro_built_rom_v3_12_audit.json')
           expected_sha = built['sha256']
+
+          def species_from(block):
+              return re.findall(r'\.species\s*=\s*SPECIES_([A-Z0-9_]+)', block)
+
+          def require_honest_ai(block, trainer):
+              assert 'AI_FLAG_CHECK_BAD_MOVE' in block, trainer
+              assert 'AI_FLAG_TRY_TO_FAINT' in block, trainer
+              assert 'AI_FLAG_CHECK_VIABILITY' in block, trainer
 
           def one_pass(n):
               rom = rom_path.read_bytes()
@@ -130,10 +147,8 @@ jobs:
                   assert trainer in blocks, trainer
                   block = blocks[trainer]
                   assert '.partySize = 6,' in block, trainer
-                  assert 'AI_FLAG_CHECK_BAD_MOVE' in block, trainer
-                  assert 'AI_FLAG_TRY_TO_FAINT' in block, trainer
-                  assert 'AI_FLAG_CHECK_VIABILITY' in block, trainer
-                  species = re.findall(r'\.species\s*=\s*SPECIES_([A-Z0-9_]+)', block)
+                  require_honest_ai(block, trainer)
+                  species = species_from(block)
                   assert species == expected_species, (trainer, species, expected_species)
                   assert not (set(species) & banned), (trainer, set(species) & banned)
                   mythicals = set(species) & approved_mythical
@@ -143,6 +158,23 @@ jobs:
                       assert mythicals == {'MEW'}, mythicals
                   else:
                       assert not mythicals, (trainer, mythicals)
+
+              for trainer, (size, expected_species) in story_giovanni.items():
+                  assert trainer in blocks, trainer
+                  block = blocks[trainer]
+                  assert f'.partySize = {size},' in block, trainer
+                  require_honest_ai(block, trainer)
+                  species = species_from(block)
+                  assert species == expected_species, (trainer, species, expected_species)
+                  assert not (set(species) & banned), (trainer, set(species) & banned)
+
+              # Verify key competitive implementation details survived trainerproc.
+              g1 = blocks['TRAINER_BOSS_GIOVANNI']
+              g2 = blocks['TRAINER_BOSS_GIOVANNI_2']
+              assert 'ITEM_SILK_SCARF' in g1 and 'ITEM_SOFT_SAND' in g1, 'Giovanni 1 held items'
+              assert 'ABILITY_SHEER_FORCE' in g1, 'Giovanni 1 Sheer Force'
+              assert 'ITEM_FOCUS_SASH' in g2 and 'ITEM_EVIOLITE' in g2 and 'ITEM_LIFE_ORB' in g2, 'Giovanni 2 held items'
+              assert 'ABILITY_ARENA_TRAP' in g2 and 'ABILITY_SHEER_FORCE' in g2, 'Giovanni 2 abilities'
 
               # Final source state must not retain the historical runtime interception.
               assert 'TryCreateQarroFiveOfSixGymParty' not in diff
@@ -183,7 +215,7 @@ jobs:
               assert protected['protectedPathHits'] == 0
               assert protected['protectedDiffLineHits'] == 0
 
-              print(f'PASS current Gym regression {n}: {sha[:16]}...; exact same-commit ROM + 8 Variant-A 6v6 rosters + honest AI flags + QoL + Ash protection OK')
+              print(f'PASS current trainer regression {n}: {sha[:16]}...; exact same-commit ROM + 8 Variant-A 6v6 leaders + 4/5 story Giovanni + honest AI + QoL + Ash protection OK')
 
           for i in range(1, 6):
               one_pass(i)
@@ -217,10 +249,10 @@ jobs:
               cat "$log"
               exit 1
             fi
-            echo "PASS emulator boot smoke $i: current same-commit 6v6 ROM remained running for 12s" | tee -a regression_out/runtime_summary.log
+            echo "PASS emulator boot smoke $i: current same-commit trainer ROM remained running for 12s" | tee -a regression_out/runtime_summary.log
           done
 
-      - name: Write current Gym regression report
+      - name: Write current trainer regression report
         if: always()
         shell: bash
         run: |
@@ -230,22 +262,23 @@ jobs:
           out = Path('regression_out')
           rom = Path('baseline/Qarro_FIRST_PLAYABLE_v3_8.gba')
           report = {
-              'marker': 'QARRO_GYM_TEST_REGRESSION_CURRENT_6V6_20260915',
+              'marker': 'QARRO_TRAINER_REGRESSION_CURRENT_6V6_GIOVANNI_20260915',
               'sourceCommit': os.environ.get('GITHUB_SHA'),
               'sourceBuildRun': int(os.environ['BUILD_RUN_ID']) if os.environ.get('BUILD_RUN_ID') else None,
               'sourceArtifact': os.environ.get('BUILD_ARTIFACT'),
               'romSha256': hashlib.sha256(rom.read_bytes()).hexdigest() if rom.is_file() else None,
               'staticPassesRequested': 5,
               'emulatorBootPassesRequested': 5,
-              'scope': 'exact same-commit FireRed build artifact + 8 Kanto Variant-A 6v6 rosters + current generated trainer data + honest AI flags + QoL/protected evidence + mGBA boot smoke',
+              'scope': 'exact same-commit FireRed build artifact + 8 Kanto Variant-A 6v6 leaders + story Giovanni 4/5 rosters + generated trainer data + honest AI flags + QoL/protected evidence + mGBA boot smoke',
               'legacyFiveOfSixBaseline': False,
-              'note': 'This validates the exact current compiled ROM and generated 6v6 trainer data. Controller-driven full Gym battles and save-fixed A/B/C selection remain separate future runtime tests.'
+              'storyGiovanniImplementationDerived': True,
+              'note': 'Validates the exact current compiled ROM and generated trainer data. Controller-driven full battles and save-fixed Gym A/B/C selection remain separate future runtime tests.'
           }
           out.mkdir(exist_ok=True)
           (out / 'gym_test_regression_report.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
           PY
 
-      - name: Upload current Gym regression evidence
+      - name: Upload current trainer regression evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
