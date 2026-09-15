@@ -2,13 +2,13 @@
 """Qarro v3.104: safely apply the quarantined Resort/Fuchsia/Cerulean RU pass.
 
 v3.103 contains the intended 66 translations, but its Python string literals
-turn ``\n`` into physical LF characters before writing assembler strings.  That
+turn ``\n`` into physical LF characters before writing assembler strings. That
 can split a FireRed ``.string`` across source lines and make the ARM build fail.
 
 This wrapper keeps v3.103 quarantined, loads its exact translation table, and
 replaces only its assembler serializer so physical newlines become one literal
 FireRed ``\n`` control code. Existing ``\p``/``\l`` codes are deliberately not
-doubled. Pokémon species, Move and Ability proper names remain English.
+doubled. Pokemon species, Move and Ability proper names remain English.
 Gameplay/trainer data and Ash Bond/Ash Cap are untouched.
 """
 from __future__ import annotations
@@ -50,7 +50,7 @@ def load_legacy_module():
     return module
 
 
-def validate_output(root: Path) -> dict[str, int]:
+def validate_output(root: Path, legacy) -> dict[str, int]:
     translated_by_file: dict[str, int] = {}
     total = 0
     for rel in TARGETS:
@@ -58,6 +58,7 @@ def validate_output(root: Path) -> dict[str, int]:
         if not path.is_file():
             die(f"missing translated target: {rel}")
         text = path.read_text(encoding="utf-8")
+
         # Every assembler string must open and close on the same physical line.
         for lineno, line in enumerate(text.splitlines(), start=1):
             if ".string \"" in line and line.count('"') < 2:
@@ -67,7 +68,7 @@ def validate_output(root: Path) -> dict[str, int]:
         if not re.search(r"[А-Яа-яЁё]", text):
             die(f"{rel}: expected Cyrillic output is missing")
 
-        patches = getattr(load_legacy_module(), "FILES", {}).get(rel)
+        patches = getattr(legacy, "FILES", {}).get(rel)
         if patches is None:
             die(f"{rel}: target missing from v3.103 translation table")
         translated_by_file[str(rel)] = len(patches)
@@ -92,7 +93,7 @@ def main() -> int:
     if rc != 0:
         die(f"v3.103 translation source returned {rc}")
 
-    translated_by_file = validate_output(root)
+    translated_by_file = validate_output(root, legacy)
     audit = root / "build" / "qarro_ru_resort_fuchsia_cerulean_v3_104_audit.json"
     audit.parent.mkdir(parents=True, exist_ok=True)
     audit.write_text(
@@ -118,7 +119,7 @@ def main() -> int:
     )
     print(
         f"[{MARKER}] PASS: safely serialized {EXPECTED} runtime blocks; "
-        "physical LF -> FireRed \\n; v3.103 remains quarantined; Ash code untouched"
+        "physical line breaks normalized; v3.103 remains quarantined; Ash code untouched"
     )
     return 0
 
