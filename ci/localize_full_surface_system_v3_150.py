@@ -16,7 +16,7 @@ TARGETS = {
         'gText_PresentTime': ('Present time in game', 'Текущее время в игре'),
         'gText_PreviousTime': ('Previous time in game', 'Предыдущее время в игре'),
         'gText_PleaseResetTime': ('Please reset the time.', 'Установи время заново.'),
-        'gText_TrainerCardIDNo': ('IDNo.', 'ИД№'),
+        'gText_TrainerCardIDNo': ('IDNo.', 'ИД No.'),
         'gText_WinsLosses': ('W:{COLOR RED}{SHADOW LIGHT_RED}{STR_VAR_1}{COLOR DARK_GRAY}{SHADOW LIGHT_GRAY}  L:{COLOR RED}{SHADOW LIGHT_RED}{STR_VAR_2}{COLOR DARK_GRAY}{SHADOW LIGHT_GRAY}', 'В:{COLOR RED}{SHADOW LIGHT_RED}{STR_VAR_1}{COLOR DARK_GRAY}{SHADOW LIGHT_GRAY}  П:{COLOR RED}{SHADOW LIGHT_RED}{STR_VAR_2}{COLOR DARK_GRAY}{SHADOW LIGHT_GRAY}'),
         'gText_UnionTradesAndBattles': ('UNION TRADES & BATTLES', 'UNION: ОБМЕНЫ И БОИ'),
         'gText_WonContestsWFriends': ('WON CONTESTS W/FRIENDS', 'ПОБЕДЫ В КОНКУРСАХ С ДРУЗ.'),
