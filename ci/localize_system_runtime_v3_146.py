@@ -166,7 +166,7 @@ def decode_body(body: str) -> str:
     return ''.join(vals)
 
 def encode_body(text: str) -> str:
-    return '"' + text.replace('"','\\"') + '"'
+    return '"' + text.replace('\\', '\\\\').replace('"','\\"').replace('\n', '\\n') + '"'
 
 def brace_tokens(s: str):
     return TOKEN_RE.findall(s)
