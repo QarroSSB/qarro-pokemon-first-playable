@@ -124,6 +124,7 @@ SCRIPTS = [
     "localize_celadon_condominiums_v3_127.py",
     "localize_museum_lab_chansey_v3_128.py",
     "localize_dept_research_lorelei_v3_129.py",
+    "localize_residual_runtime_v3_133.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
