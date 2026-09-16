@@ -10,7 +10,7 @@ Pokemon species, Move and Ability names remain English by project canon.
 Gameplay/trainer/reward/inventory/flag logic and Ash Bond/Ash Cap are untouched.
 """
 from __future__ import annotations
-import base64,json,re,sys,zlib
+import base64,json,re,subprocess,sys,zlib
 from pathlib import Path
 MARKER="QARRO_RU_RESIDUAL_RUNTIME_V3_143"
 LABEL_RE=re.compile(r"(?m)^([A-Za-z0-9_]+)::\s*$")
@@ -101,5 +101,10 @@ def main():
         "ashCapTouched":False
     },ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
     print(f"[{MARKER}] PASS: translated {total} ordinary labels + Pallet conditional block; expected audit {EXPECTED_PRE_BLOCKS} -> {EXPECTED_POST_BLOCKS}")
+    next_script = Path(__file__).resolve().with_name("localize_residual_runtime_v3_144.py")
+    if not next_script.is_file():
+        die(f"missing chained localization pass: {next_script.name}")
+    subprocess.run([sys.executable, str(next_script), str(root)], check=True)
+    print(f"[{MARKER}] CHAIN PASS: applied {next_script.name}")
     return 0
 if __name__=="__main__": raise SystemExit(main())
