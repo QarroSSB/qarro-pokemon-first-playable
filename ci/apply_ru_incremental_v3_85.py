@@ -126,6 +126,7 @@ SCRIPTS = [
     "localize_dept_research_lorelei_v3_129.py",
     "localize_residual_runtime_v3_133.py",
     "localize_residual_runtime_v3_134.py",
+    "localize_residual_runtime_v3_135.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
