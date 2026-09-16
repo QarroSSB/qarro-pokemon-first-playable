@@ -6,10 +6,10 @@ point against the actual FIRST PLAYABLE source state: Champion postgame owns
 trainer IDs 624..643 and content v3.1 owns 644..648, so the sixteen private B/C
 party records must occupy 649..664 and TRAINERS_COUNT_FRLG becomes 665.
 
-The runtime state uses one genuinely-unused FireRed save var, 0x40F7.  It stores
-eight 2-bit Gym states: 00=uninitialized, 01=A, 10=B, 11=C.  First encounter
+The runtime state uses one genuinely-unused FireRed save var, 0x40F7. It stores
+eight 2-bit Gym states: 00=uninitialized, 01=A, 10=B, 11=C. First encounter
 derives the choice deterministically from the save OTID and Gym index, then
-persists it.  Defeat/reset therefore cannot be used to reroll the team.
+persists it. Defeat/reset therefore cannot be used to reroll the team.
 
 Original story Leader IDs remain Variant A; maps, defeat flags, rematches, E4,
 Champion, localization/font, Ash Bond and Ash Cap remain outside this pass.
@@ -231,6 +231,64 @@ def patch_opponents(module: object, path: Path) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def patch_battle_setup(module: object, path: Path) -> None:
+    text = module.read(path)
+    begin_marker = "QARRO_KANTO_GYM_ABC_V3_132_BEGIN"
+    if begin_marker in text or "QARRO_KANTO_GYM_STATE_VAR" in text:
+        die("v3.132 runtime selector already present; refusing duplicate installation")
+
+    signature = "static void CreateNPCTrainerParty(struct Pokemon *party, u16 trainerNum)"
+    if text.count(signature) != 2:
+        # One forward declaration plus one function definition is the pinned contract.
+        die(f"CreateNPCTrainerParty signature count drifted: {text.count(signature)}")
+
+    # Select the definition, not the forward declaration.
+    start = text.find(signature + "\n{")
+    if start < 0:
+        die("CreateNPCTrainerParty definition missing")
+    brace = text.find("{", start + len(signature))
+    if brace < 0:
+        die("CreateNPCTrainerParty opening brace missing")
+
+    depth = 0
+    end = -1
+    for i in range(brace, len(text)):
+        char = text[i]
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                end = i + 1
+                break
+    if end < 0:
+        die("CreateNPCTrainerParty closing brace missing")
+
+    old = text[start:end]
+    required = (
+        "if (!GetTrainerStructFromId(trainerNum)->overrideTrainer)",
+        "CreateNPCTrainerPartyFromTrainer(party, GetTrainerStructFromId(trainerNum));",
+        "memcpy(&tempTrainer, GetTrainerStructFromId(trainerNum), sizeof(struct Trainer));",
+        "const struct Trainer *origTrainer = GetTrainerStructFromId(tempTrainer.overrideTrainer);",
+        "tempTrainer.party = origTrainer->party;",
+        "tempTrainer.poolSize = origTrainer->poolSize;",
+        "if (tempTrainer.partySize == 0)",
+        "tempTrainer.partySize = origTrainer->partySize;",
+        "CreateNPCTrainerPartyFromTrainer(party, (const struct Trainer *)(&tempTrainer));",
+    )
+    missing = [token for token in required if token not in old]
+    if missing:
+        die(f"native CreateNPCTrainerParty semantic anchors drifted: missing={missing}")
+
+    replacement = SELECTOR_CREATE_PARTY.rstrip()
+    text = text[:start] + replacement + text[end:]
+    if text.count("QARRO_KANTO_GYM_ABC_V3_132_BEGIN") != 1:
+        die("selector installation marker verification failed")
+    if text.count(signature) != 2:
+        die("CreateNPCTrainerParty count changed unexpectedly after selector installation")
+    path.write_text(text, encoding="utf-8")
+
+
 def main() -> int:
     if len(sys.argv) != 2:
         print(f"usage: {Path(sys.argv[0]).name} <upstream-root>", file=sys.stderr)
@@ -249,9 +307,7 @@ def main() -> int:
     validate_save_var(root)
     patch_opponents(module, opponents_path)
     variants = module.patch_parties(party_path)
-
-    module.SELECTOR_CREATE_PARTY = SELECTOR_CREATE_PARTY
-    module.patch_battle_setup(battle_setup)
+    patch_battle_setup(module, battle_setup)
 
     opponents = module.read(opponents_path)
     if not re.search(
