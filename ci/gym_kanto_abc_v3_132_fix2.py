@@ -1,24 +1,33 @@
 #!/usr/bin/env python3
-"""Qarro v3.132 fix2: use one genuinely-unused packed FireRed save var.
+"""Qarro v3.132 fix2: final Kanto A/B/C with safe IDs and one packed save var.
 
-The base v3.132 team data and private trainer IDs remain unchanged.  Only the
-save-state implementation is replaced: FireRed var 0x40F7 stores eight 2-bit
-Gym states, one per Kanto story Gym.
+Reuses the final v3.132 Kanto B/C roster/build data, but fixes the integration
+point against the actual FIRST PLAYABLE source state: Champion postgame owns
+trainer IDs 624..643 and content v3.1 owns 644..648, so the sixteen private B/C
+party records must occupy 649..664 and TRAINERS_COUNT_FRLG becomes 665.
 
-Per Gym: 00 = uninitialized, 01 = Variant A, 10 = Variant B, 11 = Variant C.
-Thus one u16 stores both initialization and chosen variant for all eight Gyms.
-The first encounter derives A/B/C deterministically from the save OTID and Gym
-index, then persists variant+1. A reset before saving re-derives the same value,
-so resets cannot reroll the opponent.
+The runtime state uses one genuinely-unused FireRed save var, 0x40F7.  It stores
+eight 2-bit Gym states: 00=uninitialized, 01=A, 10=B, 11=C.  First encounter
+derives the choice deterministically from the save OTID and Gym index, then
+persists it.  Defeat/reset therefore cannot be used to reroll the team.
+
+Original story Leader IDs remain Variant A; maps, defeat flags, rematches, E4,
+Champion, localization/font, Ash Bond and Ash Cap remain outside this pass.
 """
 from __future__ import annotations
 
 import importlib.util
+import json
+import re
 import sys
 from pathlib import Path
 
 MARKER = "QARRO_KANTO_GYM_ABC_V3_132_FIX2"
 SAVE_VAR = "0x40F7"
+FIRST_NEW_TRAINER_ID = 649
+LAST_NEW_TRAINER_ID = 664
+EXPECTED_TRAINERS_COUNT = 649
+NEW_TRAINERS_COUNT = 665
 
 SELECTOR_CREATE_PARTY = r"""// QARRO_KANTO_GYM_ABC_V3_132_BEGIN
 #define QARRO_KANTO_GYM_STATE_VAR 0x40F7
@@ -172,38 +181,130 @@ def validate_save_var(root: Path) -> None:
         die(f"save var 0x40F7 has runtime references: {hits}")
 
 
+def load_base() -> object:
+    base_script = Path(__file__).resolve().with_name("gym_kanto_abc_v3_132.py")
+    if not base_script.is_file():
+        die(f"base v3.132 script missing: {base_script}")
+    spec = importlib.util.spec_from_file_location("qarro_gym_kanto_abc_v3_132_base", base_script)
+    if spec is None or spec.loader is None:
+        die("could not load base v3.132 module")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def patch_opponents(module: object, path: Path) -> None:
+    text = module.read(path)
+    if module.MARKER in text or "TRAINER_QARRO_BROCK_B" in text:
+        die("v3.132 trainer constants already present; refusing duplicate installation")
+
+    count_match = re.search(r"(?m)^#define\s+TRAINERS_COUNT_FRLG\s+(\d+)\s*$", text)
+    if not count_match:
+        die("TRAINERS_COUNT_FRLG missing")
+    current_count = int(count_match.group(1))
+    if current_count != EXPECTED_TRAINERS_COUNT:
+        die(f"expected TRAINERS_COUNT_FRLG={EXPECTED_TRAINERS_COUNT}, got {current_count}")
+    if not re.search(r"(?m)^#define\s+MAX_TRAINERS_COUNT_FRLG\s+768\s*$", text):
+        die("MAX_TRAINERS_COUNT_FRLG drifted; refusing to consume trainer flag space")
+
+    numeric_ids = [
+        int(m.group(1))
+        for m in re.finditer(r"(?m)^#define\s+TRAINER_[A-Z0-9_]+\s+(\d+)\s*$", text)
+    ]
+    if not numeric_ids or max(numeric_ids) != FIRST_NEW_TRAINER_ID - 1:
+        die(
+            f"trainer ID extension point drifted: expected last numeric ID "
+            f"{FIRST_NEW_TRAINER_ID - 1}, got {max(numeric_ids) if numeric_ids else 'missing'}"
+        )
+
+    define_lines = [
+        f"#define {name:<48} {FIRST_NEW_TRAINER_ID + i}"
+        for i, name in enumerate(module.TRAINER_ID_ORDER)
+    ]
+    insertion = (
+        "// QARRO_KANTO_GYM_ABC_V3_132 trainer-only B/C party records\n"
+        + "\n".join(define_lines)
+        + "\n"
+        + f"#define TRAINERS_COUNT_FRLG                      {NEW_TRAINERS_COUNT}"
+    )
+    text = text[:count_match.start()] + insertion + text[count_match.end():]
+    path.write_text(text, encoding="utf-8")
+
+
 def main() -> int:
     if len(sys.argv) != 2:
         print(f"usage: {Path(sys.argv[0]).name} <upstream-root>", file=sys.stderr)
         return 2
 
     root = Path(sys.argv[1]).resolve()
+    module = load_base()
+
+    party_path = root / "src/data/trainers_frlg.party"
+    opponents_path = root / "include/constants/opponents_frlg.h"
+    battle_setup = root / "src/battle_setup.c"
+    for path in (party_path, opponents_path, battle_setup):
+        if not path.is_file():
+            die(f"required source missing: {path}")
+
     validate_save_var(root)
+    patch_opponents(module, opponents_path)
+    variants = module.patch_parties(party_path)
 
-    base_script = Path(__file__).resolve().with_name("gym_kanto_abc_v3_132.py")
-    if not base_script.is_file():
-        die(f"base v3.132 script missing: {base_script}")
-
-    spec = importlib.util.spec_from_file_location("qarro_gym_kanto_abc_v3_132_base", base_script)
-    if spec is None or spec.loader is None:
-        die("could not load base v3.132 module")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-
-    # The dedicated validation above proves 0x40F7 is unused across this pinned
-    # source. Prevent the base two-var validator from testing the retired slots.
-    module.validate_free_save_vars = lambda _root: None
     module.SELECTOR_CREATE_PARTY = SELECTOR_CREATE_PARTY
-    module.VARIANT_BITS_VAR = SAVE_VAR
-    module.VARIANT_INIT_VAR = "embedded: 00/01/10/11 state in the same 0x40F7 u16"
+    module.patch_battle_setup(battle_setup)
 
-    rc = int(module.main() or 0)
-    if rc == 0:
-        print(
-            f"[{MARKER}] PASS: base v3.132 teams/IDs retained; one-u16 0x40F7 selector "
-            "stores 8 independent uninitialized/A/B/C states"
-        )
-    return rc
+    opponents = module.read(opponents_path)
+    if not re.search(
+        rf"(?m)^#define\s+TRAINERS_COUNT_FRLG\s+{NEW_TRAINERS_COUNT}\s*$",
+        opponents,
+    ):
+        die(f"post-write trainer count is not {NEW_TRAINERS_COUNT}")
+    for i, name in enumerate(module.TRAINER_ID_ORDER):
+        wanted = FIRST_NEW_TRAINER_ID + i
+        if not re.search(rf"(?m)^#define\s+{re.escape(name)}\s+{wanted}\s*$", opponents):
+            die(f"missing exact trainer id {name}={wanted}")
+
+    selector_text = module.read(battle_setup)
+    if selector_text.count("QARRO_KANTO_GYM_STATE_VAR 0x40F7") != 1:
+        die("single-var selector postcondition failed")
+    if "0x40BD" in selector_text or "0x40BE" in selector_text:
+        die("retired two-var selector constants leaked into runtime source")
+
+    audit = {
+        "marker": MARKER,
+        "battleMode": "Kanto story Gym 6v6 A/B/C",
+        "storyLeaderCount": 8,
+        "newPartyOnlyTrainerRecords": 16,
+        "newTrainerIdRange": [FIRST_NEW_TRAINER_ID, LAST_NEW_TRAINER_ID],
+        "trainersCountBefore": EXPECTED_TRAINERS_COUNT,
+        "trainersCountAfter": NEW_TRAINERS_COUNT,
+        "selector": {
+            "stateVar": SAVE_VAR,
+            "selection": "save-OTID-derived A/B/C on first story-Leader party creation",
+            "persistence": "one packed u16; per-Gym 00/01/10/11 state; deterministic fallback prevents reset reroll",
+            "storedEncoding": {"uninitialized": 0, "A": 1, "B": 2, "C": 3},
+        },
+        "variantRecords": variants,
+        "originalStoryLeaderIdsRemainVariantA": True,
+        "rematchesTouched": False,
+        "eliteFourTouched": False,
+        "championTouched": False,
+        "localizationTouched": False,
+        "fontTouched": False,
+        "ashBondTouched": False,
+        "ashCapTouched": False,
+    }
+    out = root / "build/qarro_kanto_gym_abc_v3_132_audit.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(audit, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    print(
+        f"[{MARKER}] PASS: 8 Kanto story Leaders use save-fixed A/B/C 6v6; "
+        f"16 B/C records installed at IDs {FIRST_NEW_TRAINER_ID}-{LAST_NEW_TRAINER_ID}; "
+        f"TRAINERS_COUNT_FRLG={NEW_TRAINERS_COUNT}; one-var 0x40F7 persistence; "
+        "rematches/E4/Champion/Ash untouched"
+    )
+    return 0
 
 
 if __name__ == "__main__":
