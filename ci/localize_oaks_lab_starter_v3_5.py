@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Qarro integration wrapper: localization + 6v6 Gym baseline + story bosses + Kanto League + e normalization.
+"""Qarro integration wrapper: localization + final Kanto Gym A/B/C + story bosses + Kanto League + e normalization.
 
 Runs the exact previously-green Oak lab localization from commit 0ddb5e3,
 applies every completed incremental Russian localization pass through the
-single ordered v3.85 manifest, installs the current-canon Kanto 6v6 Variant A
-test rosters, removes the historical 5-of-6 runtime interception, applies the
-two implementation-derived pre-Gym Giovanni story boss teams, installs the
+single ordered v3.85 manifest, establishes the green Kanto 6v6 Variant-A
+baseline, removes the historical 5-of-6 runtime interception, upgrades the eight
+story Gyms to final save-fixed A/B/C 6v6 selection, applies the two
+implementation-derived pre-Gym Giovanni story boss teams, installs the
 final-canon Kanto Elite Four and Champion first-clear 6v6 builds, and only then
 normalizes literal é/É to ordinary e/E.
 
@@ -25,6 +26,7 @@ MARKER = "QARRO_POST_LOCALIZATION_E_V3_7"
 INCREMENTAL_RUNNER = "apply_ru_incremental_v3_85.py"
 GYM_SIX_RUNNER = "gym_six_variant_a_v3_86.py"
 GYM_SIX_FINALIZER = "gym_six_finalize_v3_88.py"
+KANTO_GYM_ABC_RUNNER = "gym_kanto_abc_v3_132.py"
 ROCKET_BOSS_RUNNER = "rocket_boss_giovanni_v3_98.py"
 KANTO_E4_BOSS_RUNNER = "boss_kanto_e4_first_v3_130.py"
 KANTO_CHAMPION_BOSS_RUNNER = "boss_kanto_champion_first_v3_131.py"
@@ -101,9 +103,11 @@ def main() -> int:
     # Apply translations while original POKéMON anchors still exist.
     run_ci_pass(root, INCREMENTAL_RUNNER)
 
-    # Establish a real six-Pokemon battle path before adding final A/B/C state.
+    # Establish the known-green six-Pokemon baseline, then layer the final
+    # save-fixed A/B/C selector without changing the eight story Leader IDs.
     run_ci_pass(root, GYM_SIX_RUNNER)
     run_ci_pass(root, GYM_SIX_FINALIZER)
+    run_ci_pass(root, KANTO_GYM_ABC_RUNNER)
 
     # Strengthen only the two story Giovanni battles. Exact rosters are
     # implementation-derived; final Gym Giovanni and ordinary Rocket trainers
@@ -154,6 +158,9 @@ def main() -> int:
             "gymSixFinalizer": GYM_SIX_FINALIZER,
             "gymSixVariantATestApplied": True,
             "legacyFiveOfSixRemoved": True,
+            "kantoGymABCPass": KANTO_GYM_ABC_RUNNER,
+            "kantoGymABC6v6Applied": True,
+            "kantoGymSaveFixedSelector": True,
             "rocketBossPass": ROCKET_BOSS_RUNNER,
             "storyGiovanniImplementationDerived": True,
             "kantoEliteFourBossPass": KANTO_E4_BOSS_RUNNER,
@@ -173,7 +180,7 @@ def main() -> int:
     )
 
     print(
-        f"[{MARKER}] PASS: incremental RU + true Kanto 6v6 Variant A + story Giovanni bosses + "
+        f"[{MARKER}] PASS: incremental RU + final Kanto 6v6 A/B/C + story Giovanni bosses + "
         f"Kanto Elite Four + Champion first-clear canon applied; legacy 5-of-6 removed; "
         f"{replacements} literal é/É -> e/E replacements in {changed_files} files; Ash code untouched"
     )
