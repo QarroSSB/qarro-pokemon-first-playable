@@ -7,6 +7,9 @@ cry/name) from untranslated-dialogue totals. Also inventories English-only text
 outside maps: FRLG/common data text, scripts, core UI/system C strings, and
 item/ability/move/Pokedex description data. Pokemon/Move/Ability proper names
 are classified separately and are not translation defects by project canon.
+
+Analysis-branch note: fullSurface.candidates is intentionally exported in full
+rather than truncated to 2000, so donor-ROM matching can include short UI text.
 """
 from __future__ import annotations
 import ast, json, re, sys
@@ -214,14 +217,15 @@ def main() -> int:
         "filesWithCandidates":len({x['file'] for x in broad}),
         "byKind":dict(sorted(by_kind.items(),key=lambda kv:(-kv[1],kv[0]))),
         "byFile":dict(sorted(by_file.items(),key=lambda kv:(-kv[1],kv[0]))),
-        "candidates":broad[:2000],
-        "allowedEnglishProperNames":allowed[:1000],
+        "candidates":broad,
+        "allowedEnglishProperNames":allowed,
+        "fullCandidateExport":True,
       },
       "readOnly":True,"ashBondTouched":False,"ashCapTouched":False,
     }
     out=root/"build"/"qarro_ru_runtime_surface_v3_21_audit.json"; out.parent.mkdir(parents=True,exist_ok=True)
     out.write_text(json.dumps(report,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
-    print(f"[{MARKER}] PASS: map untranslated dialogue={len(map_candidates)}; known map exclusions={len(map_excluded)}; broader English candidates={len(broad)} across {len({x['file'] for x in broad})} files; Ash untouched")
+    print(f"[{MARKER}] PASS: map untranslated dialogue={len(map_candidates)}; known map exclusions={len(map_excluded)}; broader English candidates={len(broad)} across {len({x['file'] for x in broad})} files; FULL EXPORT; Ash untouched")
     for x in broad[:25]: print(f"[{MARKER}] FULL {x['file']}:{x['line']} {x['kind']}: {x['preview'][:120]}")
     return 0
 if __name__=="__main__": raise SystemExit(main())
