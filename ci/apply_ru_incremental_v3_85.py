@@ -123,6 +123,7 @@ SCRIPTS = [
     "localize_lavender_move_deleter_heracross_v3_126.py",
     "localize_celadon_condominiums_v3_127.py",
     "localize_museum_lab_chansey_v3_128.py",
+    "localize_dept_research_lorelei_v3_129.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
