@@ -135,6 +135,7 @@ SCRIPTS = [
     "localize_residual_runtime_v3_143.py",
     "localize_system_runtime_accentfix_v3_145.py",
     "localize_system_runtime_v3_146.py",
+    "localize_full_surface_system_v3_147.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
