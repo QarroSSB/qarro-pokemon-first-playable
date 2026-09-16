@@ -1,0 +1,64 @@
+name: Analysis vanilla FireRed symbols
+
+on:
+  push:
+    branches:
+      - analysis/vanilla-fr-symbols-20260916
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-symbol-map:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential binutils-arm-none-eabi git libpng-dev
+
+      - name: Checkout vanilla pokefirered and agbcc
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth=1 https://github.com/pret/pokefirered.git vanilla
+          git clone --depth=1 https://github.com/pret/agbcc.git agbcc
+
+      - name: Build and install agbcc
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd agbcc
+          ./build.sh
+          ./install.sh ../vanilla
+
+      - name: Build exact FireRed symbol map
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C vanilla -j2
+          test -s vanilla/pokefirered.map
+          echo 'symbol map generated'
+          grep -E 'gText_(Summary5|SendOut|WelcomeToHOF|NewGame)' vanilla/pokefirered.map | head -n 20 || true
+
+      - name: Preserve map only
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          cp vanilla/pokefirered.map out/
+          if [ -f vanilla/pokefirered.sym ]; then cp vanilla/pokefirered.sym out/; fi
+          if [ -f vanilla/pokefirered.elf ]; then arm-none-eabi-nm -n vanilla/pokefirered.elf > out/pokefirered.nm; fi
+          sha1sum vanilla/pokefirered.gba > out/build_sha1.txt
+          rm -f vanilla/pokefirered.gba
+
+      - name: Upload symbol evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: vanilla-firered-symbol-map
+          retention-days: 7
+          path: out/**
