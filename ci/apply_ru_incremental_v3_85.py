@@ -139,6 +139,7 @@ SCRIPTS = [
     "localize_full_surface_system_v3_148.py",
     "localize_cable_club_help_v3_149.py",
     "localize_full_surface_system_v3_150.py",
+    "localize_full_surface_system_v3_151.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
