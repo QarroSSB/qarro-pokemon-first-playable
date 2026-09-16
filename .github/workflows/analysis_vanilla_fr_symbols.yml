@@ -45,14 +45,61 @@ jobs:
           echo 'symbol map generated'
           grep -E 'gText_(Summary5|SendOut|WelcomeToHOF|NewGame)' vanilla/pokefirered.map | head -n 20 || true
 
-      - name: Preserve map only
+      - name: Export text pointer references
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p out
+          arm-none-eabi-nm -n vanilla/pokefirered.elf > out/pokefirered.nm
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import struct
+
+          rom = Path('vanilla/pokefirered.gba').read_bytes()
+          lines = Path('out/pokefirered.nm').read_text(encoding='utf-8', errors='replace').splitlines()
+          symbols = []
+          rx = re.compile(r'^([0-9A-Fa-f]{8})\s+\S\s+((?:gText_|sText_)[A-Za-z0-9_]+)$')
+          for line in lines:
+              m = rx.match(line.strip())
+              if not m:
+                  continue
+              addr = int(m.group(1), 16)
+              if 0x08000000 <= addr < 0x09000000:
+                  symbols.append((m.group(2), addr))
+
+          out = ['symbol\taddress\tref_count\tref_offsets']
+          referenced = 0
+          total_refs = 0
+          for name, addr in symbols:
+              needle = struct.pack('<I', addr)
+              refs = []
+              start = 0
+              while True:
+                  pos = rom.find(needle, start)
+                  if pos < 0:
+                      break
+                  refs.append(pos)
+                  start = pos + 1
+              if refs:
+                  referenced += 1
+                  total_refs += len(refs)
+              out.append(f'{name}\t0x{addr:08X}\t{len(refs)}\t' + ','.join(f'0x{x:X}' for x in refs))
+
+          Path('out/text_pointer_refs.tsv').write_text('\n'.join(out) + '\n', encoding='utf-8')
+          Path('out/text_pointer_summary.txt').write_text(
+              f'text_symbols={len(symbols)}\nreferenced_symbols={referenced}\ntotal_refs={total_refs}\n',
+              encoding='utf-8',
+          )
+          print(f'text symbols: {len(symbols)}; referenced: {referenced}; refs: {total_refs}')
+          PY
+
+      - name: Preserve map and pointer evidence only
+        shell: bash
+        run: |
+          set -euo pipefail
           cp vanilla/pokefirered.map out/
           if [ -f vanilla/pokefirered.sym ]; then cp vanilla/pokefirered.sym out/; fi
-          if [ -f vanilla/pokefirered.elf ]; then arm-none-eabi-nm -n vanilla/pokefirered.elf > out/pokefirered.nm; fi
           sha1sum vanilla/pokefirered.gba > out/build_sha1.txt
           rm -f vanilla/pokefirered.gba
 
