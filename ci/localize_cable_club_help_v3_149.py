@@ -79,11 +79,12 @@ REPLACEMENTS = {
 LABEL_RE = re.compile(r"(?m)^([A-Za-z0-9_]+)::\n")
 
 def escape_asm(s: str) -> str:
-    return s.replace('\\', '\\\\').replace('"', '\\"')
+    # Preserve FireRed text escapes (\\n / \\p / \\l); only C/ASM-quote escaping is needed here.
+    return s.replace('"', '\\"')
 
 def main() -> int:
     if len(sys.argv) != 2:
-        raise SystemExit("usage: localize_cable_club_info_v3_149.py <upstream-root>")
+        raise SystemExit("usage: localize_cable_club_help_v3_149.py <upstream-root>")
     root = Path(sys.argv[1]).resolve()
     path = root / REL
     text = path.read_text(encoding="utf-8")
@@ -106,7 +107,7 @@ def main() -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({"marker": MARKER, "file": str(REL), "translated": applied,
                                "ashBondAshCapTouched": False}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"[{MARKER}] PASS: translated {len(applied)} Cable Club help blocks; Ash Bond/Ash Cap untouched")
+    print(f"[{MARKER}] PASS: translated {len(applied)} Cable Club help blocks; FireRed text escapes preserved; Ash Bond/Ash Cap untouched")
     return 0
 
 if __name__ == "__main__":
