@@ -143,6 +143,7 @@ SCRIPTS = [
     "localize_full_surface_system_v3_152.py",
     "localize_full_surface_system_v3_153.py",
     "localize_save_pc_v3_154.py",
+    "localize_move_relearner_nurse_v3_155.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
