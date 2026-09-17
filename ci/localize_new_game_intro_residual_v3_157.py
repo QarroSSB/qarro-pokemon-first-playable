@@ -5,9 +5,12 @@ Targets only the three English-only FRLG adventure-intro pages confirmed by RU
 runtime audit #283 and pinned upstream e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7.
 Text-only pass: no gameplay, trainer, reward, Gym, EXP Share, Ash Bond or Ash Cap
 logic is touched. Pokemon/Move/Ability proper-name policy remains unchanged.
+
+After its own fail-closed pass, this activation revision chains the separately
+staged v3.158 low-risk party/runtime residual pass.
 """
 from __future__ import annotations
-import json, re, sys
+import json, re, subprocess, sys
 from pathlib import Path
 
 MARKER = "QARRO_RU_NEW_GAME_INTRO_RESIDUAL_V3_157"
@@ -75,6 +78,11 @@ def main() -> int:
     out.write_text(json.dumps({"marker": MARKER, "file": str(REL), "translated": applied,
                                "ashBondAshCapTouched": False}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"[{MARKER}] PASS: translated {len(applied)} confirmed FRLG new-game intro blocks; Ash Bond/Ash Cap untouched")
+
+    next_script = Path(__file__).resolve().parent / "localize_party_runtime_residual_v3_158.py"
+    if not next_script.is_file():
+        raise FileNotFoundError(f"missing staged v3.158 script: {next_script}")
+    subprocess.run([sys.executable, str(next_script), str(root)], check=True)
     return 0
 
 if __name__ == "__main__":
