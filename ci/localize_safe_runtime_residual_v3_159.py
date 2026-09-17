@@ -52,7 +52,16 @@ STRING_RE = re.compile(r'"((?:\\.|[^"\\])*)"', re.S)
 
 
 def c_escape(s: str) -> str:
-    return s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+    """Encode ordinary C whitespace while preserving FireRed text controls."""
+    # FireRed controls such as \p and \l are consumed by the project preprocessor.
+    # Doubling their backslash turns them into an ordinary backslash and breaks
+    # charmap preprocessing (the v3.159 Build #607 failure in src/item_use.c).
+    return (
+        s.replace('"', '\\"')
+        .replace("\r", "\\r")
+        .replace("\n", "\\n")
+        .replace("\t", "\\t")
+    )
 
 
 def decode_c_literal(literal: str) -> str:
