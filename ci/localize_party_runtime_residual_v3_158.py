@@ -23,8 +23,8 @@ REPLACEMENTS = {
             "Нельзя отправить в Бокс покемона,\nкоторый тебе не принадлежит.{PAUSE_UNTIL_PRESS}",
         ),
         "sText_askText": (
-            "It might affect {STR_VAR_1}'s stats.\nAre you sure you want to use it?",
-            "Это может повлиять на параметры {STR_VAR_1}.\nВсе равно использовать?",
+            "Would you like to change {STR_VAR_1}'s\nability to {STR_VAR_2}?",
+            "Сменить способность {STR_VAR_1}\nна {STR_VAR_2}?",
         ),
         "sText_doneText": (
             "{STR_VAR_1}'s stats may have changed due\nto the effects of the {STR_VAR_2}!{PAUSE_UNTIL_PRESS}",
@@ -47,7 +47,6 @@ def c_escape(s: str) -> str:
 def replace_symbol(text: str, symbol: str, old_raw: str, new_raw: str) -> str:
     if TOKEN_RE.findall(old_raw) != TOKEN_RE.findall(new_raw):
         raise RuntimeError(f"token mismatch in {symbol}")
-    # Expansion strings use _("..."); match one declaration only and fail closed.
     pat = re.compile(
         rf"(?m)^(?P<prefix>(?:static\s+)?const\s+u8\s+{re.escape(symbol)}\[\]\s*=\s*_?\()"
         rf"(?P<quote>\"(?:\\.|[^\"\\])*\")(?P<suffix>\);)"
@@ -58,7 +57,6 @@ def replace_symbol(text: str, symbol: str, old_raw: str, new_raw: str) -> str:
     m = matches[0]
     literal = m.group("quote")[1:-1]
     decoded = bytes(literal, "utf-8").decode("unicode_escape") if all(ord(c) < 128 for c in literal) else literal
-    # For the pinned English anchors all source bytes are ASCII; compare exact runtime text.
     if decoded != old_raw:
         raise RuntimeError(f"source drift for {symbol}: {decoded!r}")
     repl = m.group("prefix") + '"' + c_escape(new_raw) + '"' + m.group("suffix")
