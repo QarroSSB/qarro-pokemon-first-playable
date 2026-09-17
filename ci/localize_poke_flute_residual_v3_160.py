@@ -79,8 +79,8 @@ def main() -> int:
     path = root / REL
     text = path.read_text(encoding="utf-8")
     pat = re.compile(
-        rf"(?ms)^(?P<prefix>[ \\t]*(?:static\\s+)?const\\s+u8\\s+{re.escape(SYMBOL)}\\[\\]\\s*=\\s*_?\\()"
-        rf"(?P<body>.*?)(?P<suffix>\\);)"
+        rf"(?ms)^(?P<prefix>[ \t]*(?:static\s+)?const\s+u8\s+{re.escape(SYMBOL)}\[\]\s*=\s*_?\()"
+        rf"(?P<body>.*?)(?P<suffix>\);)"
     )
     matches = list(pat.finditer(text))
     exact = [m for m in matches if decode_c_string_body(m.group("body")) == OLD]
