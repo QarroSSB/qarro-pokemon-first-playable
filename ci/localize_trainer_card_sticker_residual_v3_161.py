@@ -30,7 +30,7 @@ def main() -> int:
     root = Path(sys.argv[1]).resolve()
     path = root / REL
     text = path.read_text(encoding="utf-8")
-    block_re = re.compile(rf"(?ms)^(?P<label>{re.escape(LABEL)}::\n)(?P<body>(?:\s*\.string\s+.*\n)+)")
+    block_re = re.compile(rf"(?ms)^(?P<label>{re.escape(LABEL)}::\n)(?P<body>(?:[ \t]*\.string[^\n]*(?:\n|$))+)")
     matches = list(block_re.finditer(text))
     exact = []
     for m in matches:
