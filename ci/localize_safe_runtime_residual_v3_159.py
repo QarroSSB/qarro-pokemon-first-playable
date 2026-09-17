@@ -28,21 +28,21 @@ REPLACEMENTS = {
             "А?\nITEMFINDER реагирует!\\pГде-то рядом зарыт предмет!{PAUSE_UNTIL_PRESS}",
         ),
         "sText_CantThrowPokeBall_TwoMons": (
-            "Cannot throw a ball!\nThere are two Pokemon out there!\\p",
+            "Cannot throw a ball!\nThere are two Pokémon out there!\\p",
             "Нельзя бросить покебол!\nПеред тобой два покемона!\\p",
         ),
         "sText_CantThrowPokeBall_SemiInvulnerable": (
-            "Cannot throw a ball!\nThere's no Pokemon in sight!\\p",
+            "Cannot throw a ball!\nThere's no Pokémon in sight!\\p",
             "Нельзя бросить покебол!\nПокемона не видно!\\p",
         ),
     },
     Path("src/pokedex.c"): {
         "sText_SearchForPkmnBasedOnParameters": (
-            "Search for POKeMON based on\nselected parameters.",
+            "Search for POKéMON based on\nselected parameters.",
             "Искать ПОКЕМОНОВ по\nвыбранным параметрам.",
         ),
         "sText_ListByFirstLetter": (
-            "List by the first letter in the name.\nSpotted POKeMON only.",
+            "List by the first letter in the name.\nSpotted POKéMON only.",
             "Список по первой букве имени.\nТолько замеченные ПОКЕМОНЫ.",
         ),
     },
