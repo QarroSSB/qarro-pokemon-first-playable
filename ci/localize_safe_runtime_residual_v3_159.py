@@ -55,13 +55,42 @@ def c_escape(s: str) -> str:
     return s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
 
+def decode_c_literal(literal: str) -> str:
+    """Decode only ordinary C escapes and preserve FireRed text escapes verbatim."""
+    out = []
+    i = 0
+    while i < len(literal):
+        ch = literal[i]
+        if ch != "\\" or i + 1 >= len(literal):
+            out.append(ch)
+            i += 1
+            continue
+        nxt = literal[i + 1]
+        if nxt == "n":
+            out.append("\n")
+        elif nxt == "r":
+            out.append("\r")
+        elif nxt == "t":
+            out.append("\t")
+        elif nxt == "\\":
+            out.append("\\")
+        elif nxt == '"':
+            out.append('"')
+        elif nxt == "'":
+            out.append("'")
+        else:
+            # FireRed control escapes such as \p and \l are not Python escapes.
+            out.append("\\" + nxt)
+        i += 2
+    return "".join(out)
+
+
 def decode_c_string_body(body: str) -> str:
     parts = []
     for literal in STRING_RE.findall(body):
+        # Physical source line splices are formatting only.
         literal = literal.replace("\\\r\n", "").replace("\\\n", "")
-        if not all(ord(c) < 128 for c in literal):
-            raise RuntimeError("unexpected non-ASCII text in pinned English anchor")
-        parts.append(bytes(literal, "utf-8").decode("unicode_escape"))
+        parts.append(decode_c_literal(literal))
     return "".join(parts)
 
 
