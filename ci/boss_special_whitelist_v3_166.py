@@ -43,7 +43,9 @@ def seq(block): return [x.split(" @ ",1)[0].strip() for x in block.splitlines() 
 def replace_mon(block, old, new):
     m=list(re.finditer(rf"(?m)^{re.escape(old)}(?: @ [^\n]+)?$", block))
     if len(m)!=1: die(f"{old}: expected one build, got {len(m)}")
-    s=m[0].start(); e=block.find("\n\n", m[0].end()); e=len(block) if e<0 else e
+    s=m[0].start(); e=block.find("\n\n", m[0].end())
+    if e < 0:
+        return block[:s] + new.rstrip() + "\n\n"
     return block[:s]+new.rstrip()+block[e:]
 def patch(text, trainer, before, after, olds):
     s,e,b=block_bounds(text, trainer); cur=seq(b)
