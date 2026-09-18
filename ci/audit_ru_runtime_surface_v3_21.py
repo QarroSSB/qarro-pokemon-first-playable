@@ -28,7 +28,7 @@ KNOWN_MAP_NON_DIALOGUE = {
 }
 
 COMMON_TEXT = {
-    "berries.inc", "move_relearner.inc", "move_tutors.inc", "pc.inc",
+    "move_relearner.inc", "move_tutors.inc", "pc.inc",
     "pc_transfer.inc", "pkmn_center_nurse.inc", "pokedex_rating.inc",
     "save.inc", "trainers.inc",
 }
