@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -107,6 +108,10 @@ def main() -> int:
         "ashCapTouched": False,
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"[{MARKER}] PASS: translated {SYMBOL}; gameplay/logic/Ash untouched")
+    v161 = Path(__file__).resolve().parent / "localize_controls_guide_residual_v3_161.py"
+    if not v161.is_file():
+        raise FileNotFoundError(f"missing staged v3.161 script: {v161}")
+    subprocess.run([sys.executable, str(v161), str(root)], check=True)
     return 0
 
 
