@@ -150,6 +150,7 @@ SCRIPTS = [
     "localize_trainer_card_sticker_residual_v3_161.py",
     "localize_safari_shared_residual_v3_162.py",
     "localize_pokedex_order_residual_v3_163.py",
+    "localize_pokemon_storage_main_menu_v3_164.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
