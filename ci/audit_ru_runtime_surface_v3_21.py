@@ -34,7 +34,6 @@ COMMON_TEXT = {
 }
 COMMON_SCRIPTS = {
     "aide.inc", "day_care.inc", "field_move_scripts.inc", "route23.inc",
-    "safari_zone.inc",
 }
 CORE_C = {
     "strings.c", "battle_message.c", "battle_interface.c", "item_menu.c",
