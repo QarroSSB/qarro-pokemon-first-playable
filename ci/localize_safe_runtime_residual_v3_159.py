@@ -7,7 +7,7 @@ progression, Ash Bond or Ash Cap logic is touched. Pokemon/Move/Ability names
 remain English by policy. Brace/control tokens are preserved exactly.
 """
 from __future__ import annotations
-import json, re, sys
+import json, re, subprocess, sys
 from pathlib import Path
 
 MARKER = "QARRO_RU_SAFE_RUNTIME_RESIDUAL_V3_159"
@@ -152,6 +152,11 @@ def main() -> int:
         "ashCapTouched": False,
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"[{MARKER}] PASS: translated {len(applied)} safe runtime strings; gameplay/logic/Ash untouched")
+
+    v160 = Path(__file__).resolve().parent / "localize_poke_flute_residual_v3_160.py"
+    if not v160.is_file():
+        raise FileNotFoundError(f"missing staged v3.160 script: {v160}")
+    subprocess.run([sys.executable, str(v160), str(root)], check=True)
     return 0
 
 
