@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -143,6 +144,11 @@ def main() -> int:
         "ashCapTouched": False,
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"[{MARKER}] PASS: translated {len(applied)} controls-guide blocks; gameplay/logic/Ash untouched")
+
+    sticker = Path(__file__).resolve().parent / "localize_trainer_card_sticker_residual_v3_161.py"
+    if not sticker.is_file():
+        raise FileNotFoundError(f"missing staged v3.161 sticker script: {sticker}")
+    subprocess.run([sys.executable, str(sticker), str(root)], check=True)
     return 0
 
 
