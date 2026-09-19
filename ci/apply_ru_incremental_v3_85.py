@@ -165,6 +165,7 @@ SCRIPTS = [
     "localize_credits_roles_v3_176.py",
     "apply_generated_bulk_ru_v3_177.py",
     "localize_finish_tail_cleanup_v3_178.py",
+    "localize_trainers_quality_route102_104_v3_179.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
