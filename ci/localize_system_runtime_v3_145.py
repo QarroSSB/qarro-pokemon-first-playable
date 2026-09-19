@@ -22,6 +22,16 @@ def patch_symbol(text,symbol,expected,replacement):
     if len(ms)!=1: raise RuntimeError(f'{symbol}: expected one definition, got {len(ms)}')
     m=ms[0]; actual=decode_body(m.group('body'))
     if actual==replacement: return text
+    if re.search(r"[А-Яа-яЁё]", actual):
+        expected_placeholders = re.findall(r"\{[^{}]+\}", expected)
+        actual_placeholders = re.findall(r"\{[^{}]+\}", actual)
+        if actual_placeholders != expected_placeholders:
+            raise RuntimeError(
+                f'{symbol}: already-Cyrillic placeholder drift\\n'
+                f'EXPECTED_PLACEHOLDERS={expected_placeholders!r}\\n'
+                f'ACTUAL_PLACEHOLDERS={actual_placeholders!r}'
+            )
+        return text
     if actual!=expected: raise RuntimeError(f'{symbol}: source drift\\nEXPECTED={expected!r}\\nACTUAL={actual!r}')
     new=m.group('head')+encode_body(replacement)+m.group('tail')
     return text[:m.start()]+new+text[m.end():]
