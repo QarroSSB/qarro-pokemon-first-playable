@@ -1,0 +1,40 @@
+{
+  "targetAsm": {
+    "data/text/trainers.inc": {
+      "blocks": 1145,
+      "translatedBlocks": 1144
+    },
+    "data/text/fame_checker_frlg.inc": {
+      "blocks": 334,
+      "translatedBlocks": 333
+    },
+    "data/text/trainers_frlg.inc": {
+      "blocks": 235,
+      "translatedBlocks": 234
+    },
+    "data/scripts/cable_club_frlg.inc": {
+      "blocks": 86,
+      "translatedBlocks": 71
+    }
+  },
+  "targetC": {
+    "src/data/items.h": {
+      "macroMatches": 855,
+      "translatedMacros": 800
+    },
+    "src/battle_message.c": {
+      "macroMatches": 895,
+      "translatedMacros": 788
+    },
+    "src/strings.c": {
+      "macroMatches": 1066,
+      "translatedMacros": 202
+    }
+  },
+  "canonicalTermCount": 4550,
+  "translationCalls": 5815,
+  "changedUniqueStrings": 3300,
+  "cacheSize": 3359,
+  "preparedSegmentCount": 5815,
+  "placeholderFailures": []
+}
