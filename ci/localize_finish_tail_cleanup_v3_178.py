@@ -35,10 +35,18 @@ def main():
     cleaned = []
 
     trainers = root / "data/text/trainers.inc"
-    replace_once(trainers,
-                 '\t.string "← Мы всегда сражаемся POKeMON,\\nЯ и моя сестра.\\pЯ всегда проигрываю, но мы можем победить тебя.\\n2 на 2!$"',
-                 '\t.string "РЭЙ: Мы всегда сражаемся POKeMON,\\nЯ и моя сестра.\\pЯ всегда проигрываю, но мы можем победить тебя.\\n2 на 2!$"',
-                 "Ray trainer name mistranslated as arrow")
+    ray_arrow = '\t.string "← Мы всегда сражаемся POKeMON,\\nЯ и моя сестра.\\pЯ всегда проигрываю, но мы можем победить тебя.\\n2 на 2!$"'
+    ray_plain = '\t.string "Мы всегда сражаемся POKeMON,\\nЯ и моя сестра.\\pЯ всегда проигрываю, но мы можем победить тебя.\\n2 на 2!$"'
+    ray_fixed = '\t.string "РЭЙ: Мы всегда сражаемся POKeMON,\\nЯ и моя сестра.\\pЯ всегда проигрываю, но мы можем победить тебя.\\n2 на 2!$"'
+    text = trainers.read_text(encoding="utf-8")
+    if ray_fixed in text:
+        pass
+    elif ray_arrow in text:
+        trainers.write_text(text.replace(ray_arrow, ray_fixed, 1), encoding="utf-8")
+    elif ray_plain in text:
+        trainers.write_text(text.replace(ray_plain, ray_fixed, 1), encoding="utf-8")
+    else:
+        raise RuntimeError(f"{trainers}: Ray trainer intro anchor missing")
     cleaned.append("Route107_Text_RayIntro")
 
     battle = root / "src/battle_message.c"
