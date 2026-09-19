@@ -148,7 +148,7 @@ class BatchTranslator:
         # chunks around protected names/tokens cannot be glued together.
         prepared = []
         for source in todo:
-            m = re.match(r"^(\\s*)(.*?)(\\s*)$", source, re.S)
+            m = re.match(r"^(\s*)(.*?)(\s*)$", source, re.S)
             lead, core, trail = m.groups()
             prepared.append((lead, core, trail))
         tokenized = [pkg.tokenizer.encode(core) for _, core, _ in prepared]
