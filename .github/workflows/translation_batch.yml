@@ -1,0 +1,136 @@
+name: Qarro Batched Parallel RU Generator
+
+on:
+  push:
+    branches:
+      - tool/translation-batch-20260919
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  PINNED: e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7
+  EXPECTED_BASE_CANDIDATES: "3881"
+
+jobs:
+  translate:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: trainers
+            targets: "data/text/trainers.inc;data/text/trainers_frlg.inc;data/text/fame_checker_frlg.inc"
+          - group: items
+            targets: "src/data/items.h"
+          - group: battle
+            targets: "src/battle_message.c"
+          - group: system
+            targets: "src/strings.c;src/pokedex.c;src/data/pokemon/species_info/shared_dex_text.h;data/scripts/cable_club_frlg.inc;data/text/trainer_card_frlg.inc"
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: qarro-repo
+      - uses: actions/checkout@v4
+        with:
+          repository: rh-hideout/pokeemerald-expansion
+          ref: ${{ env.PINNED }}
+          path: upstream
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install --disable-pip-version-check --no-cache-dir Pillow argostranslate==1.10.0
+      - name: Reproduce exact base
+        run: bash qarro-repo/ci/reproduce_v3_173_base.sh
+      - name: Translate group in one CTranslate2 batch
+        env:
+          QARRO_TARGETS: ${{ matrix.targets }}
+          ARGOS_BEAM_SIZE: "1"
+        run: python qarro-repo/ci/generate_bulk_ru_argos_batch_group.py upstream
+      - name: Build group patch
+        env:
+          QARRO_TARGETS: ${{ matrix.targets }}
+        run: |
+          set -euo pipefail
+          IFS=';' read -r -a paths <<< "$QARRO_TARGETS"
+          git -C upstream diff --binary HEAD -- "${paths[@]}" > "patch-${{ matrix.group }}.patch"
+          test -s "patch-${{ matrix.group }}.patch"
+          cp upstream/build/qarro_argos_bulk_translation_report.json "report-${{ matrix.group }}.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: batch-patch-${{ matrix.group }}
+          path: |
+            patch-${{ matrix.group }}.patch
+            report-${{ matrix.group }}.json
+
+  merge:
+    needs: translate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: qarro-repo
+      - uses: actions/checkout@v4
+        with:
+          repository: rh-hideout/pokeemerald-expansion
+          ref: ${{ env.PINNED }}
+          path: upstream
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install --disable-pip-version-check --no-cache-dir Pillow
+      - name: Reproduce exact base
+        run: bash qarro-repo/ci/reproduce_v3_173_base.sh
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: batch-patch-*
+          path: generated
+          merge-multiple: true
+      - name: Apply group patches
+        run: |
+          set -euo pipefail
+          for p in generated/patch-*.patch; do
+            git -C upstream apply --check --whitespace=nowarn "../$p"
+            git -C upstream apply --whitespace=nowarn "../$p"
+          done
+      - name: Audit merged translation
+        run: |
+          set -euo pipefail
+          python qarro-repo/ci/audit_ru_runtime_surface_v3_21.py upstream
+          cp upstream/build/qarro_ru_runtime_surface_v3_21_audit.json after_audit.json
+          python - <<'PY'
+          import json
+          j=json.load(open('after_audit.json',encoding='utf-8'))['fullSurface']
+          print('after',j['englishOnlyCandidateCount'],j['filesWithCandidates'])
+          print(json.dumps(j['byFile'],ensure_ascii=False,indent=2))
+          if j['englishOnlyCandidateCount'] >= 700:
+              raise SystemExit('batched bulk translation did not reduce enough')
+          PY
+      - name: Build combined patch
+        run: |
+          set -euo pipefail
+          git -C upstream diff --binary HEAD --             data/text/trainers.inc             data/text/fame_checker_frlg.inc             data/text/trainers_frlg.inc             data/scripts/cable_club_frlg.inc             data/text/trainer_card_frlg.inc             src/data/items.h             src/battle_message.c             src/strings.c             src/pokedex.c             src/data/pokemon/species_info/shared_dex_text.h             > generated_bulk_ru_batch.patch
+          test -s generated_bulk_ru_batch.patch
+          git -C upstream diff --check HEAD
+      - name: Save static patch
+        run: |
+          set -euo pipefail
+          cp generated_bulk_ru_batch.patch qarro-repo/ci/generated_bulk_ru_batch.patch
+          cp after_audit.json qarro-repo/ci/generated_bulk_ru_batch_after_audit.json
+          cd qarro-repo
+          git config user.name "Qarro Batched Translation Generator"
+          git config user.email "actions@users.noreply.github.com"
+          git add ci/generated_bulk_ru_batch*
+          git commit -m "generated: batched static bulk RU patch [skip ci]"
+          git push origin HEAD:tool/translation-batch-20260919
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: batch-bulk-ru
+          path: |
+            generated_bulk_ru_batch.patch
+            after_audit.json
