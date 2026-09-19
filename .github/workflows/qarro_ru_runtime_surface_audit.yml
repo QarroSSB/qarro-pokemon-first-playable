@@ -3,7 +3,7 @@ name: Qarro RU runtime surface audit
 on:
   push:
     branches:
-      - test/gym-5of6-rework-20260911
+      - test/gym-5of6-rework-20260911\n      - tool/bulk-apply-test-20260919
   workflow_dispatch:
 
 permissions:
