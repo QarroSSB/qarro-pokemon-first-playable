@@ -23,14 +23,11 @@ TARGET_ASM = [
     "data/text/fame_checker_frlg.inc",
     "data/text/trainers_frlg.inc",
     "data/scripts/cable_club_frlg.inc",
-    "data/text/trainer_card_frlg.inc",
 ]
 TARGET_C = [
     "src/data/items.h",
     "src/battle_message.c",
     "src/strings.c",
-    "src/pokedex.c",
-    "src/data/pokemon/species_info/shared_dex_text.h",
 ]
 
 def visible_text(s: str) -> str:
