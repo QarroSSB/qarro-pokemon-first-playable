@@ -6,16 +6,16 @@ from pathlib import Path
 MARKER="QARRO_RU_TRAINERS_FRLG_QUALITY_ROUTE20_V3_194"
 TARGET=Path("data/text/trainers_frlg.inc")
 TRANSLATIONS={
-    "Route20_Text_BarryRematchIntro:": "Здесь мелководье.\nТут плавает много людей.$",
-    "Route20_Text_ShirleyRematchIntro:": "Завидуешь, что я отдыхаю\nна ОСТРОВАХ СИФОМ?$",
-    "Route20_Text_TiffanyRematchIntro:": "Обожаю качаться на волнах\nвместе с рыбками.$",
+    "Route20_Text_BarryRematchIntro:": "Здесь мелководье.\\nТут плавает много людей.$",
+    "Route20_Text_ShirleyRematchIntro:": "Завидуешь, что я отдыхаю\\nна ОСТРОВАХ СИФОМ?$",
+    "Route20_Text_TiffanyRematchIntro:": "Обожаю качаться на волнах\\nвместе с рыбками.$",
     "Route20_Text_IreneRematchIntro:": "Ты тоже был в отпуске?$",
-    "Route20_Text_DeanRematchIntro:": "Зацени мои мышцы!\pТеперь они еще больше,\nчем раньше!$",
-    "Route20_Text_DarrinRematchIntro:": "Почему ты едешь на POKeMON?\nТы так и не научился плавать?$",
-    "Route20_Text_RogerRematchIntro:": "Я прилетел сюда на своем\nPOKeMON-птице.$",
-    "Route20_Text_NoraRematchIntro:": "Мой парень подарил мне большие жемчужины.\nИ они стали еще больше!$",
-    "Route20_Text_MissyRematchIntro:": "Я приплыла сюда с ОСТРОВА СИННАБАР.\nКак я и говорила, это было нелегко.$",
-    "Route20_Text_MelissaRematchIntro:": "На западе, на СИННАБАРЕ, есть\nЛАБОРАТОРИЯ POKeMON.\pТам работает мой папа.$",
+    "Route20_Text_DeanRematchIntro:": "Зацени мои мышцы!\\pТеперь они еще больше,\\nчем раньше!$",
+    "Route20_Text_DarrinRematchIntro:": "Почему ты едешь на POKeMON?\\nТы так и не научился плавать?$",
+    "Route20_Text_RogerRematchIntro:": "Я прилетел сюда на своем POKeMON-птице.$",
+    "Route20_Text_NoraRematchIntro:": "Мой парень подарил мне большие жемчужины.\\nИ они стали еще больше!$",
+    "Route20_Text_MissyRematchIntro:": "Я приплыла сюда с ОСТРОВА СИННАБАР.\\nКак я и говорила, это было нелегко.$",
+    "Route20_Text_MelissaRematchIntro:": "На западе, на СИННАБАРЕ, есть\\nЛАБОРАТОРИЯ POKeMON.\\pТам работает мой папа.$",
 }
 BANNED_UNICODE=set("—–←→“”«»")
 def control_tokens(t): return re.findall(r'\{[^}]+\}|\\.|\$',t)
