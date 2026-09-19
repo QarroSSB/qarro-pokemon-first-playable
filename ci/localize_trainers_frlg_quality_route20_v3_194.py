@@ -21,7 +21,7 @@ BANNED_UNICODE=set("—–←→“”«»")
 def control_tokens(t): return re.findall(r'\{[^}]+\}|\\.|\$',t)
 def replace_label(path,label,tr):
     text=path.read_text(encoding="utf-8")
-    pat=re.compile(rf'(?ms)^(?P<head>{re.escape(label)}\s*\n)(?P<body>(?:[ \t]*\.string\s+"(?:\\.|[^"\\])*"\s*\n?)+)')
+    pat=re.compile(rf'(?ms)^(?P<head>{re.escape(label)}:\s*\n)(?P<body>(?:[ \t]*\.string\s+"(?:\\.|[^"\\])*"\s*\n?)+)')
     ms=list(pat.finditer(text))
     if len(ms)!=1: raise RuntimeError(f"{label}: expected one block, got {len(ms)}")
     m=ms[0]; cur="".join(re.findall(r'\.string\s+"((?:\\.|[^"\\])*)"',m.group("body")))
