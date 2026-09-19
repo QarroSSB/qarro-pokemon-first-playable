@@ -93,33 +93,25 @@ def install_argos_model() -> None:
 
 class BatchTranslator:
     def __init__(self, canonical_terms: list[str]):
-        self.canonical_terms = canonical_terms
+        # Protected fragments are never passed through the MT model. This makes
+        # FireRed control tokens and canonical Pokemon/Move/Ability names exact
+        # by construction instead of hoping a placeholder survives translation.
+        alt = "|".join(re.escape(x) for x in canonical_terms)
+        control = r"\\{[^{}]+\\}|\\\\[A-Za-z0-9_]+|\\$"
+        self.protect_re = re.compile(f"({control}|{alt})" if alt else f"({control})")
         self.cache: dict[str, str] = {}
         self.changed = 0
-        self.failed: list[dict] = []
         self.batch_inputs = 0
 
-    def _mask(self, s: str):
-        mapping: list[tuple[str, str]] = []
-        def add(value: str) -> str:
-            token = f"ZXQ{len(mapping):04d}QXZ"
-            mapping.append((token, value))
-            return token
-        s = CONTROL_RE.sub(lambda m: add(m.group(0)), s)
-        for term in self.canonical_terms:
-            if term in s:
-                s = s.replace(term, add(term))
-        return s, mapping
+    def _parts(self, s: str) -> list[tuple[str, bool]]:
+        out = []
+        for part in self.protect_re.split(s):
+            if not part:
+                continue
+            out.append((part, bool(self.protect_re.fullmatch(part))))
+        return out
 
-    def preload(self, strings: list[str]) -> None:
-        unique = list(OrderedDict.fromkeys(strings))
-        todo = [s for s in unique if s not in self.cache and english_only(s)]
-        for s in unique:
-            if not english_only(s):
-                self.cache.setdefault(s, s)
-        if not todo:
-            return
-
+    def _ensure_engine(self):
         translation = argostranslate.translate.get_translation_from_codes("en", "ru")
         pkg = translation.pkg
         if translation.translator is None:
@@ -132,15 +124,23 @@ class BatchTranslator:
             if argos_settings.compute_type != "auto":
                 params["compute_type"] = argos_settings.compute_type
             translation.translator = ctranslate2.Translator(**params)
+        return translation, pkg
 
-        masked_items = []
-        mappings = []
-        for s in todo:
-            masked, mapping = self._mask(s)
-            masked_items.append(masked)
-            mappings.append(mapping)
+    def preload(self, strings: list[str]) -> None:
+        chunks = []
+        for s in strings:
+            for part, protected in self._parts(s):
+                if protected or not english_only(part):
+                    self.cache.setdefault(part, part)
+                else:
+                    chunks.append(part)
 
-        tokenized = [pkg.tokenizer.encode(x) for x in masked_items]
+        todo = [x for x in OrderedDict.fromkeys(chunks) if x not in self.cache]
+        if not todo:
+            return
+
+        translation, pkg = self._ensure_engine()
+        tokenized = [pkg.tokenizer.encode(x) for x in todo]
         target_prefix = None
         if pkg.target_prefix != "":
             target_prefix = [[pkg.target_prefix]] * len(tokenized)
@@ -160,39 +160,34 @@ class BatchTranslator:
             raise RuntimeError(f"batch result count mismatch: {len(results)} != {len(todo)}")
 
         self.batch_inputs += len(todo)
-        for source, masked, mapping, result in zip(todo, masked_items, mappings, results):
+        for source, result in zip(todo, results):
             ru = pkg.tokenizer.decode(result.hypotheses[0])
             if pkg.target_prefix and ru.startswith(pkg.target_prefix):
                 ru = ru[len(pkg.target_prefix):]
             if ru.startswith(" "):
                 ru = ru[1:]
-            failed = False
-            for token, original in mapping:
-                if token not in ru:
-                    self.failed.append({
-                        "source": source,
-                        "masked": masked,
-                        "translation": ru,
-                        "missing": token,
-                    })
-                    failed = True
-                    break
-                ru = ru.replace(token, original)
-            if failed:
-                self.cache[source] = source
-                continue
             ru = normalize_ru(ru)
             if not CYRILLIC_RE.search(ru):
-                self.cache[source] = source
-                continue
+                ru = source
             self.cache[source] = ru
             if ru != source:
                 self.changed += 1
 
     def translate(self, s: str) -> str:
-        if s not in self.cache:
-            raise RuntimeError(f"unpreloaded translation string: {s[:120]!r}")
-        return self.cache[s]
+        out = []
+        for part, protected in self._parts(s):
+            if protected:
+                out.append(part)
+            else:
+                if part not in self.cache:
+                    # Non-English punctuation/whitespace segments can be absent
+                    # from preload; they must pass through unchanged.
+                    if not english_only(part):
+                        out.append(part)
+                        continue
+                    raise RuntimeError(f"unpreloaded translation segment: {part[:120]!r}")
+                out.append(self.cache[part])
+        return "".join(out)
 
 def escape_quoted(s: str) -> str:
     return s.replace("\n", " ").replace('"', r'\"')
