@@ -85,7 +85,7 @@ def parse_patch(text: str):
     finish()
     return files
 
-def replace_group(text: str, rel: str, idx: int, g: dict):
+def replace_group(text: str, rel: str, idx: int, g: dict, cursor: int):
     old = "\n".join(g["old"])
     new = "\n".join(g["new"])
     prev = g.get("prev")
@@ -103,15 +103,31 @@ def replace_group(text: str, rel: str, idx: int, g: dict):
                            new + "\n" + nxt, "next"))
     candidates.append((old, new, "body"))
 
+    # Patch hunks are ordered by source position. When an exact body occurs
+    # more than once (common for duplicate item descriptions), choose the first
+    # matching occurrence at or after the previous hunk's cursor. This retains
+    # deterministic source-order identity instead of guessing by text alone.
     for needle, repl, mode in candidates:
-        count = text.count(needle)
-        if count == 1:
-            return text.replace(needle, repl, 1), "applied", mode
+        positions = [m.start() for m in re.finditer(re.escape(needle), text)]
+        if not positions:
+            continue
+        after = [p for p in positions if p >= cursor]
+        if len(positions) == 1:
+            pos = positions[0]
+            new_text = text[:pos] + repl + text[pos + len(needle):]
+            return new_text, "applied", mode, pos + len(repl)
+        if after:
+            pos = after[0]
+            new_text = text[:pos] + repl + text[pos + len(needle):]
+            return new_text, "applied", mode + "-ordered", pos + len(repl)
 
-    # Idempotent replay is allowed only when the exact translated body is
-    # already present. Ambiguity or a missing old/new body remains fatal.
-    if text.count(new) >= 1:
-        return text, "already", "new-body"
+    # Idempotent replay is allowed when the exact translated body is already
+    # present at/after the current source-order cursor.
+    new_positions = [m.start() for m in re.finditer(re.escape(new), text)]
+    after_new = [p for p in new_positions if p >= cursor]
+    if after_new:
+        pos = after_new[0]
+        return text, "already", "new-body", pos + len(new)
 
     # Older bulk source may contain an English block that a later dedicated
     # pass has already translated. For ASM labeled blocks, accept that newer
@@ -124,16 +140,16 @@ def replace_group(text: str, rel: str, idx: int, g: dict):
             ms = list(re.finditer(rf"(?m)^{re.escape(label)}::\\s*$", text))
             if len(ms) == 1:
                 start = ms[0].end()
-                nxt = re.search(r"(?m)^[A-Za-z0-9_]+::\\s*$", text[start:])
-                end = start + nxt.start() if nxt else len(text)
-                body = text[start:end]
+                next_label = re.search(r"(?m)^[A-Za-z0-9_]+::\\s*$", text[start:])
+                block_end = start + next_label.start() if next_label else len(text)
+                body = text[start:block_end]
                 if re.search(r"[А-Яа-яЁё]", body):
-                    return text, "already", "label-cyrillic"
+                    return text, "already", "label-cyrillic", block_end
 
     counts = [(mode, text.count(needle)) for needle, _, mode in candidates]
     raise RuntimeError(
-        f"{rel}: micro-hunk {idx} not uniquely applicable; counts={counts}; "
-        f"old_head={old[:140]!r}"
+        f"{rel}: micro-hunk {idx} not applicable from cursor={cursor}; "
+        f"counts={counts}; old_head={old[:140]!r}"
     )
 
 def main() -> int:
@@ -162,8 +178,9 @@ def main() -> int:
         # bodies match; the later global normalizer would make this exact change.
         text = text.replace("é", "e").replace("É", "E")
         a = s = 0
+        cursor = 0
         for idx, g in enumerate(parsed[rel], 1):
-            text, state, mode = replace_group(text, rel, idx, g)
+            text, state, mode, cursor = replace_group(text, rel, idx, g, cursor)
             total += 1
             by_mode[mode] = by_mode.get(mode, 0) + 1
             if state == "applied":
