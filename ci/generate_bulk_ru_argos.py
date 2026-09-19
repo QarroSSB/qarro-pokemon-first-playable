@@ -8,6 +8,8 @@ from pathlib import Path
 
 import argostranslate.package
 import argostranslate.translate
+import argostranslate.settings
+import ctranslate2
 
 CYRILLIC_RE = re.compile(r"[А-Яа-яЁё]")
 ASCII_ALPHA_RE = re.compile(r"[A-Za-z]")
@@ -94,6 +96,7 @@ class Translator:
     def __init__(self, canonical_terms: list[str]):
         self.canonical_terms = canonical_terms
         self.cache: dict[str, str] = {}
+        self.segment_cache: dict[str, str] = {}
         self.calls = 0
         self.changed = 0
         self.failed = []
@@ -106,6 +109,58 @@ class Translator:
         if terms:
             parts.append("|".join(terms))
         return re.compile("(" + "|".join(parts) + ")")
+
+    def prepare(self, sources: list[str]) -> None:
+        protected = self._protected_regex()
+        unique = []
+        seen = set()
+        for s in sources:
+            if not english_only(s):
+                continue
+            for piece in protected.split(s):
+                if not piece or protected.fullmatch(piece) or not ASCII_ALPHA_RE.search(piece):
+                    continue
+                if piece not in seen:
+                    seen.add(piece)
+                    unique.append(piece)
+        if not unique:
+            return
+
+        packages = argostranslate.package.get_installed_packages()
+        pkg = next(p for p in packages if p.from_code == "en" and p.to_code == "ru")
+        params = {
+            "model_path": str(pkg.package_path / "model"),
+            "device": argostranslate.settings.device,
+            "inter_threads": argostranslate.settings.inter_threads,
+            "intra_threads": argostranslate.settings.intra_threads,
+        }
+        if argostranslate.settings.compute_type != "auto":
+            params["compute_type"] = argostranslate.settings.compute_type
+        engine = ctranslate2.Translator(**params)
+        tokenized = [pkg.tokenizer.encode(x) for x in unique]
+        target_prefix = None
+        if pkg.target_prefix != "":
+            target_prefix = [[pkg.target_prefix]] * len(tokenized)
+        results = engine.translate_batch(
+            tokenized,
+            target_prefix=target_prefix,
+            replace_unknowns=True,
+            max_batch_size=128,
+            batch_type="tokens",
+            beam_size=1,
+            num_hypotheses=1,
+            return_scores=True,
+        )
+        if len(results) != len(unique):
+            raise RuntimeError(f"batch result count mismatch: {len(results)} != {len(unique)}")
+        for src, result in zip(unique, results):
+            ru = pkg.tokenizer.decode(result.hypotheses[0])
+            if pkg.target_prefix and ru.startswith(pkg.target_prefix):
+                ru = ru[len(pkg.target_prefix):]
+            if ru.startswith(" "):
+                ru = ru[1:]
+            self.segment_cache[src] = normalize_ru(ru)
+        self.calls += len(unique)
 
     def translate(self, s: str) -> str:
         if s in self.cache:
@@ -126,9 +181,12 @@ class Translator:
             if not ASCII_ALPHA_RE.search(piece):
                 out.append(piece)
                 continue
-            ru_piece = argostranslate.translate.translate(piece, "en", "ru")
-            self.calls += 1
-            out.append(normalize_ru(ru_piece))
+            ru_piece = self.segment_cache.get(piece)
+            if ru_piece is None:
+                ru_piece = normalize_ru(argostranslate.translate.translate(piece, "en", "ru"))
+                self.calls += 1
+                self.segment_cache[piece] = ru_piece
+            out.append(ru_piece)
 
         ru = "".join(out)
         # Exact invariant: all protected controls/canonical terms occur in the
@@ -202,6 +260,35 @@ def translate_c(path: Path, tr: Translator) -> dict:
     path.write_text(text, encoding="utf-8")
     return {"macroMatches": len(matches), "translatedMacros": translated}
 
+def collect_asm_raw(path: Path) -> list[str]:
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    out = []
+    i = 0
+    while i < len(lines):
+        m = ASM_STRING_RE.match(lines[i])
+        if not m:
+            i += 1
+            continue
+        bodies = []
+        j = i
+        while j < len(lines):
+            mm = ASM_STRING_RE.match(lines[j])
+            if not mm:
+                break
+            bodies.append(mm.group("body"))
+            j += 1
+        out.append("".join(bodies))
+        i = j
+    return out
+
+def collect_c_raw(path: Path) -> list[str]:
+    text = path.read_text(encoding="utf-8", errors="replace")
+    out = []
+    for m in C_MACRO_RE.finditer(text):
+        body = m.group("body")
+        out.append("".join(q.group("body") for q in C_QUOTED_RE.finditer(body)))
+    return out
+
 def main() -> int:
     if len(sys.argv) != 2:
         raise SystemExit("usage: generate_bulk_ru_argos.py <upstream-root>")
@@ -211,6 +298,12 @@ def main() -> int:
     tr = Translator(canonical)
 
     probe_src = "{STR_VAR_1} used Rock Smash!\\nDone.$"
+    raw_sources = [probe_src]
+    for rel in TARGET_ASM:
+        raw_sources.extend(collect_asm_raw(root / rel))
+    for rel in TARGET_C:
+        raw_sources.extend(collect_c_raw(root / rel))
+    tr.prepare(raw_sources)
     probe = tr.translate(probe_src)
     if "{STR_VAR_1}" not in probe or "Rock Smash" not in probe or "\\n" not in probe or "$" not in probe:
         raise RuntimeError(f"placeholder/canon preflight failed: {probe!r}")
@@ -224,6 +317,7 @@ def main() -> int:
     report["translationCalls"] = tr.calls
     report["changedUniqueStrings"] = tr.changed
     report["cacheSize"] = len(tr.cache)
+    report["preparedSegmentCount"] = len(tr.segment_cache)
     report["placeholderFailures"] = tr.failed
     out = root / "build" / "qarro_argos_bulk_translation_report.json"
     out.parent.mkdir(parents=True, exist_ok=True)
