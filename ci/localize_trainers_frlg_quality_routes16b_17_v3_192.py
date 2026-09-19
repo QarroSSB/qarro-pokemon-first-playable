@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Qarro v3.192: human-quality RU pass for the next trainers_frlg.inc rematch block (Route 16b-17)."""
 from __future__ import annotations
-import json,re,sys
+import json,re,subprocess,sys
 from pathlib import Path
 MARKER="QARRO_RU_TRAINERS_FRLG_QUALITY_ROUTES16B_17_V3_192"
 TARGET=Path("data/text/trainers_frlg.inc")
@@ -39,5 +39,7 @@ def main():
     for k,v in TRANSLATIONS.items(): replace_label(path,k,v)
     out=root/"build"/"qarro_ru_trainers_frlg_quality_routes16b_17_v3_192_audit.json"; out.parent.mkdir(parents=True,exist_ok=True)
     out.write_text(json.dumps({"marker":MARKER,"targetFile":str(TARGET),"qualityPassBlocks":14,"labels":list(TRANSLATIONS),"humanEditedRussian":True,"controlTokensPreserved":True,"pokemonMoveAbilityNamesPreserved":True,"gameplayLogicTouched":False,"balanceTouched":False,"bossTeamsTouched":False,"specialWhitelistTouched":False,"ashBondTouched":False,"ashCapTouched":False},ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
-    print(f"[{MARKER}] PASS: polished 14 trainer rematch blocks in {TARGET}"); return 0
+    next_script=Path(__file__).with_name("localize_trainers_frlg_quality_routes18_19_v3_193.py")
+    subprocess.run([sys.executable,str(next_script),str(root)],check=True)
+    print(f"[{MARKER}] PASS: polished 14 trainer rematch blocks in {TARGET}; chained v3.193"); return 0
 if __name__=="__main__": raise SystemExit(main())
