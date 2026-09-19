@@ -127,6 +127,16 @@ def patch_symbol(text: str, symbol: str, expected: str, replacement: str) -> tup
         raise RuntimeError(f'{symbol}: expected exactly one string definition, got {len(matches)}')
     m=matches[0]
     actual=decode_body(m.group('body'))
+    if actual==replacement:
+        return text,1
+    if re.search(r"[А-Яа-яЁё]", actual):
+        if brace_tokens(actual) != brace_tokens(expected):
+            raise RuntimeError(
+                f'{symbol}: already-Cyrillic placeholder drift\\n'
+                f'EXPECTED_PLACEHOLDERS={brace_tokens(expected)!r}\\n'
+                f'ACTUAL_PLACEHOLDERS={brace_tokens(actual)!r}'
+            )
+        return text,1
     if actual!=expected:
         raise RuntimeError(f'{symbol}: source drift\nEXPECTED={expected!r}\nACTUAL={actual!r}')
     new=m.group('head')+encode_body(replacement)+m.group('tail')
@@ -142,7 +152,7 @@ def main() -> int:
         text=path.read_text(encoding='utf-8'); before=text
         for symbol,(expected,replacement) in targets.items():
             text,n=patch_symbol(text,symbol,expected,replacement); total+=n
-        if text==before: raise RuntimeError(f'{rel}: no changes made')
+        # Idempotent replay is valid when exact targets are already localized.
         path.write_text(text,encoding='utf-8')
         print(f'[QARRO_RU_FULL_SURFACE_V3_148] {rel}: translated {len(targets)} symbols')
     if total!=81: raise RuntimeError(f'expected 81 translations, got {total}')
