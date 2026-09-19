@@ -151,11 +151,21 @@ def main():
     p.write_text(t,encoding="utf-8")
 
     p=root/"src/pokedex.c"; t=p.read_text(encoding="utf-8")
+    # Only replace complete translatable string literals. Never raw substrings:
+    # entries such as BLACK / RED / NONE also occur inside C identifiers
+    # (RGB_BLACK, BODY_COLOR_RED, etc.) and must remain source code.
     for old,new in DEX.items():
         variants=[old,old.replace("POKe","POKé")]
         for v in variants:
-            c=t.count(v)
-            if c: t=t.replace(v,new); ops+=c
+            patterns = (
+                (f'_("{v}")', f'_("{new}")'),
+                (f'COMPOUND_STRING("{v}")', f'COMPOUND_STRING("{new}")'),
+            )
+            for src,dst in patterns:
+                n=t.count(src)
+                if n:
+                    t=t.replace(src,dst)
+                    ops+=n
     p.write_text(t,encoding="utf-8")
 
     out=root/"build"/"qarro_ru_menu_card_dex_ui_v3_174_audit.json"
