@@ -193,7 +193,7 @@ def main() -> int:
         # FireRed's installed charmap has no ordinary double-quote glyph; the
         # existing project uses quote sanitization for the same reason. Replace
         # escaped runtime double quotes with supported apostrophes.
-        text = text.replace(r'\\"', "'")
+        text = text.replace(r'\"', "'")
         path.write_text(text, encoding="utf-8")
         by_file[rel] = {
             "microHunks": len(parsed[rel]),
