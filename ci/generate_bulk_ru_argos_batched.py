@@ -97,7 +97,7 @@ class BatchTranslator:
         # FireRed control tokens and canonical Pokemon/Move/Ability names exact
         # by construction instead of hoping a placeholder survives translation.
         alt = "|".join(re.escape(x) for x in canonical_terms)
-        control = r"\\{[^{}]+\\}|\\\\[A-Za-z0-9_]+|\\$"
+        control = r"\{[^{}]+\}|\\[A-Za-z0-9_]+|\$"
         self.protect_re = re.compile(f"({control}|{alt})" if alt else f"({control})")
         self.cache: dict[str, str] = {}
         self.changed = 0
@@ -144,7 +144,14 @@ class BatchTranslator:
             return
 
         translation, pkg = self._ensure_engine()
-        tokenized = [pkg.tokenizer.encode(x) for x in todo]
+        # Preserve leading/trailing whitespace outside the MT model so
+        # chunks around protected names/tokens cannot be glued together.
+        prepared = []
+        for source in todo:
+            m = re.match(r"^(\\s*)(.*?)(\\s*)$", source, re.S)
+            lead, core, trail = m.groups()
+            prepared.append((lead, core, trail))
+        tokenized = [pkg.tokenizer.encode(core) for _, core, _ in prepared]
         target_prefix = None
         if pkg.target_prefix != "":
             target_prefix = [[pkg.target_prefix]] * len(tokenized)
@@ -164,17 +171,17 @@ class BatchTranslator:
             raise RuntimeError(f"batch result count mismatch: {len(results)} != {len(todo)}")
 
         self.batch_inputs += len(todo)
-        for source, result in zip(todo, results):
+        for source, (lead, core, trail), result in zip(todo, prepared, results):
             ru = pkg.tokenizer.decode(result.hypotheses[0])
             if pkg.target_prefix and ru.startswith(pkg.target_prefix):
                 ru = ru[len(pkg.target_prefix):]
-            if ru.startswith(" "):
-                ru = ru[1:]
-            ru = normalize_ru(ru)
+            ru = normalize_ru(ru).strip()
             if not CYRILLIC_RE.search(ru):
-                ru = source
-            self.cache[source] = ru
-            if ru != source:
+                translated = source
+            else:
+                translated = lead + ru + trail
+            self.cache[source] = translated
+            if translated != source:
                 self.changed += 1
 
     def translate(self, s: str) -> str:
