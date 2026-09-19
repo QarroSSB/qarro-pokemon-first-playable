@@ -157,6 +157,7 @@ SCRIPTS = [
     "localize_pokemon_storage_finish_v3_168.py",
     "localize_item_menu_finish_v3_169.py",
     "localize_item_use_finish_v3_170.py",
+    "localize_pokedex_rating_all_v3_171.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
