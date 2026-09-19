@@ -9,26 +9,32 @@ on:
 jobs:
   translation-probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install translator
-        run: pip install --disable-pip-version-check deep-translator==1.11.4
-      - name: Translate probe
+      - name: Install Argos Translate
+        run: pip install --disable-pip-version-check argostranslate==1.10.0
+      - name: Download EN-RU model and translate probe
         run: |
           python - <<'PY'
           import json
-          from deep_translator import GoogleTranslator
+          import argostranslate.package
+          import argostranslate.translate
+
+          argostranslate.package.update_package_index()
+          packages = argostranslate.package.get_available_packages()
+          pkg = next(p for p in packages if p.from_code == "en" and p.to_code == "ru")
+          argostranslate.package.install_from_path(pkg.download())
+
           src = [
               "The save file is corrupted. The previous save file will be loaded.",
               "Would you like to give up on this battle and quit now?",
               "A fertilizer for growing Berries that increases the harvest."
           ]
-          tr = GoogleTranslator(source="en", target="ru")
-          out = [{"en": s, "ru": tr.translate(s)} for s in src]
+          out = [{"en": s, "ru": argostranslate.translate.translate(s, "en", "ru")} for s in src]
           print(json.dumps(out, ensure_ascii=False, indent=2))
           open("translation_probe.json","w",encoding="utf-8").write(json.dumps(out,ensure_ascii=False,indent=2)+"\n")
           PY
