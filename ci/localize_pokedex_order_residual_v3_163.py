@@ -51,12 +51,16 @@ def main() -> int:
     for old, new in REPLACEMENTS:
         old_expr = f'COMPOUND_STRING("{old}")'
         new_expr = f'COMPOUND_STRING("{new}")'
-        count = text.count(old_expr)
-        if count != 1:
+        old_count = text.count(old_expr)
+        new_count = text.count(new_expr)
+        if old_count == 1 and new_count == 0:
+            text = text.replace(old_expr, new_expr, 1)
+        elif old_count == 0 and new_count == 1:
+            pass
+        else:
             raise RuntimeError(
-                f"expected exactly one pinned Pokédex order anchor; found {count}: {old!r}"
+                f"Pokédex order anchor drift old={old_count} new={new_count}: {old!r}"
             )
-        text = text.replace(old_expr, new_expr, 1)
         applied.append({"old": old, "new": new})
 
     path.write_text(text, encoding="utf-8")
