@@ -163,6 +163,8 @@ SCRIPTS = [
     "localize_menu_card_dex_ui_v3_174.py",
     "localize_shared_dex_all_v3_175.py",
     "localize_credits_roles_v3_176.py",
+    "apply_generated_bulk_ru_v3_177.py",
+    "localize_finish_tail_cleanup_v3_178.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")

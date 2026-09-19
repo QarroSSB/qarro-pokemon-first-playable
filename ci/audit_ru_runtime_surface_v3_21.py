@@ -48,6 +48,64 @@ DATA_HEADERS = {
     "src/data/pokemon/species_info/shared_dex_text.h",
 }
 
+JAPANESE_RE = re.compile(r"[ぁ-ヿ一-鿿]")
+
+INTENTIONAL_TECHNICAL_SYMBOLS = {
+    "src/strings.c": {
+        "gText_LButtonRButton","gText_10P30P50P50P","gText_5MarksPokemon",
+        "gText_PokeblocksWithFriends","gText_Sandstorm",
+        "gText_ExpandedPlaceholder_Groudon","gText_ExpandedPlaceholder_Kyogre",
+        "gText_IdNumberSlash","gText_Pokemon4","gText_Pokemon3",
+        "gText_MenuOptionPokenav","gText_MenuPokenav",
+        "gText_Lv50","gText_Lv502","gText_RecordsLv50",
+        "gText_Fog2","gText_Fog","gText_HP3","gText_HP4",
+        "gText_1F","gText_2F","gText_3F","gText_4F","gText_5F","gText_6F",
+        "gText_7F","gText_8F","gText_9F","gText_10F","gText_11F",
+        "gText_B1F","gText_B2F","gText_B3F","gText_B4F",
+    },
+    "src/pokedex.c": {
+        "sText_UnkWeight","sText_UnkWeightMetric","sText_UnkHeightMetric",
+        "sText_HTHeight","sText_WTWeight",
+    },
+    "src/pokemon_summary_screen.c": {
+        "gText_SkillPageIvs","gText_SkillPageEvs",
+        "gText_GradeF","gText_GradeD","gText_GradeC",
+        "gText_GradeB","gText_GradeA","gText_GradeS",
+    },
+    "src/option_menu.c": {"gText_ButtonTypeLEqualsA","gText_ButtonTypeLR"},
+    "src/battle_message.c": {"sText_HP","sText_ApostropheS"},
+}
+
+INTENTIONAL_TECHNICAL_RAW = {
+    "src/strings.c": {"TMs & HMs"},
+    "src/pokedex.c": {"ABC","DEF","GHI","JKL","MNO","PQR","STU","VWX","YZ"},
+    "src/battle_message.c": {
+        "Magnitude {B_BUFF1}!",
+        "{B_BUFF1}{CLEAR 13}Judgment{CLEAR 13}{B_BUFF2}",
+        "s",
+    },
+    "src/battle_interface.c": {"s"},
+}
+
+CREDITS_ROLE_RE = re.compile(
+    r"\b(?:Director|Programmers?|Designers?|Composition|Effects|Scenario|Testing|"
+    r"Special Thanks|Supervisors?|Coordinators?|Managers?|Producers?|Translator|"
+    r"Editor|POK[eé]DEX Text|POK[eé]MON Designers?|Braille Code Check)\b",
+    re.I,
+)
+
+def intentional_english_reason(rel: str, symbol: str | None, raw: str, anchor: str) -> str | None:
+    if JAPANESE_RE.search(raw):
+        return "Japanese compatibility/debug text; not English localization surface"
+    if rel == "src/credits_frlg.c" and symbol and symbol.startswith("gCreditsString_"):
+        if not CREDITS_ROLE_RE.search(raw):
+            return "credits staff/organization proper name preserved in original form"
+    if symbol and symbol in INTENTIONAL_TECHNICAL_SYMBOLS.get(rel, set()):
+        return "canonical technical abbreviation/control label preserved"
+    if raw in INTENTIONAL_TECHNICAL_RAW.get(rel, set()):
+        return "canonical technical/grammar/Move token preserved"
+    return None
+
 def die(msg: str) -> None:
     raise SystemExit(f"[{MARKER}] ERROR: {msg}")
 
@@ -124,9 +182,13 @@ def scan_c_file(path: Path, root: Path):
         sym=None
         sm=re.search(r"([A-Za-z_][A-Za-z0-9_]*)\s*(?:\[[^\]]*\])?\s*=\s*$", last_line)
         if sm: sym=sm.group(1)
-        item={"file":path.relative_to(root).as_posix(),"line":line,"kind":cls,"symbol":sym,"anchor":last_line[-180:],"raw":raw,"preview":v[:240],"characters":len(v)}
+        rel=path.relative_to(root).as_posix()
+        item={"file":rel,"line":line,"kind":cls,"symbol":sym,"anchor":last_line[-180:],"raw":raw,"preview":v[:240],"characters":len(v)}
+        intentional_reason=intentional_english_reason(rel,sym,raw,last_line)
         if is_allowed:
-            item["reason"]="English proper name allowed by canon"; allowed.append(item)
+            item["reason"]="English proper name allowed by Pokemon/Move/Ability canon"; allowed.append(item)
+        elif intentional_reason:
+            item["reason"]=intentional_reason; allowed.append(item)
         else: out.append(item)
     return out,allowed
 
@@ -214,7 +276,9 @@ def main() -> int:
         "byKind":dict(sorted(by_kind.items(),key=lambda kv:(-kv[1],kv[0]))),
         "byFile":dict(sorted(by_file.items(),key=lambda kv:(-kv[1],kv[0]))),
         "candidates":broad[:2000],
-        "allowedEnglishProperNames":allowed[:1000],
+        "allowedEnglishProperNames":[x for x in allowed if x.get("reason","").startswith("English proper name")][:1000],
+        "allowedIntentionalEnglishOrTechnical":[x for x in allowed if not x.get("reason","").startswith("English proper name")][:2000],
+        "allowedIntentionalEnglishOrTechnicalCount":sum(1 for x in allowed if not x.get("reason","").startswith("English proper name")),
       },
       "readOnly":True,"ashBondTouched":False,"ashCapTouched":False,
     }
