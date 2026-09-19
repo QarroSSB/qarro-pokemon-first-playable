@@ -160,6 +160,8 @@ SCRIPTS = [
     "localize_pokedex_rating_all_v3_171.py",
     "localize_small_surface_sweep_v3_172.py",
     "localize_field_daycare_bulk_v3_173.py",
+    "localize_menu_card_dex_ui_v3_174.py",
+    "localize_shared_dex_all_v3_175.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
