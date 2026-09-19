@@ -153,6 +153,7 @@ SCRIPTS = [
     "localize_pokemon_storage_main_menu_v3_164.py",
     "localize_pokemon_storage_messages_v3_165.py",
     "boss_special_whitelist_v3_166.py",
+    "localize_pokemon_storage_messages_v3_167.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
