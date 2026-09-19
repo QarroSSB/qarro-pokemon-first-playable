@@ -163,7 +163,7 @@ MAPS={
 "Will you take back the other one,\\n":"Заберешь и второго POKeMON,\\n",
 "too?$":"тоже?$",
 "Fine.\\n":"Хорошо.\\n",
-"Good to see you.\\p":"Рад тебя видеть.\\p",
+
 "Your POKéMON can only be doing good!$":"Твой POKeMON чувствует себя отлично!$",
 "By level, your {STR_VAR_1} has\\n":"{STR_VAR_1} вырос\\n",
 "grown by {STR_VAR_2}.$":"на {STR_VAR_2} уровней.$",
