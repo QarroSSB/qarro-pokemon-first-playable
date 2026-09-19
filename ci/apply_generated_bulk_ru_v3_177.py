@@ -155,6 +155,12 @@ def main() -> int:
     for rel in sorted(EXPECTED):
         path = root / rel
         text = path.read_text(encoding="utf-8")
+        # The generated bulk source was frozen after the project's standard
+        # accented-e normalization, while this incremental script runs just
+        # before that global step in the normal build chain. Normalize the same
+        # characters early only in these target text files so micro-hunk source
+        # bodies match; the later global normalizer would make this exact change.
+        text = text.replace("é", "e").replace("É", "E")
         a = s = 0
         for idx, g in enumerate(parsed[rel], 1):
             text, state, mode = replace_group(text, rel, idx, g)
