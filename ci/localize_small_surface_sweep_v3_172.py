@@ -224,10 +224,6 @@ def main():
       'static const u8 sText_doneText[] = _("Способность {STR_VAR_1} стала\\n{STR_VAR_2}!{PAUSE_UNTIL_PRESS}");',
       'static const u8 sText_BasePointsResetToZero[] = _("{STR_VAR_1}\'s base points\\nwere all reset to zero!{PAUSE_UNTIL_PRESS}");':
       'static const u8 sText_BasePointsResetToZero[] = _("Базовые очки {STR_VAR_1}\\nсброшены до нуля!{PAUSE_UNTIL_PRESS}");',
-      '    static const u8 sText_askText[] = _("It might affect {STR_VAR_1}\'s stats.\\nAre you sure you want to use it?");':
-      '    static const u8 sText_askText[] = _("Это может изменить параметры {STR_VAR_1}.\\nИспользовать?");',
-      '    static const u8 sText_doneText[] = _("{STR_VAR_1}\'s stats may have changed due\\nto the effects of the {STR_VAR_2}!{PAUSE_UNTIL_PRESS}");':
-      '    static const u8 sText_doneText[] = _("Параметры {STR_VAR_1} могли измениться\\nиз-за {STR_VAR_2}!{PAUSE_UNTIL_PRESS}");',
       '    static const u8 sText_doneText[] = _("{STR_VAR_1}\'s Dynamax Level\\nincreased by 1!{PAUSE_UNTIL_PRESS}");':
       '    static const u8 sText_doneText[] = _("Dynamax Level {STR_VAR_1}\\nповышен на 1!{PAUSE_UNTIL_PRESS}");',
     }
