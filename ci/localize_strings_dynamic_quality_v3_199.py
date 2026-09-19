@@ -19,8 +19,8 @@ TRANSLATIONS={
     "gText_MenuDexNav": "DEXNAV",
 }
 EXACT_REPLACEMENTS=[
-    ("const u8 gText_PkmnFainted_FldPsn[] = _(\"{STR_VAR_1} Обморок...\\\\p\\\\n\");", "const u8 gText_PkmnFainted_FldPsn[] = _(\"{STR_VAR_1} теряет сознание...\\\\p\\\\n\");"),
-    ("const u8 gText_PkmnFainted_FldPsn[] = _(\"{STR_VAR_1} Выжил после отравления.\\\\nЯд исчез! Яд исчез!\\\\p\");", "const u8 gText_PkmnFainted_FldPsn[] = _(\"{STR_VAR_1} пережил отравление.\\\\nДействие яда прошло!\\\\p\");"),
+    ("const u8 gText_PkmnFainted_FldPsn[] = _(\"{STR_VAR_1} Обморок...\\p\\n\");", "const u8 gText_PkmnFainted_FldPsn[] = _(\"{STR_VAR_1} теряет сознание...\\p\\n\");"),
+    ("const u8 gText_PkmnFainted_FldPsn[] = _(\"{STR_VAR_1} Выжил после отравления.\\nЯд исчез! Яд исчез!\\p\");", "const u8 gText_PkmnFainted_FldPsn[] = _(\"{STR_VAR_1} пережил отравление.\\nДействие яда прошло!\\p\");"),
 ]
 BANNED_UNICODE=set("—–←→“”«»")
 
