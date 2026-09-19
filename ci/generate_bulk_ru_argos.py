@@ -117,9 +117,14 @@ class Translator:
             for piece in protected.split(s):
                 if not piece or protected.fullmatch(piece) or not ASCII_ALPHA_RE.search(piece):
                     continue
-                if piece not in seen:
-                    seen.add(piece)
-                    unique.append(piece)
+                leading = piece[:len(piece) - len(piece.lstrip())]
+                trailing = piece[len(piece.rstrip()):]
+                core = piece.strip()
+                if not core:
+                    continue
+                if core not in seen:
+                    seen.add(core)
+                    unique.append(core)
         if not unique:
             return
 
@@ -178,12 +183,18 @@ class Translator:
             if not ASCII_ALPHA_RE.search(piece):
                 out.append(piece)
                 continue
-            ru_piece = self.segment_cache.get(piece)
-            if ru_piece is None:
-                ru_piece = normalize_ru(argostranslate.translate.translate(piece, "en", "ru"))
+            leading = piece[:len(piece) - len(piece.lstrip())]
+            trailing = piece[len(piece.rstrip()):]
+            core = piece.strip()
+            if not core:
+                out.append(piece)
+                continue
+            ru_core = self.segment_cache.get(core)
+            if ru_core is None:
+                ru_core = normalize_ru(argostranslate.translate.translate(core, "en", "ru")).strip()
                 self.calls += 1
-                self.segment_cache[piece] = ru_piece
-            out.append(ru_piece)
+                self.segment_cache[core] = ru_core
+            out.append(leading + ru_core + trailing)
 
         ru = "".join(out)
         # Exact invariant: all protected controls/canonical terms occur in the
