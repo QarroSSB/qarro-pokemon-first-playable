@@ -113,6 +113,10 @@ class BatchTranslator:
 
     def _ensure_engine(self):
         translation = argostranslate.translate.get_translation_from_codes("en", "ru")
+        # Argos exposes a CachedTranslation wrapper publicly; unwrap it until
+        # the underlying PackageTranslation that owns pkg/translator is reached.
+        while hasattr(translation, "underlying"):
+            translation = translation.underlying
         pkg = translation.pkg
         if translation.translator is None:
             params = {
