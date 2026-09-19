@@ -35,7 +35,12 @@ def bounds(text,label):
     return start,end,text[start:end]
 def replace(text,label,tr):
     start,end,old=bounds(text,label)
-    if re.search(r"[А-Яа-яЁё]",old): die(f"{label}: already Cyrillic")
+    if re.search(r"[А-Яа-яЁё]",old):
+        # Idempotent audit replay: an earlier pass may already have localized
+        # this exact labeled block. Accept only a structurally valid text block.
+        if ".string " not in old: die(f"{label}: Cyrillic block is not text")
+        if "$" not in old: die(f"{label}: Cyrillic block missing terminator")
+        return text
     if ".string " not in old: die(f"{label}: not text block")
     safe=tr.replace('"','\\"')
     return text[:start]+f'{label}::\n\t.string "{safe}"\n\n'+text[end:]
