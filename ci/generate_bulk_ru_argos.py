@@ -98,19 +98,14 @@ class Translator:
         self.changed = 0
         self.failed = []
 
-    def _mask(self, s: str):
-        mapping: list[tuple[str, str]] = []
-
-        def add(value: str) -> str:
-            token = f"ZXQ{len(mapping):04d}QXZ"
-            mapping.append((token, value))
-            return token
-
-        s = CONTROL_RE.sub(lambda m: add(m.group(0)), s)
-        for term in self.canonical_terms:
-            if term in s:
-                s = s.replace(term, add(term))
-        return s, mapping
+    def _protected_regex(self):
+        # Protect runtime controls and every canonical Pokémon / Move / Ability
+        # term by splitting around them. Protected spans never enter Argos.
+        terms = [re.escape(x) for x in self.canonical_terms if x]
+        parts = [r'\\{[^{}]+\\}', r'\\\\[A-Za-z0-9_]+', r'\\$']
+        if terms:
+            parts.append("|".join(terms))
+        return re.compile("(" + "|".join(parts) + ")")
 
     def translate(self, s: str) -> str:
         if s in self.cache:
@@ -119,17 +114,32 @@ class Translator:
             self.cache[s] = s
             return s
 
-        masked, mapping = self._mask(s)
-        ru = argostranslate.translate.translate(masked, "en", "ru")
-        self.calls += 1
-        for token, original in mapping:
-            if token not in ru:
-                self.failed.append({"source": s, "masked": masked, "translation": ru, "missing": token})
-                self.cache[s] = s
-                return s
-            ru = ru.replace(token, original)
+        protected = self._protected_regex()
+        pieces = protected.split(s)
+        out = []
+        for piece in pieces:
+            if not piece:
+                continue
+            if protected.fullmatch(piece):
+                out.append(piece)
+                continue
+            if not ASCII_ALPHA_RE.search(piece):
+                out.append(piece)
+                continue
+            ru_piece = argostranslate.translate.translate(piece, "en", "ru")
+            self.calls += 1
+            out.append(normalize_ru(ru_piece))
 
-        ru = normalize_ru(ru)
+        ru = "".join(out)
+        # Exact invariant: all protected controls/canonical terms occur in the
+        # same order after translation because they were never model input.
+        before = protected.findall(s)
+        after = protected.findall(ru)
+        if before != after:
+            self.failed.append({"source": s, "translation": ru, "before": before, "after": after})
+            self.cache[s] = s
+            return s
+
         if not CYRILLIC_RE.search(ru):
             self.cache[s] = s
             return s
