@@ -16,7 +16,7 @@ ASCII_ALPHA_RE = re.compile(r"[A-Za-z]")
 ASM_STRING_RE = re.compile(r'^(?P<prefix>\s*\.string\s+)"(?P<body>(?:\\.|[^"\\])*)"\s*$')
 C_MACRO_RE = re.compile(r'(?P<macro>COMPOUND_STRING|_)\s*\(\s*(?P<body>(?:"(?:\\.|[^"\\])*"\s*)+)\)', re.S)
 C_QUOTED_RE = re.compile(r'"(?P<body>(?:\\.|[^"\\])*)"')
-CONTROL_RE = re.compile(r'\{[^{}]+\}|\\[A-Za-z0-9_]+|\$')
+CONTROL_RE = re.compile(r'\{[^{}]+\}|\\[npl]|\$')
 
 TARGET_ASM = [
     "data/text/trainers.inc",
@@ -32,7 +32,7 @@ TARGET_C = [
 
 def visible_text(s: str) -> str:
     s = re.sub(r"\{[^{}]*\}", " ", s)
-    s = re.sub(r"\\[A-Za-z0-9_]+", " ", s)
+    s = re.sub(r"\\[npl]", " ", s)
     s = s.replace("$", " ")
     return re.sub(r"\s+", " ", s).strip()
 
@@ -102,7 +102,7 @@ class Translator:
         # Protect runtime controls and every canonical Pokémon / Move / Ability
         # term by splitting around them. Protected spans never enter Argos.
         terms = [re.escape(x) for x in self.canonical_terms if x]
-        parts = [r'\{[^{}]+\}', r'\\[A-Za-z0-9_]+', r'\$']
+        parts = [r'\{[^{}]+\}', r'\\[npl]', r'\$']
         if terms:
             parts.append("|".join(terms))
         return re.compile("(" + "|".join(parts) + ")")
