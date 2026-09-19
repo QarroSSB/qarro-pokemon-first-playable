@@ -34,6 +34,13 @@ def main():
     translated = []
     cleaned = []
 
+    trainers = root / "data/text/trainers.inc"
+    replace_once(trainers,
+                 '\t.string "← Мы всегда сражаемся POKeMON,\\nЯ и моя сестра.\\pЯ всегда проигрываю, но мы можем победить тебя.\\n2 на 2!$"',
+                 '\t.string "РЭЙ: Мы всегда сражаемся POKeMON,\\nЯ и моя сестра.\\pЯ всегда проигрываю, но мы можем победить тебя.\\n2 на 2!$"',
+                 "Ray trainer name mistranslated as arrow")
+    cleaned.append("Route107_Text_RayIntro")
+
     battle = root / "src/battle_message.c"
     replace_once(battle, '[DOME_ROUND1]    = COMPOUND_STRING("Round 1"),',
                          '[DOME_ROUND1]    = COMPOUND_STRING("Раунд 1"),', "DOME round 1")
