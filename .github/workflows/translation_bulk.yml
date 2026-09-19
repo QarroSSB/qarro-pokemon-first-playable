@@ -1,0 +1,143 @@
+name: Qarro Bulk RU Translation Generator
+
+on:
+  push:
+    branches:
+      - tool/translation-probe-20260919
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+env:
+  PINNED: e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7
+  BASE_BUILD_ARTIFACT_ID: "10575289401"
+  EXPECTED_BASE_CANDIDATES: "3881"
+
+jobs:
+  generate-static-translation-patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout generator branch
+        uses: actions/checkout@v4
+        with:
+          path: qarro-repo
+
+      - name: Checkout exact Expansion 1.17.0
+        uses: actions/checkout@v4
+        with:
+          repository: rh-hideout/pokeemerald-expansion
+          ref: ${{ env.PINNED }}
+          path: upstream
+
+      - name: Download exact FULL GREEN Build 648 artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl -fL \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${BASE_BUILD_ARTIFACT_ID}/zip" \
+            -o build648.zip
+          mkdir build648
+          unzip -q build648.zip -d build648
+          PATCH="$(find build648 -name qarro_applied_diff_v3_8.patch -print -quit)"
+          test -n "$PATCH"
+          git -C upstream apply --whitespace=nowarn "../$PATCH"
+
+      - name: Freeze exact post-patch base
+        run: |
+          set -euo pipefail
+          git -C upstream config user.name "Qarro Translation Generator"
+          git -C upstream config user.email "actions@users.noreply.github.com"
+          git -C upstream add -A
+          git -C upstream commit -m "Qarro FULL GREEN Build 648 base"
+
+      - name: Verify base audit count
+        run: |
+          set -euo pipefail
+          python qarro-repo/ci/audit_ru_runtime_surface_v3_21.py upstream
+          python - <<'PY'
+          import json, os
+          p="upstream/build/qarro_ru_runtime_surface_v3_21_audit.json"
+          n=json.load(open(p,encoding="utf-8"))["fullSurface"]["englishOnlyCandidateCount"]
+          exp=int(os.environ["EXPECTED_BASE_CANDIDATES"])
+          print("base candidates", n)
+          if n != exp:
+              raise SystemExit(f"expected exact base {exp}, got {n}")
+          PY
+          cp upstream/build/qarro_ru_runtime_surface_v3_21_audit.json base_audit.json
+
+      - name: Install Argos Translate
+        run: pip install --disable-pip-version-check argostranslate==1.10.0
+
+      - name: Generate bulk Russian translation
+        run: |
+          set -euo pipefail
+          python qarro-repo/ci/generate_bulk_ru_argos.py upstream
+
+      - name: Audit translated surface
+        run: |
+          set -euo pipefail
+          python qarro-repo/ci/audit_ru_runtime_surface_v3_21.py upstream
+          cp upstream/build/qarro_ru_runtime_surface_v3_21_audit.json translated_audit.json
+          cp upstream/build/qarro_argos_bulk_translation_report.json translation_report.json
+          python - <<'PY'
+          import json
+          j=json.load(open("translated_audit.json",encoding="utf-8"))["fullSurface"]
+          print("after candidates", j["englishOnlyCandidateCount"])
+          print("after files", j["filesWithCandidates"])
+          print(json.dumps(j["byFile"], ensure_ascii=False, indent=2))
+          if j["englishOnlyCandidateCount"] >= 700:
+              raise SystemExit("bulk translation did not reduce candidate count enough")
+          PY
+
+      - name: Build static translation-only patch
+        run: |
+          set -euo pipefail
+          git -C upstream diff --binary HEAD -- \
+            data/text/trainers.inc \
+            data/text/fame_checker_frlg.inc \
+            data/text/trainers_frlg.inc \
+            data/scripts/cable_club_frlg.inc \
+            data/text/trainer_card_frlg.inc \
+            src/data/items.h \
+            src/battle_message.c \
+            src/strings.c \
+            src/pokedex.c \
+            src/data/pokemon/species_info/shared_dex_text.h \
+            > bulk_ru_v3_174.patch
+          test -s bulk_ru_v3_174.patch
+          git -C upstream diff --check HEAD
+
+      - name: Save generated static patch on generator branch
+        run: |
+          set -euo pipefail
+          cp bulk_ru_v3_174.patch qarro-repo/ci/generated_bulk_ru_v3_174.patch
+          cp base_audit.json qarro-repo/ci/generated_bulk_ru_v3_174_base_audit.json
+          cp translated_audit.json qarro-repo/ci/generated_bulk_ru_v3_174_after_audit.json
+          cp translation_report.json qarro-repo/ci/generated_bulk_ru_v3_174_report.json
+          cd qarro-repo
+          git config user.name "Qarro Translation Generator"
+          git config user.email "actions@users.noreply.github.com"
+          git add ci/generated_bulk_ru_v3_174*
+          if git diff --cached --quiet; then
+            echo "No generated files changed"
+          else
+            git commit -m "generated: static bulk RU patch v3.174 [skip ci]"
+            git push origin HEAD:tool/translation-probe-20260919
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bulk-ru-v3-174
+          path: |
+            bulk_ru_v3_174.patch
+            base_audit.json
+            translated_audit.json
+            translation_report.json
