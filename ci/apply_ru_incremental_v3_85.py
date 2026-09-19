@@ -181,6 +181,7 @@ SCRIPTS = [
     "localize_trainers_frlg_quality_routes16b_17_v3_192.py",
     "localize_trainers_frlg_quality_finish_v3_195.py",
     "localize_strings_core_quality_v3_196.py",
+    "localize_strings_ui_quality_v3_197.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
