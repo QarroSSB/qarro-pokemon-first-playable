@@ -21,7 +21,8 @@ def patch_symbol(text,symbol,expected,replacement):
     ms=list(rx.finditer(text))
     if len(ms)!=1: raise RuntimeError(f'{symbol}: expected one definition, got {len(ms)}')
     m=ms[0]; actual=decode_body(m.group('body'))
-    if actual==replacement: return text\n    if actual!=expected: raise RuntimeError(f'{symbol}: source drift\\nEXPECTED={expected!r}\\nACTUAL={actual!r}')
+    if actual==replacement: return text
+    if actual!=expected: raise RuntimeError(f'{symbol}: source drift\\nEXPECTED={expected!r}\\nACTUAL={actual!r}')
     new=m.group('head')+encode_body(replacement)+m.group('tail')
     return text[:m.start()]+new+text[m.end():]
 def main():
