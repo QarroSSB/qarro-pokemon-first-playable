@@ -102,7 +102,7 @@ class Translator:
         # Protect runtime controls and every canonical Pokémon / Move / Ability
         # term by splitting around them. Protected spans never enter Argos.
         terms = [re.escape(x) for x in self.canonical_terms if x]
-        parts = [r'\\{[^{}]+\\}', r'\\\\[A-Za-z0-9_]+', r'\\$']
+        parts = [r'\{[^{}]+\}', r'\\[A-Za-z0-9_]+', r'\$']
         if terms:
             parts.append("|".join(terms))
         return re.compile("(" + "|".join(parts) + ")")
@@ -210,8 +210,9 @@ def main() -> int:
     canonical = collect_canonical_terms(root)
     tr = Translator(canonical)
 
-    probe = tr.translate("{STR_VAR_1} used Rock Smash!$")
-    if "{STR_VAR_1}" not in probe or "Rock Smash" not in probe or "$" not in probe:
+    probe_src = "{STR_VAR_1} used Rock Smash!\\nDone.$"
+    probe = tr.translate(probe_src)
+    if "{STR_VAR_1}" not in probe or "Rock Smash" not in probe or "\\n" not in probe or "$" not in probe:
         raise RuntimeError(f"placeholder/canon preflight failed: {probe!r}")
 
     report = {"targetAsm": {}, "targetC": {}, "canonicalTermCount": len(canonical)}
