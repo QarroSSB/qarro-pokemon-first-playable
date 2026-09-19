@@ -194,6 +194,9 @@ def main() -> int:
         # existing project uses quote sanitization for the same reason. Replace
         # escaped runtime double quotes with supported apostrophes.
         text = text.replace(r'\"', "'")
+        # Argos emitted one decorative U+2190 arrow in trainer dialogue.
+        # The pinned FireRed charmap does not define it, so remove it.
+        text = text.replace("← ", "").replace("←", "")
         path.write_text(text, encoding="utf-8")
         by_file[rel] = {
             "microHunks": len(parsed[rel]),
