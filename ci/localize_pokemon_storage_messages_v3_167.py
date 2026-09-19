@@ -52,7 +52,92 @@ def main() -> int:
         pat = re.compile(
             rf'(?m)^(?P<prefix>\s*\[{re.escape(key)}\]\s*=\s*\{{COMPOUND_STRING\(")'
             rf'{re.escape(old)}'
-            rf'(?P<suffix>"\),\s*MSG_VAR_NONE\}},\s*)
+            rf'(?P<suffix>"\),\s*MSG_VAR_NONE\}},\s*)        )
+        matches = list(pat.finditer(text))
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"expected exactly one pinned MSG_VAR_NONE anchor for {key}; found {len(matches)}"
+            )
+        match = matches[0]
+        text = (
+            text[:match.start()]
+            + match.group("prefix")
+            + new
+            + match.group("suffix")
+            + text[match.end():]
+        )
+        translated.append({"key": key, "old": old, "new": new})
+
+    path.write_text(text, encoding="utf-8")
+
+    out = root / "build" / "qarro_ru_pss_messages_v3_167_audit.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps({
+        "marker": MARKER,
+        "file": str(REL),
+        "pinnedUpstream": PINNED_UPSTREAM,
+        "translated": translated,
+        "translatedCount": len(translated),
+        "scope": "ten additional Pokemon Storage MSG_VAR_NONE runtime messages only",
+        "policy": "Pokemon/Move/Ability proper names English; descriptions/UI/dialogue/system text Russian",
+        "logicTouched": False,
+        "ashBondTouched": False,
+        "ashCapTouched": False,
+    }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    print(
+        f"[{MARKER}] PASS: translated {len(translated)} additional Pokémon Storage runtime messages; "
+        "gameplay/logic/Ash untouched"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
+        )
+        matches = list(pat.finditer(text))
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"expected exactly one pinned MSG_VAR_NONE anchor for {key}; found {len(matches)}"
+            )
+        match = matches[0]
+        text = (
+            text[:match.start()]
+            + match.group("prefix")
+            + new
+            + match.group("suffix")
+            + text[match.end():]
+        )
+        translated.append({"key": key, "old": old, "new": new})
+
+    path.write_text(text, encoding="utf-8")
+
+    out = root / "build" / "qarro_ru_pss_messages_v3_167_audit.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps({
+        "marker": MARKER,
+        "file": str(REL),
+        "pinnedUpstream": PINNED_UPSTREAM,
+        "translated": translated,
+        "translatedCount": len(translated),
+        "scope": "ten additional Pokemon Storage MSG_VAR_NONE runtime messages only",
+        "policy": "Pokemon/Move/Ability proper names English; descriptions/UI/dialogue/system text Russian",
+        "logicTouched": False,
+        "ashBondTouched": False,
+        "ashCapTouched": False,
+    }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    print(
+        f"[{MARKER}] PASS: translated {len(translated)} additional Pokémon Storage runtime messages; "
+        "gameplay/logic/Ash untouched"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
         )
         matches = list(pat.finditer(text))
         if len(matches) != 1:
