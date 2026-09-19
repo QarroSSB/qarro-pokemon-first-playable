@@ -102,7 +102,7 @@ BLOCKS=[
 ("data/scripts/route23.inc","Text_OnlyPassWithBadgeDontHaveYet",r'''Text_OnlyPassWithBadgeDontHaveYet::
 	.string "Здесь можно пройти только с\n"
 	.string "{STR_VAR_1}.\p"
-	.string "У тебя его пока нет.\p"
+	.string "У тебя пока нет {STR_VAR_1}.\p"
 	.string "Он нужен, чтобы попасть в\n"
 	.string "POKeMON LEAGUE.$"
 '''),
