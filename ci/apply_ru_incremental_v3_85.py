@@ -186,6 +186,7 @@ SCRIPTS = [
     "localize_strings_dynamic_quality_v3_199.py",
     "localize_battle_message_core_quality_v3_200.py",
     "localize_battle_message_progression_quality_v3_201.py",
+    "localize_battle_message_status_quality_v3_202.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
