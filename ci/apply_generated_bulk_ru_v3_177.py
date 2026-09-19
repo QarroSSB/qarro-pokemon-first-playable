@@ -113,6 +113,23 @@ def replace_group(text: str, rel: str, idx: int, g: dict):
     if text.count(new) >= 1:
         return text, "already", "new-body"
 
+    # Older bulk source may contain an English block that a later dedicated
+    # pass has already translated. For ASM labeled blocks, accept that newer
+    # translation only when the same exact label exists once and its current
+    # body already contains Cyrillic text.
+    if prev is not None:
+        lm = re.fullmatch(r"([A-Za-z0-9_]+)::", prev.strip())
+        if lm:
+            label = lm.group(1)
+            ms = list(re.finditer(rf"(?m)^{re.escape(label)}::\\s*$", text))
+            if len(ms) == 1:
+                start = ms[0].end()
+                nxt = re.search(r"(?m)^[A-Za-z0-9_]+::\\s*$", text[start:])
+                end = start + nxt.start() if nxt else len(text)
+                body = text[start:end]
+                if re.search(r"[А-Яа-яЁё]", body):
+                    return text, "already", "label-cyrillic"
+
     counts = [(mode, text.count(needle)) for needle, _, mode in candidates]
     raise RuntimeError(
         f"{rel}: micro-hunk {idx} not uniquely applicable; counts={counts}; "
