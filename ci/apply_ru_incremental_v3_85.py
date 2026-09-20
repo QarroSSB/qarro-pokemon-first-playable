@@ -191,6 +191,7 @@ SCRIPTS = [
     "localize_battle_message_weather_quality_v3_204.py",
     "localize_battle_message_capture_quality_v3_205.py",
     "localize_battle_message_obedience_safari_quality_v3_206.py",
+    "localize_battle_message_item_recovery_quality_v3_207.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
