@@ -1,20 +1,17 @@
 #!/usr/bin/env python3
-"""Qarro QoL wrapper: proven v3.5 behavior + v3.22 toggleable Exp. Share.
+"""Qarro Gym-test QoL wrapper: preserve proven Build 249 behavior only.
 
-Runs the exact Build 249 QoL implementation first, then applies the next
-confirmed project feature: one-time post-Pokedex Exp. Share with party-wide
-Gen 6-style ON/OFF Key Item behavior. Species/content policy remains Gen I-V.
-Ash Bond / Ash Cap remain untouched.
+This isolated test branch must remain without Exp. Share while Gym 5-of-6
+behavior is being validated. FireRed / Expansion 1.17.0 / Gen I-V policy only.
+Ash Bond / Ash Cap remain untouched and are never reconnected here.
 """
 from __future__ import annotations
 
 import subprocess
-import sys
 from pathlib import Path
 
 BASE_COMMIT = "cdce73eba8ca7c7b6c2ef12eca199e197abe2687"
 BASE_PATH = "ci/qol_v3_5.py"
-FOLLOWUP_PATH = "ci/exp_share_v3_22.py"
 
 
 def load_from_git(repo: Path, commit: str, path: str, module_name: str) -> dict:
@@ -31,32 +28,16 @@ def load_from_git(repo: Path, commit: str, path: str, module_name: str) -> dict:
     return ns
 
 
-def load_followup(repo: Path) -> dict:
-    path = repo / FOLLOWUP_PATH
-    if not path.is_file():
-        raise RuntimeError(f"missing Qarro Exp. Share follow-up: {path}")
-    code = path.read_text(encoding="utf-8")
-    ns = {"__name__": "qarro_exp_share_v322", "__file__": str(path.resolve())}
-    exec(compile(code, str(path), "exec"), ns)
-    return ns
-
-
 def main() -> int:
     repo = Path(__file__).resolve().parents[1]
-
     base = load_from_git(repo, BASE_COMMIT, BASE_PATH, "qarro_qol_build249_baseline")
     rc = int(base["main"]() or 0)
     if rc:
         return rc
 
-    followup = load_followup(repo)
-    rc = int(followup["main"]() or 0)
-    if rc:
-        return rc
-
     print(
-        "[QARRO_QOL_V3_22] PASS: Build 249 QoL preserved; post-Pokedex toggleable "
-        "party-wide Exp. Share added; Gen I-V content policy and Ash protections unchanged"
+        "[QARRO_QOL_GYM_TEST] PASS: Build 249 QoL preserved; Exp. Share intentionally absent "
+        "on isolated Gym test branch; Gen I-V policy and Ash protections unchanged"
     )
     return 0
 
