@@ -193,6 +193,7 @@ SCRIPTS = [
     "localize_battle_message_obedience_safari_quality_v3_206.py",
     "localize_battle_message_item_recovery_quality_v3_207.py",
     "localize_battle_message_misc_effects_quality_v3_208.py",
+    "localize_battle_message_utility_quality_v3_209.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
