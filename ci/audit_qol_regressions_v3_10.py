@@ -4,7 +4,8 @@
 Checks the already-applied patches without changing gameplay data:
 - defeat cannot remove player money, while trainer-win rewards remain;
 - ordinary Bag Balls are refunded only on failed captures, never successful ones;
-- starter supplies are granted exactly once in Oak's initial post-Pokedex scene.
+- starter supplies are granted exactly once in Oak's initial post-Pokedex scene;
+- the isolated Gym 5-of-6 test branch remains without Exp. Share.
 
 FireRed / Expansion 1.17.0 / Gen I-V policy only. Ash Bond / Ash Cap untouched.
 """
@@ -147,6 +148,34 @@ def audit_starter_kit(root: Path) -> dict:
     }
 
 
+def audit_no_exp_share(root: Path) -> dict:
+    config = read(root / "include/config/item.h")
+    oak = read(root / "data/maps/PalletTown_ProfessorOaksLab_Frlg/scripts.inc")
+
+    native_flag = "#define I_EXP_SHARE_FLAG        0"
+    native_item = "#define I_EXP_SHARE_ITEM        GEN_5"
+    if config.count(native_flag) != 1:
+        raise RuntimeError("Gym test branch no longer has native disabled I_EXP_SHARE_FLAG")
+    if config.count(native_item) != 1:
+        raise RuntimeError("Gym test branch no longer has native Gen V Exp. Share item mode")
+
+    forbidden_oak = (
+        "giveitem ITEM_EXP_SHARE",
+        "setflag FLAG_0x260",
+        "Qarro v3.22: give toggleable party-wide Exp. Share",
+    )
+    hits = [token for token in forbidden_oak if token in oak]
+    if hits:
+        raise RuntimeError(f"Gym test branch unexpectedly grants/enables Exp. Share: {hits}")
+
+    return {
+        "enabled": False,
+        "oakGrant": False,
+        "partyWideFlag": False,
+        "nativeItemMode": "GEN_5",
+    }
+
+
 def main() -> int:
     if len(sys.argv) != 2:
         print(f"usage: {Path(sys.argv[0]).name} <upstream-root>", file=sys.stderr)
@@ -158,6 +187,7 @@ def main() -> int:
         "money": audit_money(root),
         "failedCatchBall": audit_failed_catch_ball(root),
         "starterKit": audit_starter_kit(root),
+        "expShare": audit_no_exp_share(root),
         "ashBondTouched": False,
         "ashCapTouched": False,
     }
@@ -166,7 +196,7 @@ def main() -> int:
     out.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(
         f"[{MARKER}] PASS: defeat money protected; failed-catch Ball refund is failure-only; "
-        "post-Pokedex starter kit remains one-time"
+        "post-Pokedex starter kit remains one-time; Gym test branch has no Exp. Share"
     )
     print(f"audit: {out}")
     return 0
