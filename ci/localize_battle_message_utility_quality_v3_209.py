@@ -3,6 +3,7 @@
 from __future__ import annotations
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -119,7 +120,9 @@ def main() -> int:
         "ashBondTouched": False,
         "ashCapTouched": False,
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"[{MARKER}] PASS: polished {len(TRANSLATIONS)} battle utility/item/ability strings")
+    next_script = Path(__file__).with_name("localize_battle_message_utility_repolish_v3_210.py")
+    subprocess.run([sys.executable, str(next_script), str(root)], check=True)
+    print(f"[{MARKER}] PASS: polished {len(TRANSLATIONS)} battle utility/item/ability strings; chained v3.210")
     return 0
 
 if __name__ == "__main__":
