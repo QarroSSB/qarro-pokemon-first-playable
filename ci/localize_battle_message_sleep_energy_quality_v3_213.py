@@ -3,6 +3,7 @@
 from __future__ import annotations
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -67,15 +68,10 @@ def replace_entry(path: Path, string_id: str, expected: str, translated: str) ->
     if current != expected:
         raise RuntimeError(f"{string_id}: source drift: {current!r} != {expected!r}")
     if control_tokens(current) != control_tokens(translated):
-        raise RuntimeError(
-            f"{string_id}: control-token drift old={control_tokens(current)} new={control_tokens(translated)}"
-        )
+        raise RuntimeError(f"{string_id}: control-token drift old={control_tokens(current)} new={control_tokens(translated)}")
     if '"' in translated or set(translated) & BANNED_UNICODE:
         raise RuntimeError(f"{string_id}: invalid translation surface")
-    path.write_text(
-        text[:m.start()] + m.group("prefix") + translated + m.group("suffix") + text[m.end():],
-        encoding="utf-8",
-    )
+    path.write_text(text[:m.start()] + m.group("prefix") + translated + m.group("suffix") + text[m.end():], encoding="utf-8")
 
 def main() -> int:
     if len(sys.argv) != 2:
@@ -103,7 +99,9 @@ def main() -> int:
         "ashBondTouched": False,
         "ashCapTouched": False,
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"[{MARKER}] PASS: polished {len(TRANSLATIONS)} sleep/uproar/energy battle strings")
+    next_script = Path(__file__).with_name("localize_battle_message_final_repolish_v3_214.py")
+    subprocess.run([sys.executable, str(next_script), str(root)], check=True)
+    print(f"[{MARKER}] PASS: polished {len(TRANSLATIONS)} sleep/uproar/energy battle strings; chained v3.214")
     return 0
 
 if __name__ == "__main__":
