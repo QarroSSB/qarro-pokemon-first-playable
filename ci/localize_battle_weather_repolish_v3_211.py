@@ -1,44 +1,57 @@
 #!/usr/bin/env python3
-from pathlib import Path
+"""Qarro v3.211: human-quality repolish for remaining battle weather phrasing."""
+from __future__ import annotations
+import json
 import re
+import sys
+from pathlib import Path
 
-ROOT = Path.cwd()
-TARGET = ROOT / "src" / "battle_message.c"
-
+MARKER = "QARRO_RU_BATTLE_WEATHER_REPOLISH_V3_211"
+TARGET = Path("src/battle_message.c")
 REPLACEMENTS = [
     ("Песчаная буря стихла.", "Песчаная буря утихла."),
     ("Пошёл дождь!", "Начался дождь!"),
     ("Солнечный свет стал ярче!", "Солнце засияло ярче!"),
 ]
 
+def control_tokens(text: str) -> list[str]:
+    return re.findall(r"\{[^}]+\}|\\[npl]|\$", text)
 
-def control_signature(text: str):
-    return re.findall(r"\\[npl]|\\x[0-9A-Fa-f]{2}|\\[{}]", text)
-
-
-def main():
-    text = TARGET.read_text(encoding="utf-8")
+def main() -> int:
+    if len(sys.argv) != 2:
+        raise SystemExit("usage: localize_battle_weather_repolish_v3_211.py <upstream-root>")
+    root = Path(sys.argv[1]).resolve()
+    path = root / TARGET
+    text = path.read_text(encoding="utf-8")
     original = text
-
     for old, new in REPLACEMENTS:
         count = text.count(old)
         if count != 1:
-            raise SystemExit(f"FAIL v3.211: expected exactly one anchor for {old!r}, got {count}")
-        if control_signature(old) != control_signature(new):
-            raise SystemExit(f"FAIL v3.211: control-token mismatch for {old!r}")
+            raise RuntimeError(f"v3.211 anchor drift: {old!r} count={count}")
+        if control_tokens(old) != control_tokens(new):
+            raise RuntimeError(f"v3.211 control-token drift: {old!r}")
         text = text.replace(old, new, 1)
-
     if text == original:
-        raise SystemExit("FAIL v3.211: no changes applied")
-
-    TARGET.write_text(text, encoding="utf-8")
-    print("PASS v3.211: battle weather human-quality repolish applied")
-    print(f"changedStrings:{len(REPLACEMENTS)}")
-    print("gameplayTouched:false")
-    print("balanceTouched:false")
-    print("ashBondTouched:false")
-    print("ashCapTouched:false")
-
+        raise RuntimeError("v3.211 made no changes")
+    path.write_text(text, encoding="utf-8")
+    out = root / "build" / "qarro_ru_battle_weather_repolish_v3_211_audit.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps({
+        "marker": MARKER,
+        "targetFile": str(TARGET),
+        "qualityPassStrings": len(REPLACEMENTS),
+        "humanEditedRussian": True,
+        "sourceAnchorsFailClosed": True,
+        "controlTokensPreserved": True,
+        "gameplayLogicTouched": False,
+        "balanceTouched": False,
+        "bossTeamsTouched": False,
+        "specialWhitelistTouched": False,
+        "ashBondTouched": False,
+        "ashCapTouched": False,
+    }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"[{MARKER}] PASS: repolished {len(REPLACEMENTS)} battle weather strings")
+    return 0
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
