@@ -5,8 +5,9 @@ Runs after the existing QoL and RU foundation audits. It verifies that their
 machine-readable reports exist and still encode the confirmed user policy:
 FireRed / Expansion 1.17.0 / Gen I-V, readable Cyrillic coverage, no money
 loss on defeat, failed-catch Ball refund only, the one-time post-Pokedex
-starter kit, and the confirmed post-Viridian visible ground-item progression.
-It changes no gameplay data and does not touch Ash Bond/Cap.
+starter kit, no Exp. Share on the Gym test branch, and the confirmed
+post-Viridian visible ground-item progression. It changes no gameplay data
+and does not touch Ash Bond/Cap.
 """
 from __future__ import annotations
 
@@ -53,6 +54,7 @@ def main() -> int:
     money = qol.get("money", {})
     catch = qol.get("failedCatchBall", {})
     kit = qol.get("starterKit", {})
+    exp_share = qol.get("expShare", {})
     require(money.get("removeMoneyCalls") == 0, "defeat money regression")
     require(money.get("winRewardPreserved") is True, "trainer win reward regression")
     require(catch.get("refundCalls") == 1, "failed-catch Ball refund count regression")
@@ -65,6 +67,10 @@ def main() -> int:
     require(kit.get("antidotes") == 5, "starter Antidote total regression")
     require(kit.get("paralyzeHeals") == 5, "starter Paralyze Heal total regression")
     require(kit.get("duplicateNewGameGrant") is False, "duplicate starter grant regression")
+    require(exp_share.get("enabled") is False, "Gym test Exp. Share enabled regression")
+    require(exp_share.get("oakGrant") is False, "Gym test Oak Exp. Share grant regression")
+    require(exp_share.get("partyWideFlag") is False, "Gym test party-wide Exp. Share regression")
+    require(exp_share.get("nativeItemMode") == "GEN_5", "Gym test Exp. Share item-mode regression")
     require(qol.get("ashBondTouched") is False and qol.get("ashCapTouched") is False,
             "Ash invariant regression in QoL audit")
 
@@ -112,6 +118,7 @@ def main() -> int:
         "marker": MARKER,
         "policy": "FireRed / Expansion 1.17.0 / Gen I-V",
         "qolRegression": "PASS",
+        "noExpShare": "PASS",
         "ruFoundation": "PASS",
         "ruBaseline": {
             "scannedTextFilesAtLeast": EXPECTED_RU_SCANNED_FILES,
@@ -145,7 +152,7 @@ def main() -> int:
         print(f"[{MARKER}] preserved 4 regression audit reports in {ci_out}")
 
     print(
-        f"[{MARKER}] PASS: QoL + RU foundation + ground-item policies remain internally consistent; "
+        f"[{MARKER}] PASS: QoL + no-Exp-Share + RU foundation + ground-item policies remain internally consistent; "
         f"RU baseline >= {EXPECTED_RU_FILES_WITH_CYRILLIC} files / {EXPECTED_RU_CYRILLIC_CHARACTERS} chars"
     )
     print(f"audit: {out}")
