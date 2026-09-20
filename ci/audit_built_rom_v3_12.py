@@ -3,9 +3,10 @@
 
 Read-only: verifies the produced ROM is a plausible 32 MiB FireRed BPRE image,
 its recorded SHA-256 matches the actual bytes, all prerequisite regression
-reports are present, and the RU+EN font/localization foundation evidence is
-actually healthy rather than merely present. No gameplay/source data is
-modified; Ash Bond and Ash Cap are never touched.
+reports are present, the consolidated regression bundle still encodes the
+confirmed QoL/no-Exp-Share policy, and the RU+EN font/localization foundation
+evidence is actually healthy rather than merely present. No gameplay/source
+data is modified; Ash Bond and Ash Cap are never touched.
 """
 from __future__ import annotations
 
@@ -131,9 +132,21 @@ def main() -> int:
     require(bool(sha_tokens), "empty ROM checksum file")
     require(sha_tokens[0].lower() == actual_sha, "ROM SHA-256 mismatch")
 
+    audits = {}
     for name, marker in REQUIRED_AUDITS.items():
         data = load_json(out / name)
         require(data.get("marker") == marker, f"audit marker drift: {name}")
+        audits[name] = data
+
+    bundle = audits["qarro_regression_bundle_v3_11_audit.json"]
+    require(bundle.get("policy") == "FireRed / Expansion 1.17.0 / Gen I-V",
+            "consolidated policy drift")
+    require(bundle.get("qolRegression") == "PASS", "consolidated QoL regression evidence missing")
+    require(bundle.get("noExpShare") == "PASS", "consolidated no-Exp-Share evidence missing")
+    require(bundle.get("ruFoundation") == "PASS", "consolidated RU foundation evidence missing")
+    require(bundle.get("groundItems") == "PASS", "consolidated ground-item evidence missing")
+    require(bundle.get("ashBondTouched") is False and bundle.get("ashCapTouched") is False,
+            "Ash invariant regression in consolidated evidence")
 
     ru_summary = verify_ru_foundation(load_json(out / RU_AUDIT))
 
@@ -144,6 +157,12 @@ def main() -> int:
         "gameCode": game_code,
         "sha256": actual_sha,
         "requiredAuditEvidence": sorted([*REQUIRED_AUDITS, RU_AUDIT]),
+        "consolidatedRegression": {
+            "qol": "PASS",
+            "noExpShare": "PASS",
+            "ruFoundation": "PASS",
+            "groundItems": "PASS",
+        },
         "ruFoundation": ru_summary,
         "ashBondTouched": False,
         "ashCapTouched": False,
@@ -151,7 +170,7 @@ def main() -> int:
     report_path = out / "qarro_built_rom_v3_12_audit.json"
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(
-        f"[{MARKER}] PASS: 32 MiB BPRE ROM + SHA-256 + regression evidence + "
+        f"[{MARKER}] PASS: 32 MiB BPRE ROM + SHA-256 + consolidated regression evidence + "
         f"{ru_summary['cyrillicGlyphs']} Cyrillic glyphs across {ru_summary['fontAtlases']} font atlases + "
         f"Russian text coverage verified"
     )
