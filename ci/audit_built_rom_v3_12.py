@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 """Post-build integrity gate for the Qarro FireRed artifact.
 
-Read-only: verifies the produced ROM is a plausible 32 MiB FireRed BPRE image,
-its recorded SHA-256 matches the actual bytes, all prerequisite regression
-reports are present, the consolidated regression bundle still encodes the
-confirmed QoL/no-Exp-Share policy, and the RU+EN font/localization foundation
-evidence is actually healthy rather than merely present. No gameplay/source
-data is modified; Ash Bond and Ash Cap are never touched.
+Read-only: verifies the produced ROM, checksum, consolidated regression bundle,
+QoL/no-Exp-Share evidence, and RU font/localization foundation. Gameplay is not
+modified; Ash Bond and Ash Cap are never touched.
 """
 from __future__ import annotations
 
@@ -26,15 +23,9 @@ REQUIRED_AUDITS = {
 }
 RU_AUDIT = "qarro_ru_foundation_v3_9_audit.json"
 EXPECTED_FONT_ATLASES = {
-    "latin_small_narrow.png",
-    "latin_small.png",
-    "latin_normal.png",
-    "latin_short.png",
-    "latin_narrow.png",
-    "latin_narrower.png",
-    "latin_small_narrower.png",
-    "latin_short_narrow.png",
-    "latin_short_narrower.png",
+    "latin_small_narrow.png", "latin_small.png", "latin_normal.png",
+    "latin_short.png", "latin_narrow.png", "latin_narrower.png",
+    "latin_small_narrower.png", "latin_short_narrow.png", "latin_short_narrower.png",
 }
 EXPECTED_EARLY_MARKERS = {"Привет", "ПОКЕМОН", "ПАЛЛЕТ", "ОУК", "МАМА", "Пора идти"}
 EXPECTED_CYRILLIC_GLYPHS = 66
@@ -55,57 +46,67 @@ def load_json(path: Path) -> dict:
     return data
 
 
+def verify_qol(qol: dict) -> dict:
+    money = qol.get("money", {})
+    catch = qol.get("failedCatchBall", {})
+    kit = qol.get("starterKit", {})
+    exp = qol.get("expShare", {})
+    require(money.get("removeMoneyCalls") == 0 and money.get("winRewardPreserved") is True,
+            "built-ROM QoL evidence: defeat-money policy drift")
+    require(catch.get("refundCalls") == 1, "built-ROM QoL evidence: Ball refund count drift")
+    require(catch.get("refundAfterSuccessfulCaptureReturn") is True,
+            "built-ROM QoL evidence: Ball refund escaped failed-capture path")
+    require(catch.get("successStillConsumesBall") is True and catch.get("safariExcluded") is True,
+            "built-ROM QoL evidence: capture-consumption policy drift")
+    require(kit.get("timing") == "initial post-Pokedex Oak scene" and kit.get("oneTimeSceneGuard") is True,
+            "built-ROM QoL evidence: starter-kit timing/guard drift")
+    require((kit.get("pokeBallsTotal"), kit.get("potions"), kit.get("antidotes"), kit.get("paralyzeHeals"))
+            == (20, 10, 5, 5), "built-ROM QoL evidence: starter-kit quantities drift")
+    require(kit.get("duplicateNewGameGrant") is False,
+            "built-ROM QoL evidence: duplicate starter grant")
+    require(exp.get("enabled") is False and exp.get("oakGrant") is False and exp.get("partyWideFlag") is False,
+            "built-ROM QoL evidence: Exp. Share enabled/granted")
+    require(exp.get("nativeItemMode") == "GEN_5", "built-ROM QoL evidence: Exp. Share item-mode drift")
+    require(qol.get("ashBondTouched") is False and qol.get("ashCapTouched") is False,
+            "Ash invariant regression in QoL evidence")
+    return {"money": "PASS", "failedCatchBall": "PASS", "starterKit": "PASS", "noExpShare": "PASS"}
+
+
 def verify_ru_foundation(ru: dict) -> dict:
     policy = ru.get("policy", "")
-    require(
-        "FireRed" in policy and "Expansion 1.17.0" in policy and "Gen I-V" in policy,
-        "RU policy evidence drift",
-    )
-    require(
-        ru.get("cyrillic_glyph_count") == EXPECTED_CYRILLIC_GLYPHS,
-        f"unexpected Cyrillic glyph count: {ru.get('cyrillic_glyph_count')!r}",
-    )
-
+    require("FireRed" in policy and "Expansion 1.17.0" in policy and "Gen I-V" in policy,
+            "RU policy evidence drift")
+    require(ru.get("cyrillic_glyph_count") == EXPECTED_CYRILLIC_GLYPHS,
+            f"unexpected Cyrillic glyph count: {ru.get('cyrillic_glyph_count')!r}")
     fonts = ru.get("fonts")
     require(isinstance(fonts, dict), "missing RU font-atlas evidence")
     require(set(fonts) == EXPECTED_FONT_ATLASES, "RU font-atlas set drift")
     for name in sorted(EXPECTED_FONT_ATLASES):
         evidence = fonts.get(name)
         require(isinstance(evidence, dict), f"invalid font evidence: {name}")
-        require(
-            evidence.get("cyrillic_nonempty") == EXPECTED_CYRILLIC_GLYPHS,
-            f"{name}: not all Cyrillic glyphs are non-empty",
-        )
-        require(
-            evidence.get("advance_raster_matches") == EXPECTED_CYRILLIC_GLYPHS,
-            f"{name}: raster/advance mismatch evidence",
-        )
+        require(evidence.get("cyrillic_nonempty") == EXPECTED_CYRILLIC_GLYPHS,
+                f"{name}: not all Cyrillic glyphs are non-empty")
+        require(evidence.get("advance_raster_matches") == EXPECTED_CYRILLIC_GLYPHS,
+                f"{name}: raster/advance mismatch evidence")
         require(int(evidence.get("min_ink_pixels", 0)) > 0, f"{name}: empty glyph ink evidence")
         require(4 <= int(evidence.get("min_advance", 0)) <= 16, f"{name}: invalid min advance")
         require(4 <= int(evidence.get("max_advance", 99)) <= 16, f"{name}: invalid max advance")
-
     text = ru.get("text")
     require(isinstance(text, dict), "missing Russian text audit evidence")
     require(int(text.get("scanned_text_files", 0)) >= 1000, "RU audit scanned too few text files")
     require(int(text.get("files_with_cyrillic", 0)) >= 10, "Russian localization coverage unexpectedly sparse")
     require(int(text.get("cyrillic_characters", 0)) >= 5000, "Russian localization character count unexpectedly sparse")
-
     hits = text.get("early_marker_hits")
     require(isinstance(hits, dict), "missing early-game Russian marker evidence")
     require(EXPECTED_EARLY_MARKERS.issubset(hits), "early-game Russian marker set drift")
     for marker in EXPECTED_EARLY_MARKERS:
         require(int(hits.get(marker, 0)) > 0, f"missing localized early-game marker: {marker}")
-
     require(int(text.get("accented_e_file_count", -1)) == 0, "unsupported accented-e remains in source text")
     require(text.get("files_still_containing_accented_e") == [], "accented-e file list is not empty")
-
     return {
-        "cyrillicGlyphs": EXPECTED_CYRILLIC_GLYPHS,
-        "fontAtlases": len(EXPECTED_FONT_ATLASES),
-        "scannedTextFiles": int(text["scanned_text_files"]),
-        "filesWithCyrillic": int(text["files_with_cyrillic"]),
-        "cyrillicCharacters": int(text["cyrillic_characters"]),
-        "earlyMarkers": len(EXPECTED_EARLY_MARKERS),
+        "cyrillicGlyphs": EXPECTED_CYRILLIC_GLYPHS, "fontAtlases": len(EXPECTED_FONT_ATLASES),
+        "scannedTextFiles": int(text["scanned_text_files"]), "filesWithCyrillic": int(text["files_with_cyrillic"]),
+        "cyrillicCharacters": int(text["cyrillic_characters"]), "earlyMarkers": len(EXPECTED_EARLY_MARKERS),
         "accentedEFiles": 0,
     }
 
@@ -114,66 +115,43 @@ def main() -> int:
     if len(sys.argv) != 2:
         print(f"usage: {Path(sys.argv[0]).name} <ci-output-dir>", file=sys.stderr)
         return 2
-
     out = Path(sys.argv[1]).resolve()
-    rom_path = out / ROM_NAME
-    sha_path = out / SHA_NAME
+    rom_path, sha_path = out / ROM_NAME, out / SHA_NAME
     require(rom_path.is_file(), f"missing built ROM: {rom_path}")
     require(sha_path.is_file(), f"missing ROM checksum: {sha_path}")
-
     rom = rom_path.read_bytes()
     require(len(rom) == 32 * 1024 * 1024, f"unexpected ROM size: {len(rom)}")
     require(len(rom) >= 0xB0, "ROM too small for GBA header")
     game_code = rom[0xAC:0xB0].decode("ascii", errors="replace")
     require(game_code == "BPRE", f"unexpected GBA game code: {game_code!r}")
-
     actual_sha = hashlib.sha256(rom).hexdigest()
     sha_tokens = sha_path.read_text(encoding="ascii").strip().split()
     require(bool(sha_tokens), "empty ROM checksum file")
     require(sha_tokens[0].lower() == actual_sha, "ROM SHA-256 mismatch")
-
     audits = {}
     for name, marker in REQUIRED_AUDITS.items():
         data = load_json(out / name)
         require(data.get("marker") == marker, f"audit marker drift: {name}")
         audits[name] = data
-
     bundle = audits["qarro_regression_bundle_v3_11_audit.json"]
-    require(bundle.get("policy") == "FireRed / Expansion 1.17.0 / Gen I-V",
-            "consolidated policy drift")
+    require(bundle.get("policy") == "FireRed / Expansion 1.17.0 / Gen I-V", "consolidated policy drift")
     require(bundle.get("qolRegression") == "PASS", "consolidated QoL regression evidence missing")
     require(bundle.get("noExpShare") == "PASS", "consolidated no-Exp-Share evidence missing")
     require(bundle.get("ruFoundation") == "PASS", "consolidated RU foundation evidence missing")
     require(bundle.get("groundItems") == "PASS", "consolidated ground-item evidence missing")
     require(bundle.get("ashBondTouched") is False and bundle.get("ashCapTouched") is False,
             "Ash invariant regression in consolidated evidence")
-
+    qol_summary = verify_qol(audits["qarro_qol_regression_v3_10_audit.json"])
     ru_summary = verify_ru_foundation(load_json(out / RU_AUDIT))
-
     report = {
-        "marker": MARKER,
-        "rom": ROM_NAME,
-        "sizeBytes": len(rom),
-        "gameCode": game_code,
-        "sha256": actual_sha,
+        "marker": MARKER, "rom": ROM_NAME, "sizeBytes": len(rom), "gameCode": game_code, "sha256": actual_sha,
         "requiredAuditEvidence": sorted([*REQUIRED_AUDITS, RU_AUDIT]),
-        "consolidatedRegression": {
-            "qol": "PASS",
-            "noExpShare": "PASS",
-            "ruFoundation": "PASS",
-            "groundItems": "PASS",
-        },
-        "ruFoundation": ru_summary,
-        "ashBondTouched": False,
-        "ashCapTouched": False,
+        "consolidatedRegression": {"qol": "PASS", "noExpShare": "PASS", "ruFoundation": "PASS", "groundItems": "PASS"},
+        "qolEvidence": qol_summary, "ruFoundation": ru_summary, "ashBondTouched": False, "ashCapTouched": False,
     }
     report_path = out / "qarro_built_rom_v3_12_audit.json"
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(
-        f"[{MARKER}] PASS: 32 MiB BPRE ROM + SHA-256 + consolidated regression evidence + "
-        f"{ru_summary['cyrillicGlyphs']} Cyrillic glyphs across {ru_summary['fontAtlases']} font atlases + "
-        f"Russian text coverage verified"
-    )
+    print(f"[{MARKER}] PASS: 32 MiB BPRE ROM + SHA-256 + direct QoL/no-Exp-Share evidence + consolidated regression evidence + {ru_summary['cyrillicGlyphs']} Cyrillic glyphs across {ru_summary['fontAtlases']} font atlases + Russian text coverage verified")
     print(f"audit: {report_path}")
     return 0
 
