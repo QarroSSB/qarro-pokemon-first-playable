@@ -7,8 +7,8 @@ Ash Bond / Ash Cap remain untouched and are never reconnected here.
 """
 from __future__ import annotations
 
+import runpy
 import subprocess
-import sys
 from pathlib import Path
 
 BASE_COMMIT = "cdce73eba8ca7c7b6c2ef12eca199e197abe2687"
@@ -37,18 +37,15 @@ def main() -> int:
     if rc:
         return rc
 
-    # Reassert the isolated Gym runtime after the preserved QoL baseline.
-    # The Gym pass is idempotent and scoped to the eight story Leaders only.
-    rc = subprocess.run(
-        [sys.executable, str(repo / GYM_PATH), sys.argv[1]],
-        check=False,
-    ).returncode
-    if rc:
-        return rc
+    # The no-legend six-candidate rosters are already installed by the earlier
+    # isolated Gym balance pass. Reassert only the runtime party interception
+    # after QoL; do not rerun roster mutation or touch unrelated gameplay data.
+    gym = runpy.run_path(str(repo / GYM_PATH), run_name="qarro_gym_runtime_reassert")
+    gym["patch_battle_setup"](Path(__import__("sys").argv[1]).resolve())
 
     print(
         "[QARRO_QOL_GYM_TEST] PASS: Build 249 QoL preserved; Exp. Share intentionally absent; "
-        "Gym 5-of-6 runtime reasserted after QoL; Gen I-V policy and Ash protections unchanged"
+        "Gym 5-of-6 runtime wiring reasserted after QoL; Gen I-V policy and Ash protections unchanged"
     )
     return 0
 
