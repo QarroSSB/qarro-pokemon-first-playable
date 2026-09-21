@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Qarro integration wrapper: localization + final Kanto Gym A/B/C + story bosses + Kanto League + e normalization.
+"""Qarro Gym-test localization integration wrapper.
 
 Runs the exact previously-green Oak lab localization from commit 0ddb5e3,
 applies every completed incremental Russian localization pass through the
-single ordered v3.85 manifest, establishes the green Kanto 6v6 Variant-A
-baseline, removes the historical 5-of-6 runtime interception, upgrades the eight
-story Gyms to final save-fixed A/B/C 6v6 selection, applies the two
-implementation-derived pre-Gym Giovanni story boss teams, installs the
-final-canon Kanto Elite Four and Champion first-clear 6v6 builds, and only then
-normalizes literal é/É to ordinary e/E.
+single ordered v3.85 manifest, preserves the isolated Gym 5-of-6 runtime
+contract, applies the two implementation-derived pre-Gym Giovanni story boss
+teams, installs the final-canon Kanto Elite Four and Champion first-clear 6v6
+builds, and only then normalizes literal é/É to ordinary e/E.
 
-The ordering keeps FireRed POKéMON anchors intact until all localization passes
-have consumed them. Ash Bond / Ash Cap are untouched.
+The old localization wrapper also installed the final Kanto 6v6 A/B/C Gym
+selector, which overwrote the isolated test branch's 5-of-6 runtime wiring.
+That Gym mutation is intentionally omitted here. Ash Bond / Ash Cap are
+untouched.
 """
 from __future__ import annotations
 
@@ -24,9 +24,6 @@ BASE_COMMIT = "0ddb5e33c653bc4550cecb18d5e0440232df7a8a"
 BASE_PATH = "ci/localize_oaks_lab_starter_v3_5.py"
 MARKER = "QARRO_POST_LOCALIZATION_E_V3_7"
 INCREMENTAL_RUNNER = "apply_ru_incremental_v3_85.py"
-GYM_SIX_RUNNER = "gym_six_variant_a_v3_86.py"
-GYM_SIX_FINALIZER = "gym_six_finalize_v3_88.py"
-KANTO_GYM_ABC_RUNNER = "gym_kanto_abc_v3_132_fix2.py"
 ROCKET_BOSS_RUNNER = "rocket_boss_giovanni_v3_98.py"
 KANTO_E4_BOSS_RUNNER = "boss_kanto_e4_first_v3_130.py"
 KANTO_CHAMPION_BOSS_RUNNER = "boss_kanto_champion_first_v3_131.py"
@@ -103,11 +100,10 @@ def main() -> int:
     # Apply translations while original POKéMON anchors still exist.
     run_ci_pass(root, INCREMENTAL_RUNNER)
 
-    # Establish the known-green six-Pokemon baseline, then layer the final
-    # save-fixed A/B/C selector without changing the eight story Leader IDs.
-    run_ci_pass(root, GYM_SIX_RUNNER)
-    run_ci_pass(root, GYM_SIX_FINALIZER)
-    run_ci_pass(root, KANTO_GYM_ABC_RUNNER)
+    # IMPORTANT: this isolated branch is testing deterministic 5-of-6 Gyms.
+    # Do not run gym_six_variant_a_v3_86.py, gym_six_finalize_v3_88.py or
+    # gym_kanto_abc_v3_132_fix2.py here: those passes replace battle_setup.c
+    # with the legacy/final 6v6 A/B/C selector and erase the 5-of-6 runtime.
 
     # Strengthen only the two story Giovanni battles. Exact rosters are
     # implementation-derived; final Gym Giovanni and ordinary Rocket trainers
@@ -154,13 +150,11 @@ def main() -> int:
         {
             "incrementalLocalizationManifest": INCREMENTAL_RUNNER,
             "incrementalLocalizationApplied": True,
-            "gymSixPass": GYM_SIX_RUNNER,
-            "gymSixFinalizer": GYM_SIX_FINALIZER,
-            "gymSixVariantATestApplied": True,
-            "legacyFiveOfSixRemoved": True,
-            "kantoGymABCPass": KANTO_GYM_ABC_RUNNER,
-            "kantoGymABC6v6Applied": True,
-            "kantoGymSaveFixedSelector": True,
+            "gymFiveOfSixPreserved": True,
+            "gymSixVariantATestApplied": False,
+            "legacyFiveOfSixRemoved": False,
+            "kantoGymABC6v6Applied": False,
+            "kantoGymSaveFixedSelector": False,
             "rocketBossPass": ROCKET_BOSS_RUNNER,
             "storyGiovanniImplementationDerived": True,
             "kantoEliteFourBossPass": KANTO_E4_BOSS_RUNNER,
@@ -180,8 +174,8 @@ def main() -> int:
     )
 
     print(
-        f"[{MARKER}] PASS: incremental RU + final Kanto 6v6 A/B/C + story Giovanni bosses + "
-        f"Kanto Elite Four + Champion first-clear canon applied; legacy 5-of-6 removed; "
+        f"[{MARKER}] PASS: incremental RU + isolated Gym 5-of-6 preserved + story Giovanni bosses + "
+        f"Kanto Elite Four + Champion first-clear canon applied; "
         f"{replacements} literal é/É -> e/E replacements in {changed_files} files; Ash code untouched"
     )
     return 0
