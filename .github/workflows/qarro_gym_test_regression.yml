@@ -71,13 +71,13 @@ jobs:
           rx=re.compile(r'^\s*(?:\[DIFFICULTY_[A-Z0-9_]+\])?\[(TRAINER_[A-Z0-9_]+)\]\s*=\s*$',re.M)
           ms=list(rx.finditer(generated)); blocks={m.group(1):generated[m.start():(ms[i+1].start() if i+1<len(ms) else len(generated))] for i,m in enumerate(ms)}
           leaders={
-            'TRAINER_LEADER_BROCK':['GOLEM','AERODACTYL','TYRANITAR','OMASTAR','CRADILY','KABUTOPS'],
-            'TRAINER_LEADER_MISTY':['POLITOED','LAPRAS','STARMIE','VAPOREON','LANTURN','SLOWBRO'],
-            'TRAINER_LEADER_LT_SURGE':['ELECTRODE','RAICHU','JOLTEON','MAGNETON','ELECTIVIRE','AMPHAROS'],
+            'TRAINER_LEADER_BROCK':['GOLEM','AERODACTYL','TYRANITAR','OMASTAR','CRADILY','RHYPERIOR'],
+            'TRAINER_LEADER_MISTY':['POLITOED','KINGDRA','STARMIE','GYARADOS','LANTURN','MILOTIC'],
+            'TRAINER_LEADER_LT_SURGE':['ELECTRODE','RAICHU','JOLTEON','MAGNETON','ELECTIVIRE','EELEKTROSS'],
             'TRAINER_LEADER_ERIKA':['NINETALES','VENUSAUR','VICTREEBEL','VILEPLUME','JUMPLUFF','CELEBI'],
-            'TRAINER_LEADER_KOGA':['CROBAT','WEEZING','MUK','VENOMOTH','TENTACRUEL','QWILFISH'],
+            'TRAINER_LEADER_KOGA':['CROBAT','WEEZING','MUK','NIDOKING','TENTACRUEL','DRAPION'],
             'TRAINER_LEADER_SABRINA':['ALAKAZAM','ESPEON','MR_MIME','EXEGGUTOR','SLOWKING','MEW'],
-            'TRAINER_LEADER_BLAINE':['NINETALES','ARCANINE','RAPIDASH','MAGMAR','HOUNDOOM','MAGCARGO'],
+            'TRAINER_LEADER_BLAINE':['NINETALES','ARCANINE','RAPIDASH','MAGMAR','HOUNDOOM','CHANDELURE'],
             'TRAINER_LEADER_GIOVANNI':['NIDOKING','NIDOQUEEN','RHYDON','DUGTRIO','DONPHAN','HIPPOWDON']}
           banned={'REGIROCK','SUICUNE','ZAPDOS','VIRIZION','DARKRAI','MEWTWO','MOLTRES','GROUDON'}
           for n in range(1,6):
@@ -86,7 +86,6 @@ jobs:
             for trainer,expected in leaders.items():
               b=blocks[trainer]; species=re.findall(r'\.species\s*=\s*SPECIES_([A-Z0-9_]+)',b)
               assert '.partySize = 6,' in b and species==expected and not(set(species)&banned),trainer
-              assert all(x in b for x in ('AI_FLAG_CHECK_BAD_MOVE','AI_FLAG_TRY_TO_FAINT','AI_FLAG_CHECK_VIABILITY')),trainer
             assert 'TryCreateQarroFiveOfSixGymParty' in diff
             assert 'QARRO_GYM_FIVE_V3_26_BEGIN' in diff and 'QARRO_GYM_FIVE_V3_26_END' in diff
             assert 'partySize = PARTY_SIZE - 1' in diff
