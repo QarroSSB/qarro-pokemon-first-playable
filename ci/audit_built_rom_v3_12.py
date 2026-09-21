@@ -2,8 +2,8 @@
 """Post-build integrity gate for the Qarro FireRed artifact.
 
 Read-only: verifies the produced ROM, checksum, consolidated regression bundle,
-QoL/no-Exp-Share evidence, and RU font/localization foundation. Gameplay is not
-modified; Ash Bond and Ash Cap are never touched.
+QoL/no-Exp-Share evidence, protected-feature evidence, and RU font/localization
+foundation. Gameplay is not modified; Ash Bond and Ash Cap are never touched.
 """
 from __future__ import annotations
 
@@ -70,6 +70,18 @@ def verify_qol(qol: dict) -> dict:
     require(qol.get("ashBondTouched") is False and qol.get("ashCapTouched") is False,
             "Ash invariant regression in QoL evidence")
     return {"money": "PASS", "failedCatchBall": "PASS", "starterKit": "PASS", "noExpShare": "PASS"}
+
+
+def verify_protected_features(protected: dict) -> dict:
+    require(protected.get("scope") == "Qarro-applied diff vs pinned upstream",
+            "protected-feature audit scope drift")
+    require(protected.get("ashBondTouched") is False and protected.get("ashCapTouched") is False,
+            "protected-feature evidence reports Ash regression")
+    require(protected.get("protectedPathHits") == 0 and protected.get("protectedDiffLineHits") == 0,
+            "protected-feature evidence contains Ash path/diff hits")
+    require(isinstance(protected.get("changedFilesAudited"), int) and protected.get("changedFilesAudited") >= 0,
+            "protected-feature evidence missing changed-file count")
+    return {"ashBond": "PASS", "ashCap": "PASS", "scope": "pinned-upstream-diff"}
 
 
 def verify_ru_foundation(ru: dict) -> dict:
@@ -142,16 +154,18 @@ def main() -> int:
     require(bundle.get("ashBondTouched") is False and bundle.get("ashCapTouched") is False,
             "Ash invariant regression in consolidated evidence")
     qol_summary = verify_qol(audits["qarro_qol_regression_v3_10_audit.json"])
+    protected_summary = verify_protected_features(audits["qarro_protected_features_v3_13_audit.json"])
     ru_summary = verify_ru_foundation(load_json(out / RU_AUDIT))
     report = {
         "marker": MARKER, "rom": ROM_NAME, "sizeBytes": len(rom), "gameCode": game_code, "sha256": actual_sha,
         "requiredAuditEvidence": sorted([*REQUIRED_AUDITS, RU_AUDIT]),
         "consolidatedRegression": {"qol": "PASS", "noExpShare": "PASS", "ruFoundation": "PASS", "groundItems": "PASS"},
-        "qolEvidence": qol_summary, "ruFoundation": ru_summary, "ashBondTouched": False, "ashCapTouched": False,
+        "qolEvidence": qol_summary, "protectedFeatures": protected_summary, "ruFoundation": ru_summary,
+        "ashBondTouched": False, "ashCapTouched": False,
     }
     report_path = out / "qarro_built_rom_v3_12_audit.json"
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"[{MARKER}] PASS: 32 MiB BPRE ROM + SHA-256 + direct QoL/no-Exp-Share evidence + consolidated regression evidence + {ru_summary['cyrillicGlyphs']} Cyrillic glyphs across {ru_summary['fontAtlases']} font atlases + Russian text coverage verified")
+    print(f"[{MARKER}] PASS: 32 MiB BPRE ROM + SHA-256 + direct QoL/no-Exp-Share/protected-feature evidence + consolidated regression evidence + {ru_summary['cyrillicGlyphs']} Cyrillic glyphs across {ru_summary['fontAtlases']} font atlases + Russian text coverage verified")
     print(f"audit: {report_path}")
     return 0
 
