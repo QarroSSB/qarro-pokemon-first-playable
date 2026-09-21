@@ -253,6 +253,8 @@ def main() -> int:
         by_kind[x["kind"]]=by_kind.get(x["kind"],0)+1
         by_file[x["file"]]=by_file.get(x["file"],0)+1
 
+    allowed_proper=[x for x in allowed if x.get("reason","").startswith("English proper name")]
+    allowed_intentional=[x for x in allowed if not x.get("reason","").startswith("English proper name")]
     report={
       "marker":MARKER,
       "policy":"FireRed / Expansion 1.17.0 / Gen I-V; Pokemon+Move+Ability proper names may remain English",
@@ -275,16 +277,18 @@ def main() -> int:
         "filesWithCandidates":len({x['file'] for x in broad}),
         "byKind":dict(sorted(by_kind.items(),key=lambda kv:(-kv[1],kv[0]))),
         "byFile":dict(sorted(by_file.items(),key=lambda kv:(-kv[1],kv[0]))),
-        "candidates":broad[:2000],
-        "allowedEnglishProperNames":[x for x in allowed if x.get("reason","").startswith("English proper name")][:1000],
-        "allowedIntentionalEnglishOrTechnical":[x for x in allowed if not x.get("reason","").startswith("English proper name")][:2000],
-        "allowedIntentionalEnglishOrTechnicalCount":sum(1 for x in allowed if not x.get("reason","").startswith("English proper name")),
+        "candidates":broad,
+        "allowedEnglishProperNames":allowed_proper,
+        "allowedEnglishProperNamesCount":len(allowed_proper),
+        "allowedIntentionalEnglishOrTechnical":allowed_intentional,
+        "allowedIntentionalEnglishOrTechnicalCount":len(allowed_intentional),
+        "inventoryComplete":True,
       },
       "readOnly":True,"ashBondTouched":False,"ashCapTouched":False,
     }
     out=root/"build"/"qarro_ru_runtime_surface_v3_21_audit.json"; out.parent.mkdir(parents=True,exist_ok=True)
     out.write_text(json.dumps(report,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
-    print(f"[{MARKER}] PASS: map untranslated dialogue={len(map_candidates)}; known map exclusions={len(map_excluded)}; broader English candidates={len(broad)} across {len({x['file'] for x in broad})} files; Ash untouched")
+    print(f"[{MARKER}] PASS: map untranslated dialogue={len(map_candidates)}; known map exclusions={len(map_excluded)}; broader English candidates={len(broad)} across {len({x['file'] for x in broad})} files; complete inventory={len(broad)} candidates/{len(allowed_proper)} allowed proper names/{len(allowed_intentional)} intentional technical; Ash untouched")
     for x in broad[:25]: print(f"[{MARKER}] FULL {x['file']}:{x['line']} {x['kind']}: {x['preview'][:120]}")
     return 0
 if __name__=="__main__": raise SystemExit(main())
