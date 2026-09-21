@@ -8,10 +8,12 @@ Ash Bond / Ash Cap remain untouched and are never reconnected here.
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
 
 BASE_COMMIT = "cdce73eba8ca7c7b6c2ef12eca199e197abe2687"
 BASE_PATH = "ci/qol_v3_5.py"
+GYM_PATH = "ci/gym_five_v3_25.py"
 
 
 def load_from_git(repo: Path, commit: str, path: str, module_name: str) -> dict:
@@ -35,9 +37,18 @@ def main() -> int:
     if rc:
         return rc
 
+    # Reassert the isolated Gym runtime after the preserved QoL baseline.
+    # The Gym pass is idempotent and scoped to the eight story Leaders only.
+    rc = subprocess.run(
+        [sys.executable, str(repo / GYM_PATH), sys.argv[1]],
+        check=False,
+    ).returncode
+    if rc:
+        return rc
+
     print(
-        "[QARRO_QOL_GYM_TEST] PASS: Build 249 QoL preserved; Exp. Share intentionally absent "
-        "on isolated Gym test branch; Gen I-V policy and Ash protections unchanged"
+        "[QARRO_QOL_GYM_TEST] PASS: Build 249 QoL preserved; Exp. Share intentionally absent; "
+        "Gym 5-of-6 runtime reasserted after QoL; Gen I-V policy and Ash protections unchanged"
     )
     return 0
 
