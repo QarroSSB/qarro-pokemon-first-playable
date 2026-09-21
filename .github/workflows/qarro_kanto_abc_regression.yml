@@ -1,9 +1,11 @@
-name: Qarro Kanto A-B-C regression
+name: Qarro Kanto A-B-C regression (legacy manual)
 
+# Legacy 6v6 A/B/C selector regression.
+# The isolated Gym 5-of-6 test branch intentionally replaced this runtime model.
+# Keep this workflow available for historical/manual inspection, but do not gate
+# pushes on the incompatible legacy contract. Current Gym behaviour is gated by
+# qarro_gym_five_contract.yml and qarro_gym_test_regression.yml.
 on:
-  push:
-    branches:
-      - test/gym-5of6-rework-20260911
   workflow_dispatch:
 
 permissions:
@@ -11,202 +13,10 @@ permissions:
   actions: read
 
 jobs:
-  kanto-abc-regression:
+  legacy-contract-not-applicable:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
     steps:
-      - name: Checkout current branch
-        uses: actions/checkout@v4
-
-      - name: Wait for exact same-commit FireRed build
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Explain legacy scope
         run: |
-          set -euo pipefail
-          mkdir -p baseline evidence
-          build_run=""
-          for attempt in $(seq 1 60); do
-            runs="$(gh api -H 'Accept: application/vnd.github+json' \
-              "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$GITHUB_SHA&branch=$GITHUB_REF_NAME&event=push&per_page=20")"
-            build_run="$(printf '%s' "$runs" | jq -r '.workflow_runs[] | select(.path == ".github/workflows/qarro_first_playable_build.yml") | .id' | head -n1)"
-            if [[ -n "$build_run" && "$build_run" != "null" ]]; then
-              status="$(printf '%s' "$runs" | jq -r --argjson id "$build_run" '.workflow_runs[] | select(.id == $id) | .status')"
-              conclusion="$(printf '%s' "$runs" | jq -r --argjson id "$build_run" '.workflow_runs[] | select(.id == $id) | (.conclusion // "")')"
-              echo "same-commit build run=$build_run status=$status conclusion=$conclusion"
-              if [[ "$status" == "completed" ]]; then
-                [[ "$conclusion" == "success" ]] || { echo "Exact same-commit FireRed build failed: $conclusion"; exit 1; }
-                break
-              fi
-            fi
-            sleep 10
-          done
-          [[ -n "$build_run" && "$build_run" != "null" ]] || { echo "No FireRed build found for $GITHUB_SHA"; exit 1; }
-          echo "BUILD_RUN_ID=$build_run" >> "$GITHUB_ENV"
-
-      - name: Download exact same-commit build artifact
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          artifact_name="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN_ID/artifacts?per_page=100" \
-            --jq '.artifacts[] | select(.name | startswith("Qarro-FIRST-PLAYABLE-v3.8-")) | .name' | head -n1)"
-          [[ -n "$artifact_name" ]] || { echo "Current build artifact not found"; exit 1; }
-          gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$artifact_name" --dir baseline
-          test -f baseline/trainers_frlg.generated.h
-          test -f baseline/qarro_applied_diff_v3_8.patch
-          test -f baseline/qarro_built_rom_v3_12_audit.json
-          echo "BUILD_ARTIFACT=$artifact_name" >> "$GITHUB_ENV"
-
-      - name: Validate all 24 Kanto Gym variants and save-fixed selector
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - <<'PY' | tee evidence/kanto_abc_static.log
-          from pathlib import Path
-          import hashlib, json, re
-
-          root = Path('baseline')
-          generated = (root / 'trainers_frlg.generated.h').read_text(encoding='utf-8')
-          diff = (root / 'qarro_applied_diff_v3_8.patch').read_text(encoding='utf-8', errors='replace')
-          built = json.loads((root / 'qarro_built_rom_v3_12_audit.json').read_text(encoding='utf-8'))
-          rom = root / 'Qarro_FIRST_PLAYABLE_v3_8.gba'
-
-          expected = {
-              'TRAINER_LEADER_BROCK': ['GOLEM','AERODACTYL','TYRANITAR','OMASTAR','CRADILY','KABUTOPS'],
-              'TRAINER_QARRO_BROCK_B': ['GOLEM','KABUTOPS','SHUCKLE','OMASTAR','CRADILY','TYRANITAR'],
-              'TRAINER_QARRO_BROCK_C': ['TYRANITAR','RHYDON','AERODACTYL','OMASTAR','CRADILY','KABUTOPS'],
-              'TRAINER_LEADER_MISTY': ['POLITOED','LAPRAS','STARMIE','VAPOREON','LANTURN','SLOWBRO'],
-              'TRAINER_QARRO_MISTY_B': ['STARMIE','SLOWBRO','CLOYSTER','QUAGSIRE','LAPRAS','VAPOREON'],
-              'TRAINER_QARRO_MISTY_C': ['LANTURN','LAPRAS','STARMIE','SLOWKING','VAPOREON','SLOWBRO'],
-              'TRAINER_LEADER_LT_SURGE': ['ELECTRODE','RAICHU','JOLTEON','MAGNETON','ELECTIVIRE','AMPHAROS'],
-              'TRAINER_QARRO_LT_SURGE_B': ['RAICHU','AMPHAROS','LANTURN','MAGNETON','ELECTABUZZ','ELECTIVIRE'],
-              'TRAINER_QARRO_LT_SURGE_C': ['RAICHU','JOLTEON','ELECTRODE','AMPHAROS','MANECTRIC','ELECTIVIRE'],
-              'TRAINER_LEADER_ERIKA': ['NINETALES','VENUSAUR','VICTREEBEL','VILEPLUME','JUMPLUFF','CELEBI'],
-              'TRAINER_QARRO_ERIKA_B': ['VILEPLUME','BELLOSSOM','CELEBI','EXEGGUTOR','PARASECT','VENUSAUR'],
-              'TRAINER_QARRO_ERIKA_C': ['VENUSAUR','TANGROWTH','VICTREEBEL','JUMPLUFF','CELEBI','VILEPLUME'],
-              'TRAINER_LEADER_KOGA': ['CROBAT','WEEZING','MUK','VENOMOTH','TENTACRUEL','QWILFISH'],
-              'TRAINER_QARRO_KOGA_B': ['CROBAT','VENOMOTH','WEEZING','QWILFISH','ARIADOS','MUK'],
-              'TRAINER_QARRO_KOGA_C': ['WEEZING','NIDOQUEEN','CROBAT','TENTACRUEL','MUK','VENOMOTH'],
-              'TRAINER_LEADER_SABRINA': ['ALAKAZAM','ESPEON','MR_MIME','EXEGGUTOR','SLOWKING','MEW'],
-              'TRAINER_QARRO_SABRINA_B': ['ALAKAZAM','SLOWBRO','JYNX','HYPNO','ESPEON','MEW'],
-              'TRAINER_QARRO_SABRINA_C': ['ESPEON','MR_MIME','ALAKAZAM','MEW','SLOWKING','GALLADE'],
-              'TRAINER_LEADER_BLAINE': ['NINETALES','ARCANINE','RAPIDASH','MAGMAR','HOUNDOOM','MAGCARGO'],
-              'TRAINER_QARRO_BLAINE_B': ['NINETALES','ARCANINE','MAGCARGO','TYPHLOSION','HOUNDOOM','RAPIDASH'],
-              'TRAINER_QARRO_BLAINE_C': ['RAPIDASH','CHARIZARD','ARCANINE','MAGMAR','HOUNDOOM','NINETALES'],
-              'TRAINER_LEADER_GIOVANNI': ['NIDOKING','NIDOQUEEN','RHYDON','DUGTRIO','DONPHAN','HIPPOWDON'],
-              'TRAINER_QARRO_GIOVANNI_B': ['RHYDON','NIDOQUEEN','MAROWAK','SANDSLASH','NIDOKING','HIPPOWDON'],
-              'TRAINER_QARRO_GIOVANNI_C': ['DUGTRIO','DONPHAN','NIDOQUEEN','RHYDON','QUAGSIRE','NIDOKING'],
-          }
-          budgets = {
-              'BROCK': (12, 0, 2),
-              'MISTY': (16, 0, 3),
-              'LT_SURGE': (20, 80, 4),
-              'ERIKA': (24, 160, 5),
-              'KOGA': (26, 252, 6),
-              'SABRINA': (28, 360, 6),
-              'BLAINE': (30, 420, 6),
-              'GIOVANNI': (31, 510, 6),
-          }
-          banned = {'REGIROCK','SUICUNE','ZAPDOS','VIRIZION','DARKRAI','MEWTWO','MOLTRES','GROUDON'}
-
-          rx = re.compile(r'^\s*(?:\[DIFFICULTY_[A-Z0-9_]+\])?\[(TRAINER_[A-Z0-9_]+)\]\s*=\s*$', re.M)
-          matches = list(rx.finditer(generated))
-          blocks = {}
-          for i, match in enumerate(matches):
-              end = matches[i + 1].start() if i + 1 < len(matches) else len(generated)
-              blocks[match.group(1)] = generated[match.start():end]
-
-          def leader_key(trainer):
-              for key in budgets:
-                  if key in trainer:
-                      return key
-              raise AssertionError(trainer)
-
-          for trainer, wanted_species in expected.items():
-              assert trainer in blocks, trainer
-              block = blocks[trainer]
-              assert '.partySize = 6,' in block, trainer
-              for flag in ('AI_FLAG_CHECK_BAD_MOVE','AI_FLAG_TRY_TO_FAINT','AI_FLAG_CHECK_VIABILITY'):
-                  assert flag in block, (trainer, flag)
-              species = re.findall(r'\.species\s*=\s*SPECIES_([A-Z0-9_]+)', block)
-              assert species == wanted_species, (trainer, species, wanted_species)
-              assert not (set(species) & banned), (trainer, set(species) & banned)
-
-              iv, ev_budget, item_budget = budgets[leader_key(trainer)]
-              iv_rows = re.findall(r'TRAINER_PARTY_IVS\(([^)]*)\)', block)
-              assert len(iv_rows) == 6, (trainer, len(iv_rows))
-              for row in iv_rows:
-                  values = [int(x.strip()) for x in row.split(',')]
-                  assert values == [iv] * 6, (trainer, values, iv)
-
-              ev_rows = re.findall(r'TRAINER_PARTY_EVS\(([^)]*)\)', block)
-              if ev_budget == 0:
-                  assert len(ev_rows) == 0, (trainer, ev_rows)
-              else:
-                  assert len(ev_rows) == 6, (trainer, len(ev_rows))
-                  for row in ev_rows:
-                      values = [int(x.strip()) for x in row.split(',')]
-                      assert sum(values) == ev_budget, (trainer, values, ev_budget)
-
-              item_count = len(re.findall(r'\.heldItem\s*=\s*ITEM_[A-Z0-9_]+', block))
-              assert item_count == item_budget, (trainer, item_count, item_budget)
-
-          # The original story Leader IDs remain the battle IDs; B/C IDs are only party sources.
-          for token in (
-              'QARRO_KANTO_GYM_ABC_V3_132_BEGIN',
-              '#define QARRO_KANTO_GYM_STATE_VAR 0x40F7',
-              'VarGet(QARRO_KANTO_GYM_STATE_VAR)',
-              'VarSet(QARRO_KANTO_GYM_STATE_VAR, packed)',
-              'READ_OTID_FROM_SAVE',
-              'TRAINER_QARRO_BROCK_B',
-              'TRAINER_QARRO_GIOVANNI_C',
-              'TRAINERS_COUNT_FRLG                      665',
-          ):
-              assert token in diff, token
-          assert 'TryCreateQarroFiveOfSixGymParty' not in diff
-          assert 'QARRO_GYM_FIVE_V3_26_BEGIN' not in diff
-          assert 'QARRO_GYM_FIVE_V3_26_END' not in diff
-
-          assert rom.is_file()
-          sha = hashlib.sha256(rom.read_bytes()).hexdigest()
-          assert sha == built['sha256'], (sha, built['sha256'])
-          assert built['sizeBytes'] == 33554432
-          assert built['gameCode'] == 'BPRE'
-          assert built['ashBondTouched'] is False
-          assert built['ashCapTouched'] is False
-
-          print(f'PASS: 24/24 Kanto A/B/C compiled teams match canon; exact IV/EV/item budgets; save-fixed 0x40F7 selector; ROM {sha[:16]}...')
-          PY
-
-      - name: Write Kanto A-B-C regression report
-        if: always()
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import hashlib, json, os
-          rom = Path('baseline/Qarro_FIRST_PLAYABLE_v3_8.gba')
-          report = {
-              'marker': 'QARRO_KANTO_ABC_REGRESSION_V3_132',
-              'sourceCommit': os.environ.get('GITHUB_SHA'),
-              'sourceBuildRun': int(os.environ['BUILD_RUN_ID']) if os.environ.get('BUILD_RUN_ID') else None,
-              'sourceArtifact': os.environ.get('BUILD_ARTIFACT'),
-              'romSha256': hashlib.sha256(rom.read_bytes()).hexdigest() if rom.is_file() else None,
-              'kantoVariantsChecked': 24,
-              'partySize': 6,
-              'selectorSaveVar': '0x40F7',
-              'legacyFiveOfSixExpected': False,
-              'ashProtected': True,
-          }
-          Path('evidence/kanto_abc_regression_report.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
-          PY
-
-      - name: Upload Kanto A-B-C regression evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Qarro-kanto-abc-regression-${{ github.run_number }}
-          path: evidence/
-          if-no-files-found: warn
+          echo 'Legacy Kanto A/B/C 6v6 selector regression is intentionally not a push gate on the Gym 5-of-6 test branch.'
+          echo 'Use the current Gym 5-of-6 contract and Gym test regression for this branch.'
