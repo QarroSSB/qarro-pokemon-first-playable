@@ -56,7 +56,7 @@ def main() -> int:
     if full.get("inventoryComplete") is not True:
         raise SystemExit(f"[{MARKER}] ERROR: fullSurface inventory is not declared complete")
 
-    full_count = full.get("englishOnlyRuntimeCandidates")
+    full_count = full.get("englishOnlyCandidateCount")
     full_candidates = full.get("candidates")
     if not isinstance(full_count, int) or not isinstance(full_candidates, list):
         raise SystemExit(f"[{MARKER}] ERROR: malformed fullSurface evidence")
