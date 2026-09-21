@@ -2,8 +2,9 @@
 """Post-build integrity gate for the Qarro FireRed artifact.
 
 Read-only: verifies the produced ROM, checksum, consolidated regression bundle,
-QoL/no-Exp-Share evidence, protected-feature evidence, and RU font/localization
-foundation. Gameplay is not modified; Ash Bond and Ash Cap are never touched.
+QoL/no-Exp-Share evidence, ground-item evidence, protected-feature evidence,
+and RU font/localization foundation. Gameplay is not modified; Ash Bond and
+Ash Cap are never touched.
 """
 from __future__ import annotations
 
@@ -70,6 +71,22 @@ def verify_qol(qol: dict) -> dict:
     require(qol.get("ashBondTouched") is False and qol.get("ashCapTouched") is False,
             "Ash invariant regression in QoL evidence")
     return {"money": "PASS", "failedCatchBall": "PASS", "starterKit": "PASS", "noExpShare": "PASS"}
+
+
+def verify_ground_items(ground: dict) -> dict:
+    require(ground.get("preViridianHiddenRemoved") == 1,
+            "built-ROM ground-item evidence: pre-Viridian pickup policy drift")
+    require(ground.get("visibleCustomPickupCount") == 4,
+            "built-ROM ground-item evidence: visible pickup count drift")
+    pickups = ground.get("visiblePostViridianPickups")
+    require(isinstance(pickups, list) and len(pickups) == 4,
+            "built-ROM ground-item evidence: pickup list drift")
+    allowed_maps = {"Route2_Frlg", "Route3_Frlg", "Route4_Frlg"}
+    require(all(isinstance(p, dict) and p.get("map") in allowed_maps for p in pickups),
+            "built-ROM ground-item evidence: route progression drift")
+    require(ground.get("ashBondTouched") is False and ground.get("ashCapTouched") is False,
+            "Ash invariant regression in ground-item evidence")
+    return {"preViridianHiddenRemoved": 1, "visibleCustomPickupCount": 4, "routeProgression": "PASS"}
 
 
 def verify_protected_features(protected: dict) -> dict:
@@ -154,18 +171,20 @@ def main() -> int:
     require(bundle.get("ashBondTouched") is False and bundle.get("ashCapTouched") is False,
             "Ash invariant regression in consolidated evidence")
     qol_summary = verify_qol(audits["qarro_qol_regression_v3_10_audit.json"])
+    ground_summary = verify_ground_items(audits["qarro_ground_items_v3_23_audit.json"])
     protected_summary = verify_protected_features(audits["qarro_protected_features_v3_13_audit.json"])
     ru_summary = verify_ru_foundation(load_json(out / RU_AUDIT))
     report = {
         "marker": MARKER, "rom": ROM_NAME, "sizeBytes": len(rom), "gameCode": game_code, "sha256": actual_sha,
         "requiredAuditEvidence": sorted([*REQUIRED_AUDITS, RU_AUDIT]),
         "consolidatedRegression": {"qol": "PASS", "noExpShare": "PASS", "ruFoundation": "PASS", "groundItems": "PASS"},
-        "qolEvidence": qol_summary, "protectedFeatures": protected_summary, "ruFoundation": ru_summary,
+        "qolEvidence": qol_summary, "groundItemEvidence": ground_summary,
+        "protectedFeatures": protected_summary, "ruFoundation": ru_summary,
         "ashBondTouched": False, "ashCapTouched": False,
     }
     report_path = out / "qarro_built_rom_v3_12_audit.json"
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"[{MARKER}] PASS: 32 MiB BPRE ROM + SHA-256 + direct QoL/no-Exp-Share/protected-feature evidence + consolidated regression evidence + {ru_summary['cyrillicGlyphs']} Cyrillic glyphs across {ru_summary['fontAtlases']} font atlases + Russian text coverage verified")
+    print(f"[{MARKER}] PASS: 32 MiB BPRE ROM + SHA-256 + direct QoL/no-Exp-Share/ground-item/protected-feature evidence + consolidated regression evidence + {ru_summary['cyrillicGlyphs']} Cyrillic glyphs across {ru_summary['fontAtlases']} font atlases + Russian text coverage verified")
     print(f"audit: {report_path}")
     return 0
 
