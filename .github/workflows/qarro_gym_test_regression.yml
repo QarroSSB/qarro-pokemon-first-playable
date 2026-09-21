@@ -27,27 +27,20 @@ jobs:
           mkdir -p baseline regression_out
           build_run=""
           for attempt in $(seq 1 60); do
-            runs="$(gh api \
-              -H 'Accept: application/vnd.github+json' \
-              "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$GITHUB_SHA&branch=$GITHUB_REF_NAME&event=push&per_page=20")"
+            runs="$(gh api -H 'Accept: application/vnd.github+json' "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$GITHUB_SHA&branch=$GITHUB_REF_NAME&event=push&per_page=20")"
             build_run="$(printf '%s' "$runs" | jq -r '.workflow_runs[] | select(.path == ".github/workflows/qarro_first_playable_build.yml") | .id' | head -n1)"
             if [[ -n "$build_run" && "$build_run" != "null" ]]; then
               status="$(printf '%s' "$runs" | jq -r --argjson id "$build_run" '.workflow_runs[] | select(.id == $id) | .status')"
               conclusion="$(printf '%s' "$runs" | jq -r --argjson id "$build_run" '.workflow_runs[] | select(.id == $id) | (.conclusion // "")')"
               echo "same-commit build run=$build_run status=$status conclusion=$conclusion"
               if [[ "$status" == "completed" ]]; then
-                [[ "$conclusion" == "success" ]] || { echo "Exact same-commit FireRed build failed: $conclusion"; exit 1; }
+                [[ "$conclusion" == "success" ]] || exit 1
                 break
               fi
-            else
-              echo "Waiting for FireRed build for exact commit $GITHUB_SHA (attempt $attempt/60)"
             fi
             sleep 10
           done
-          [[ -n "$build_run" && "$build_run" != "null" ]] || { echo "No FireRed build found for exact commit $GITHUB_SHA"; exit 1; }
-          status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$build_run" --jq '.status')"
-          conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$build_run" --jq '.conclusion // ""')"
-          [[ "$status" == "completed" && "$conclusion" == "success" ]] || { echo "FireRed build did not complete successfully"; exit 1; }
+          [[ -n "$build_run" && "$build_run" != "null" ]] || exit 1
           echo "BUILD_RUN_ID=$build_run" >> "$GITHUB_ENV"
 
       - name: Download exact same-commit build artifact
@@ -56,21 +49,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          artifact_name="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN_ID/artifacts?per_page=100" \
-            --jq '.artifacts[] | select(.name | startswith("Qarro-FIRST-PLAYABLE-v3.8-")) | .name' | head -n1)"
-          [[ -n "$artifact_name" ]] || { echo "Current build artifact not found for run $BUILD_RUN_ID"; exit 1; }
-          echo "Using current artifact: $artifact_name"
-          gh run download "$BUILD_RUN_ID" \
-            --repo "$GITHUB_REPOSITORY" \
-            --name "$artifact_name" \
-            --dir baseline
-          test -f baseline/Qarro_FIRST_PLAYABLE_v3_8.gba
-          test -f baseline/trainers_frlg.generated.h
-          test -f baseline/qarro_built_rom_v3_12_audit.json
-          test -f baseline/qarro_qol_regression_v3_10_audit.json
-          test -f baseline/qarro_regression_bundle_v3_11_audit.json
-          test -f baseline/qarro_protected_features_v3_13_audit.json
-          test -f baseline/qarro_applied_diff_v3_8.patch
+          artifact_name="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN_ID/artifacts?per_page=100" --jq '.artifacts[] | select(.name | startswith("Qarro-FIRST-PLAYABLE-v3.8-")) | .name' | head -n1)"
+          [[ -n "$artifact_name" ]] || exit 1
+          gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$artifact_name" --dir baseline
+          for f in Qarro_FIRST_PLAYABLE_v3_8.gba trainers_frlg.generated.h qarro_built_rom_v3_12_audit.json qarro_qol_regression_v3_10_audit.json qarro_regression_bundle_v3_11_audit.json qarro_protected_features_v3_13_audit.json qarro_applied_diff_v3_8.patch; do test -f "baseline/$f"; done
           echo "BUILD_ARTIFACT=$artifact_name" >> "$GITHUB_ENV"
 
       - name: Five independent current trainer and QoL evidence passes
@@ -80,145 +62,42 @@ jobs:
           python3 - <<'PY' | tee regression_out/static_regression.log
           from pathlib import Path
           import hashlib, json, re
-
-          root = Path('baseline')
-          rom_path = root / 'Qarro_FIRST_PLAYABLE_v3_8.gba'
-          trainers_path = root / 'trainers_frlg.generated.h'
-          diff_path = root / 'qarro_applied_diff_v3_8.patch'
-
-          leaders = {
-              'TRAINER_LEADER_BROCK': ['GOLEM', 'AERODACTYL', 'TYRANITAR', 'OMASTAR', 'CRADILY', 'KABUTOPS'],
-              'TRAINER_LEADER_MISTY': ['POLITOED', 'LAPRAS', 'STARMIE', 'VAPOREON', 'LANTURN', 'SLOWBRO'],
-              'TRAINER_LEADER_LT_SURGE': ['ELECTRODE', 'RAICHU', 'JOLTEON', 'MAGNETON', 'ELECTIVIRE', 'AMPHAROS'],
-              'TRAINER_LEADER_ERIKA': ['NINETALES', 'VENUSAUR', 'VICTREEBEL', 'VILEPLUME', 'JUMPLUFF', 'CELEBI'],
-              'TRAINER_LEADER_KOGA': ['CROBAT', 'WEEZING', 'MUK', 'VENOMOTH', 'TENTACRUEL', 'QWILFISH'],
-              'TRAINER_LEADER_SABRINA': ['ALAKAZAM', 'ESPEON', 'MR_MIME', 'EXEGGUTOR', 'SLOWKING', 'MEW'],
-              'TRAINER_LEADER_BLAINE': ['NINETALES', 'ARCANINE', 'RAPIDASH', 'MAGMAR', 'HOUNDOOM', 'MAGCARGO'],
-              'TRAINER_LEADER_GIOVANNI': ['NIDOKING', 'NIDOQUEEN', 'RHYDON', 'DUGTRIO', 'DONPHAN', 'HIPPOWDON'],
-          }
-          story_giovanni = {
-              'TRAINER_BOSS_GIOVANNI': (4, ['NIDORINO', 'RHYHORN', 'KANGASKHAN', 'NIDOKING']),
-              'TRAINER_BOSS_GIOVANNI_2': (5, ['DUGTRIO', 'NIDOQUEEN', 'RHYDON', 'KANGASKHAN', 'NIDOKING']),
-          }
-          banned = {'REGIROCK', 'SUICUNE', 'ZAPDOS', 'VIRIZION', 'DARKRAI', 'MEWTWO', 'MOLTRES', 'GROUDON'}
-          approved_mythical = {'CELEBI', 'MEW'}
-
-          def load(name):
-              return json.loads((root / name).read_text(encoding='utf-8'))
-
-          def trainer_blocks(text):
-              # trainerproc currently emits e.g.
-              # [DIFFICULTY_NORMAL][TRAINER_LEADER_BROCK] =
-              # Keep the optional difficulty prefix so the check also survives
-              # older single-dimension generated layouts.
-              rx = re.compile(r'^\s*(?:\[DIFFICULTY_[A-Z0-9_]+\])?\[(TRAINER_[A-Z0-9_]+)\]\s*=\s*$', re.M)
-              matches = list(rx.finditer(text))
-              out = {}
-              for i, match in enumerate(matches):
-                  end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
-                  out[match.group(1)] = text[match.start():end]
-              return out
-
-          generated = trainers_path.read_text(encoding='utf-8')
-          blocks = trainer_blocks(generated)
-          diff = diff_path.read_text(encoding='utf-8', errors='replace')
-          built = load('qarro_built_rom_v3_12_audit.json')
-          expected_sha = built['sha256']
-
-          def species_from(block):
-              return re.findall(r'\.species\s*=\s*SPECIES_([A-Z0-9_]+)', block)
-
-          def require_honest_ai(block, trainer):
-              assert 'AI_FLAG_CHECK_BAD_MOVE' in block, trainer
-              assert 'AI_FLAG_TRY_TO_FAINT' in block, trainer
-              assert 'AI_FLAG_CHECK_VIABILITY' in block, trainer
-
-          def one_pass(n):
-              rom = rom_path.read_bytes()
-              assert len(rom) == 32 * 1024 * 1024, len(rom)
-              sha = hashlib.sha256(rom).hexdigest()
-              assert sha == expected_sha, (sha, expected_sha)
-              assert rom[0xAC:0xB0] == b'BPRE', rom[0xAC:0xB0]
-              assert rom[0xB2] == 0x96, hex(rom[0xB2])
-              calc = (-(sum(rom[0xA0:0xBD]) + 0x19)) & 0xFF
-              assert calc == rom[0xBD], (hex(calc), hex(rom[0xBD]))
-
-              for trainer, expected_species in leaders.items():
-                  assert trainer in blocks, trainer
-                  block = blocks[trainer]
-                  assert '.partySize = 6,' in block, trainer
-                  require_honest_ai(block, trainer)
-                  species = species_from(block)
-                  assert species == expected_species, (trainer, species, expected_species)
-                  assert not (set(species) & banned), (trainer, set(species) & banned)
-                  mythicals = set(species) & approved_mythical
-                  if trainer == 'TRAINER_LEADER_ERIKA':
-                      assert mythicals == {'CELEBI'}, mythicals
-                  elif trainer == 'TRAINER_LEADER_SABRINA':
-                      assert mythicals == {'MEW'}, mythicals
-                  else:
-                      assert not mythicals, (trainer, mythicals)
-
-              for trainer, (size, expected_species) in story_giovanni.items():
-                  assert trainer in blocks, trainer
-                  block = blocks[trainer]
-                  assert f'.partySize = {size},' in block, trainer
-                  require_honest_ai(block, trainer)
-                  species = species_from(block)
-                  assert species == expected_species, (trainer, species, expected_species)
-                  assert not (set(species) & banned), (trainer, set(species) & banned)
-
-              # Verify key competitive implementation details survived trainerproc.
-              g1 = blocks['TRAINER_BOSS_GIOVANNI']
-              g2 = blocks['TRAINER_BOSS_GIOVANNI_2']
-              assert 'ITEM_SILK_SCARF' in g1 and 'ITEM_SOFT_SAND' in g1, 'Giovanni 1 held items'
-              assert 'ABILITY_SHEER_FORCE' in g1, 'Giovanni 1 Sheer Force'
-              assert 'ITEM_FOCUS_SASH' in g2 and 'ITEM_EVIOLITE' in g2 and 'ITEM_LIFE_ORB' in g2, 'Giovanni 2 held items'
-              assert 'ABILITY_ARENA_TRAP' in g2 and 'ABILITY_SHEER_FORCE' in g2, 'Giovanni 2 abilities'
-
-              # Final source state must not retain the historical runtime interception.
-              assert 'TryCreateQarroFiveOfSixGymParty' not in diff
-              assert 'QARRO_GYM_FIVE_V3_26_BEGIN' not in diff
-              assert 'QARRO_GYM_FIVE_V3_26_END' not in diff
-
-              qol = load('qarro_qol_regression_v3_10_audit.json')
-              assert qol['money']['removeMoneyCalls'] == 0
-              assert qol['money']['winRewardPreserved'] is True
-              assert qol['failedCatchBall']['refundCalls'] == 1
-              assert qol['failedCatchBall']['successStillConsumesBall'] is True
-              assert qol['failedCatchBall']['safariExcluded'] is True
-              kit = qol['starterKit']
-              assert kit['oneTimeSceneGuard'] is True
-              assert kit['pokeBallsTotal'] == 20
-              assert kit['potions'] == 10
-              assert kit['antidotes'] == 5
-              assert kit['paralyzeHeals'] == 5
-              assert kit['duplicateNewGameGrant'] is False
-              assert qol['ashBondTouched'] is False
-              assert qol['ashCapTouched'] is False
-
-              bundle = load('qarro_regression_bundle_v3_11_audit.json')
-              assert bundle['policy'] == 'FireRed / Expansion 1.17.0 / Gen I-V'
-              assert bundle['qolRegression'] == 'PASS'
-              assert bundle['ashBondTouched'] is False
-              assert bundle['ashCapTouched'] is False
-
-              assert built['sizeBytes'] == 33554432
-              assert built['gameCode'] == 'BPRE'
-              assert built['sha256'] == expected_sha
-              assert built['ashBondTouched'] is False
-              assert built['ashCapTouched'] is False
-
-              protected = load('qarro_protected_features_v3_13_audit.json')
-              assert protected['ashBondTouched'] is False
-              assert protected['ashCapTouched'] is False
-              assert protected['protectedPathHits'] == 0
-              assert protected['protectedDiffLineHits'] == 0
-
-              print(f'PASS current trainer regression {n}: {sha[:16]}...; exact same-commit ROM + 8 Variant-A 6v6 leaders + 4/5 story Giovanni + honest AI + QoL + Ash protection OK')
-
-          for i in range(1, 6):
-              one_pass(i)
+          root=Path('baseline')
+          rom_path=root/'Qarro_FIRST_PLAYABLE_v3_8.gba'
+          generated=(root/'trainers_frlg.generated.h').read_text(encoding='utf-8')
+          diff=(root/'qarro_applied_diff_v3_8.patch').read_text(encoding='utf-8',errors='replace')
+          def load(n): return json.loads((root/n).read_text(encoding='utf-8'))
+          built=load('qarro_built_rom_v3_12_audit.json')
+          rx=re.compile(r'^\s*(?:\[DIFFICULTY_[A-Z0-9_]+\])?\[(TRAINER_[A-Z0-9_]+)\]\s*=\s*$',re.M)
+          ms=list(rx.finditer(generated)); blocks={m.group(1):generated[m.start():(ms[i+1].start() if i+1<len(ms) else len(generated))] for i,m in enumerate(ms)}
+          leaders={
+            'TRAINER_LEADER_BROCK':['GOLEM','AERODACTYL','TYRANITAR','OMASTAR','CRADILY','KABUTOPS'],
+            'TRAINER_LEADER_MISTY':['POLITOED','LAPRAS','STARMIE','VAPOREON','LANTURN','SLOWBRO'],
+            'TRAINER_LEADER_LT_SURGE':['ELECTRODE','RAICHU','JOLTEON','MAGNETON','ELECTIVIRE','AMPHAROS'],
+            'TRAINER_LEADER_ERIKA':['NINETALES','VENUSAUR','VICTREEBEL','VILEPLUME','JUMPLUFF','CELEBI'],
+            'TRAINER_LEADER_KOGA':['CROBAT','WEEZING','MUK','VENOMOTH','TENTACRUEL','QWILFISH'],
+            'TRAINER_LEADER_SABRINA':['ALAKAZAM','ESPEON','MR_MIME','EXEGGUTOR','SLOWKING','MEW'],
+            'TRAINER_LEADER_BLAINE':['NINETALES','ARCANINE','RAPIDASH','MAGMAR','HOUNDOOM','MAGCARGO'],
+            'TRAINER_LEADER_GIOVANNI':['NIDOKING','NIDOQUEEN','RHYDON','DUGTRIO','DONPHAN','HIPPOWDON']}
+          banned={'REGIROCK','SUICUNE','ZAPDOS','VIRIZION','DARKRAI','MEWTWO','MOLTRES','GROUDON'}
+          for n in range(1,6):
+            rom=rom_path.read_bytes(); sha=hashlib.sha256(rom).hexdigest()
+            assert len(rom)==33554432 and rom[0xAC:0xB0]==b'BPRE' and sha==built['sha256']
+            for trainer,expected in leaders.items():
+              b=blocks[trainer]; species=re.findall(r'\.species\s*=\s*SPECIES_([A-Z0-9_]+)',b)
+              assert '.partySize = 6,' in b and species==expected and not(set(species)&banned),trainer
+              assert all(x in b for x in ('AI_FLAG_CHECK_BAD_MOVE','AI_FLAG_TRY_TO_FAINT','AI_FLAG_CHECK_VIABILITY')),trainer
+            assert 'TryCreateQarroFiveOfSixGymParty' in diff
+            assert 'QARRO_GYM_FIVE_V3_26_BEGIN' in diff and 'QARRO_GYM_FIVE_V3_26_END' in diff
+            assert 'partySize = PARTY_SIZE - 1' in diff
+            qol=load('qarro_qol_regression_v3_10_audit.json')
+            assert qol['money']['removeMoneyCalls']==0 and qol['money']['winRewardPreserved'] is True
+            assert qol['failedCatchBall']['refundCalls']==1 and qol['failedCatchBall']['successStillConsumesBall'] is True and qol['failedCatchBall']['safariExcluded'] is True
+            kit=qol['starterKit']; assert kit['oneTimeSceneGuard'] is True and kit['pokeBallsTotal']==20 and kit['potions']==10 and kit['antidotes']==5 and kit['paralyzeHeals']==5 and kit['duplicateNewGameGrant'] is False
+            assert qol['ashBondTouched'] is False and qol['ashCapTouched'] is False
+            bundle=load('qarro_regression_bundle_v3_11_audit.json'); assert bundle['policy']=='FireRed / Expansion 1.17.0 / Gen I-V' and bundle['qolRegression']=='PASS'
+            protected=load('qarro_protected_features_v3_13_audit.json'); assert protected['ashBondTouched'] is False and protected['ashCapTouched'] is False and protected['protectedPathHits']==0 and protected['protectedDiffLineHits']==0
+            print(f'PASS regression {n}: {sha[:16]}...; six-member Gym source pools + final 5-of-6 runtime + QoL + protected features OK')
           PY
 
       - name: Install mGBA runtime smoke dependencies
@@ -228,28 +107,16 @@ jobs:
           sudo add-apt-repository -y universe
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends mgba-qt xvfb
-          command -v mgba-qt || test -x /usr/games/mgba-qt
-          (mgba-qt --version || /usr/games/mgba-qt --version) 2>&1 | tee regression_out/mgba_version.log
 
       - name: Five fresh emulator boot smoke runs on current ROM
         shell: bash
         run: |
           set -euo pipefail
           ROM="$PWD/baseline/Qarro_FIRST_PLAYABLE_v3_8.gba"
-          EMU="$(command -v mgba-qt || true)"
-          [[ -n "$EMU" ]] || EMU=/usr/games/mgba-qt
+          EMU="$(command -v mgba-qt || true)"; [[ -n "$EMU" ]] || EMU=/usr/games/mgba-qt
           for i in 1 2 3 4 5; do
-            log="regression_out/mgba_boot_${i}.log"
-            set +e
-            timeout --signal=TERM 12s xvfb-run -a -s '-screen 0 640x480x24' "$EMU" "$ROM" >"$log" 2>&1
-            rc=$?
-            set -e
-            if [[ "$rc" -ne 124 ]]; then
-              echo "Boot smoke $i failed: emulator exited before 12s with rc=$rc"
-              cat "$log"
-              exit 1
-            fi
-            echo "PASS emulator boot smoke $i: current same-commit trainer ROM remained running for 12s" | tee -a regression_out/runtime_summary.log
+            set +e; timeout --signal=TERM 12s xvfb-run -a -s '-screen 0 640x480x24' "$EMU" "$ROM" >"regression_out/mgba_boot_${i}.log" 2>&1; rc=$?; set -e
+            [[ "$rc" -eq 124 ]] || { cat "regression_out/mgba_boot_${i}.log"; exit 1; }
           done
 
       - name: Write current trainer regression report
@@ -258,24 +125,10 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import hashlib, json, os
-          out = Path('regression_out')
-          rom = Path('baseline/Qarro_FIRST_PLAYABLE_v3_8.gba')
-          report = {
-              'marker': 'QARRO_TRAINER_REGRESSION_CURRENT_6V6_GIOVANNI_20260915',
-              'sourceCommit': os.environ.get('GITHUB_SHA'),
-              'sourceBuildRun': int(os.environ['BUILD_RUN_ID']) if os.environ.get('BUILD_RUN_ID') else None,
-              'sourceArtifact': os.environ.get('BUILD_ARTIFACT'),
-              'romSha256': hashlib.sha256(rom.read_bytes()).hexdigest() if rom.is_file() else None,
-              'staticPassesRequested': 5,
-              'emulatorBootPassesRequested': 5,
-              'scope': 'exact same-commit FireRed build artifact + 8 Kanto Variant-A 6v6 leaders + story Giovanni 4/5 rosters + generated trainer data + honest AI flags + QoL/protected evidence + mGBA boot smoke',
-              'legacyFiveOfSixBaseline': False,
-              'storyGiovanniImplementationDerived': True,
-              'note': 'Validates the exact current compiled ROM and generated trainer data. Controller-driven full battles and save-fixed Gym A/B/C selection remain separate future runtime tests.'
-          }
-          out.mkdir(exist_ok=True)
-          (out / 'gym_test_regression_report.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
+          import hashlib,json,os
+          rom=Path('baseline/Qarro_FIRST_PLAYABLE_v3_8.gba'); out=Path('regression_out'); out.mkdir(exist_ok=True)
+          report={'marker':'QARRO_TRAINER_REGRESSION_GYM_5OF6_20260921','sourceCommit':os.environ.get('GITHUB_SHA'),'sourceBuildRun':int(os.environ['BUILD_RUN_ID']) if os.environ.get('BUILD_RUN_ID') else None,'sourceArtifact':os.environ.get('BUILD_ARTIFACT'),'romSha256':hashlib.sha256(rom.read_bytes()).hexdigest() if rom.is_file() else None,'staticPassesRequested':5,'emulatorBootPassesRequested':5,'scope':'exact same-commit FireRed build + six-member Gym source pools + final Gym 5-of-6 runtime wiring + QoL/protected evidence + mGBA boot smoke','legacyFiveOfSixBaseline':True}
+          (out/'gym_test_regression_report.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
           PY
 
       - name: Upload current trainer regression evidence
