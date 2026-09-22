@@ -19,6 +19,7 @@ TRANSLATIONS={
     "gText_MenuDexNav": "ДЕКСНАВ",
     "gText_DexHoenn": "ХОЭНН",
     "gText_Hoenn": "ХОЭНН",
+    "gText_BP": "БО",
 }
 EXACT_REPLACEMENTS=[
     ("const u8 gText_PkmnFainted_FldPsn[] = _(\"{STR_VAR_1} Обморок...\\p\\n\");", "const u8 gText_PkmnFainted_FldPsn[] = _(\"{STR_VAR_1} теряет сознание...\\p\\n\");"),
@@ -57,7 +58,7 @@ def replace_exact(path,old,new):
 def main():
     if len(sys.argv)!=2: raise SystemExit("usage: localize_strings_dynamic_quality_v3_199.py <upstream-root>")
     root=Path(sys.argv[1]).resolve(); path=root/TARGET
-    if len(TRANSLATIONS)!=13 or len(EXACT_REPLACEMENTS)!=2:
+    if len(TRANSLATIONS)!=14 or len(EXACT_REPLACEMENTS)!=2:
         raise RuntimeError("unexpected v3.199 operation count")
     for sym,tr in TRANSLATIONS.items(): replace_symbol(path,sym,tr)
     for old,new in EXACT_REPLACEMENTS: replace_exact(path,old,new)
