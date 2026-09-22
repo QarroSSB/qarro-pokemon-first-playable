@@ -20,7 +20,7 @@ TRANSLATIONS={
     "gText_DexHoenn": "ХОЭНН",
     "gText_Hoenn": "ХОЭНН",
     "gText_BP": "БО",
-    "gText_NumBP": "{STR_VAR_1} БО",
+    "gText_NumBP": "{STR_VAR_1}{COLOR DARK_GRAY}{SHADOW LIGHT_GRAY} БО",
 }
 EXACT_REPLACEMENTS=[
     ("const u8 gText_PkmnFainted_FldPsn[] = _(\"{STR_VAR_1} Обморок...\\p\\n\");", "const u8 gText_PkmnFainted_FldPsn[] = _(\"{STR_VAR_1} теряет сознание...\\p\\n\");"),
