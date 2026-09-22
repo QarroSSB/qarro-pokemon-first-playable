@@ -167,6 +167,12 @@ jobs:
           if candidates:
               first = candidates[0]
               print('RU_MAP_RUNTIME_FIRST=' + json.dumps(first, ensure_ascii=False, sort_keys=True))
+          full = report.get('fullSurface', {})
+          full_candidates = full.get('candidates', [])
+          print(f"RU_FULL_SURFACE_REMAINING={full.get('englishOnlyCandidateCount')}")
+          if full_candidates:
+              first = full_candidates[0]
+              print('RU_FULL_SURFACE_FIRST=' + json.dumps(first, ensure_ascii=False, sort_keys=True))
           PY
           python3 qarro-repo/ci/gate_ru_runtime_completion_v3_215.py \
             upstream/build/qarro_ru_runtime_surface_v3_21_audit.json \
