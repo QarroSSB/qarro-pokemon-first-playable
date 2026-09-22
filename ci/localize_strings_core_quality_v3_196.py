@@ -50,7 +50,7 @@ TRANSLATIONS = {
     "gText_ReturnToWaitingRoom": "Вернуться в ЗАЛ ОЖИДАНИЯ?",
     "gText_CancelChallenge": "Отменить испытание?",
     "gText_PkmnCantBeTraded": "Этого POKeMON нельзя обменять.",
-    "gText_OTSlash": "OT/",
+    "gText_OTSlash": "ОТ/",
     "gText_RentalPkmn": "АРЕНДНЫЙ POKeMON",
     "gText_Appeal": "ПРИВЛЕЧ.",
     "gText_Jam": "ПОМЕХА",
