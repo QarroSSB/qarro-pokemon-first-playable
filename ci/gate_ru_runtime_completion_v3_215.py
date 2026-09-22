@@ -18,6 +18,10 @@ from pathlib import Path
 MARKER = "QARRO_RU_RUNTIME_COMPLETION_V3_215"
 
 
+def _annotation_value(value: object) -> str:
+    return str(value or "").replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+
 def main() -> int:
     if len(sys.argv) != 2:
         print(f"usage: {Path(sys.argv[0]).name} <audit-json>", file=sys.stderr)
@@ -45,6 +49,11 @@ def main() -> int:
         )
     if count:
         first = candidates[0]
+        file = _annotation_value(first.get("file"))
+        line = first.get("line") if isinstance(first.get("line"), int) else 1
+        label = _annotation_value(first.get("label") or "unknown")
+        preview = _annotation_value(first.get("preview") or first.get("raw") or "")
+        print(f"::error file={file},line={line},title=RU map-runtime blocker::{label}: {preview}")
         raise SystemExit(
             f"[{MARKER}] BLOCKER: {count} English-only FireRed map dialogue block(s) remain; "
             f"first={first.get('file')}:{first.get('line')} {first.get('label')}"
