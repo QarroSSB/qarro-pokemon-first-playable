@@ -80,6 +80,7 @@ def main():
         "gText_HeavyRain": "СИЛЬНЫЙ ДОЖДЬ",
         "gText_Quiz": "ВИКТОРИНА",
         "gText_Answer": "ОТВЕТ",
+        "gText_ExpShareOff": "Раздача опыта отключена.{PAUSE_UNTIL_PRESS}",
     }
     for sym, val in clean_strings.items():
         replace_symbol(strings, sym, val)
