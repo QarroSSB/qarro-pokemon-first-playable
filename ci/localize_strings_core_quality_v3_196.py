@@ -37,7 +37,7 @@ TRANSLATIONS = {
     "gText_CryOf": "КРИК",
     "gText_SizeComparedTo": "РАЗМЕР ОТНОСИТЕЛЬНО ",
     "gText_HOFDexSaving": "СОХРАНЕНИЕ...\\nНЕ ВЫКЛЮЧАЙ ПИТАНИЕ.",
-    "gText_Number": "No. ",
+    "gText_Number": "НОМ. ",
     "gText_IDNumber": "ID НОМЕР",
     "gText_ConfirmStarterChoice": "Выбираешь этого POKeMON?",
     "gText_Berry2": " ЯГОДА",
