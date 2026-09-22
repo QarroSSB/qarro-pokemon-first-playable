@@ -81,6 +81,7 @@ def main():
         "gText_Quiz": "ВИКТОРИНА",
         "gText_Answer": "ОТВЕТ",
         "gText_ExpShareOff": "Раздача опыта отключена.{PAUSE_UNTIL_PRESS}",
+        "gText_ExpShareOn": "Раздача опыта включена.{PAUSE_UNTIL_PRESS}",
     }
     for sym, val in clean_strings.items():
         replace_symbol(strings, sym, val)
