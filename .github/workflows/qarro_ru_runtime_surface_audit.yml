@@ -168,6 +168,12 @@ jobs:
           if candidates:
               first = candidates[0]
               print('RU_MAP_RUNTIME_FIRST=' + json.dumps(first, ensure_ascii=False, sort_keys=True))
+              file = first.get('file', '')
+              line = first.get('line', 1)
+              symbol = first.get('symbol') or first.get('label') or first.get('kind') or 'unknown'
+              preview = first.get('preview') or first.get('raw') or ''
+              preview = str(preview).replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+              print(f'::error file={file},line={line},title=RU map-runtime blocker::{symbol}: {preview}')
           full = report.get('fullSurface', {})
           full_candidates = full.get('candidates', [])
           print(f"RU_FULL_SURFACE_REMAINING={full.get('englishOnlyCandidateCount')}")
