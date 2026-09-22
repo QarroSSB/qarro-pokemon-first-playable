@@ -31,7 +31,7 @@ TRANSLATIONS = {
     "gText_RButton": "КНОПКА R",
     "gText_LButton": "КНОПКА L",
     "gText_Start": "START",
-    "gText_Select": "SELECT",
+    "gText_Select": "ВЫБОР",
     "gText_ControlPad": "+ КРЕСТОВИНА",
     "gText_ThisIsAPokemon": "Вот кого мы называем POKeMON.{PAUSE 96}\\p",
     "gText_CryOf": "КРИК",
