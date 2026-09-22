@@ -173,6 +173,12 @@ jobs:
           if full_candidates:
               first = full_candidates[0]
               print('RU_FULL_SURFACE_FIRST=' + json.dumps(first, ensure_ascii=False, sort_keys=True))
+              file = first.get('file', '')
+              line = first.get('line', 1)
+              symbol = first.get('symbol') or first.get('label') or first.get('kind') or 'unknown'
+              preview = first.get('preview') or first.get('raw') or ''
+              preview = str(preview).replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+              print(f'::error file={file},line={line},title=RU full-surface blocker::{symbol}: {preview}')
           PY
           python3 qarro-repo/ci/gate_ru_runtime_completion_v3_215.py \
             upstream/build/qarro_ru_runtime_surface_v3_21_audit.json \
