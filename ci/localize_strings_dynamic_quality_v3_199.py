@@ -16,7 +16,7 @@ TRANSLATIONS={
     "gText_XNatureHatchedSomewhereAt": "Характер: {DYNAMIC 0}{DYNAMIC 2}{DYNAMIC 1}{DYNAMIC 5},\\nвылупился где-то на {LV_2}{DYNAMIC 0}{DYNAMIC 3}{DYNAMIC 1}.",
     "gText_ApostropheSBase": " - БАЗА",
     "gText_NumPlayerLink": "{STR_VAR_1}P СЕТЬ",
-    "gText_MenuDexNav": "DEXNAV",
+    "gText_MenuDexNav": "ДЕКСНАВ",
 }
 EXACT_REPLACEMENTS=[
     ("const u8 gText_PkmnFainted_FldPsn[] = _(\"{STR_VAR_1} Обморок...\\p\\n\");", "const u8 gText_PkmnFainted_FldPsn[] = _(\"{STR_VAR_1} теряет сознание...\\p\\n\");"),
