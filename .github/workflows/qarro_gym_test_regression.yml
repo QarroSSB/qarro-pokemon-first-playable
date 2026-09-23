@@ -72,6 +72,8 @@ jobs:
           assert f'PINNED: {pinned}' in build_workflow
           assert f'ref: {pinned}' in build_workflow
           assert 'path: upstream' in build_workflow
+          assert 'KIT_TGZ_SHA256: 95ca1dd309d79ecfed86e21b441725c8b68b7ec0368efc33dcf790be0d62eed9' in build_workflow
+          assert 'KIT_B64_SHA256: 19e30690575cf31d941f9e183c7e52f452238a4d18759577c520909a718e01c1' in build_workflow
           assert 'make -C upstream clean' in build_workflow
           assert 'make -C upstream -j4 -O firered' in build_workflow
           def load(n): return json.loads((root/n).read_text(encoding='utf-8'))
