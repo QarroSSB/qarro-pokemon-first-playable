@@ -68,6 +68,7 @@ jobs:
           diff=(root/'qarro_applied_diff_v3_8.patch').read_text(encoding='utf-8',errors='replace')
           build_workflow=Path('.github/workflows/qarro_first_playable_build.yml').read_text(encoding='utf-8')
           pinned='e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7'
+          assert '- name: Checkout exact Expansion 1.17.0' in build_workflow
           assert 'repository: rh-hideout/pokeemerald-expansion' in build_workflow
           assert f'PINNED: {pinned}' in build_workflow
           assert f'ref: {pinned}' in build_workflow
