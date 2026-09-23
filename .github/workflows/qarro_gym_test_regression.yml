@@ -71,6 +71,7 @@ jobs:
           assert 'repository: rh-hideout/pokeemerald-expansion' in build_workflow
           assert f'PINNED: {pinned}' in build_workflow
           assert f'ref: {pinned}' in build_workflow
+          assert 'path: upstream' in build_workflow
           assert 'make -C upstream -j4 -O firered' in build_workflow
           def load(n): return json.loads((root/n).read_text(encoding='utf-8'))
           built=load('qarro_built_rom_v3_12_audit.json')
