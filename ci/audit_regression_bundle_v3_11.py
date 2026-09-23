@@ -32,6 +32,11 @@ EXPECTED_RU_FONT_STAT_KEYS = {
     "cyrillic_nonempty", "min_ink_pixels", "min_advance", "max_advance",
     "advance_raster_matches",
 }
+EXPECTED_RU_TEXT_STAT_KEYS = {
+    "scanned_text_files", "files_with_cyrillic", "cyrillic_characters",
+    "early_marker_hits", "files_still_containing_accented_e",
+    "accented_e_file_count",
+}
 
 
 def load(path: Path) -> dict:
@@ -105,6 +110,8 @@ def main() -> int:
                 f"Cyrillic advance-range regression in {name}")
 
     text = ru.get("text", {})
+    require(isinstance(text, dict) and set(text) == EXPECTED_RU_TEXT_STAT_KEYS,
+            "Russian localization text-stat schema regression")
     require(text.get("scanned_text_files", 0) >= EXPECTED_RU_SCANNED_FILES,
             "Russian localization scan coverage regression")
     require(text.get("files_with_cyrillic", 0) >= EXPECTED_RU_FILES_WITH_CYRILLIC,
