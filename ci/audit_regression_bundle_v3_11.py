@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 
 MARKER = "QARRO_REGRESSION_BUNDLE_V3_11"
+EXPECTED_RU_POLICY = "FireRed / Expansion 1.17.0 / Gen I-V; Pokemon+Move+Ability names may remain English"
 EXPECTED_RU_SCANNED_FILES = 1471
 EXPECTED_RU_FILES_WITH_CYRILLIC = 16
 EXPECTED_RU_CYRILLIC_CHARACTERS = 9480
@@ -81,8 +82,7 @@ def main() -> int:
             "Ash invariant regression in QoL audit")
 
     policy = ru.get("policy", "")
-    require("FireRed" in policy and "Expansion 1.17.0" in policy and "Gen I-V" in policy,
-            "RU foundation policy drift")
+    require(policy == EXPECTED_RU_POLICY, "RU foundation policy drift")
     require(ru.get("cyrillic_glyph_count", 0) >= 66, "Cyrillic charmap coverage regression")
     fonts = ru.get("fonts", {})
     require(set(fonts) == EXPECTED_RU_FONT_ATLASES,
