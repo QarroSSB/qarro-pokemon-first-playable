@@ -33,4 +33,5 @@ jobs:
           grep -F 'ashCapTouched": False' ci/gym_five_v3_25.py
           grep -F 'PINNED: e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7' .github/workflows/qarro_first_playable_build.yml
           grep -F 'make -C upstream -j4 -O firered' .github/workflows/qarro_first_playable_build.yml
-          echo 'PASS: isolated Gym test keeps FireRed/Expansion 1.17.0, no Exp. Share, no Legendary Gym anchors, only approved Mythicals, and protected Ash features untouched'
+          grep -F "'policy':'FireRed / Expansion 1.17.0 / Gen I-V'" ci/regression_bundle_v3_11.py
+          echo 'PASS: isolated Gym test keeps FireRed/Expansion 1.17.0, Gen I-V, no Exp. Share, no Legendary Gym anchors, only approved Mythicals, and protected Ash features untouched'
