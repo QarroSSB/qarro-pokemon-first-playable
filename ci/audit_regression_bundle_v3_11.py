@@ -107,7 +107,7 @@ def main() -> int:
             "Russian localization character-count regression")
     marker_hits = text.get("early_marker_hits", {})
     require(isinstance(marker_hits, dict), "missing Russian early-marker evidence")
-    require(EXPECTED_RU_EARLY_MARKERS.issubset(marker_hits), "Russian early-marker set regression")
+    require(set(marker_hits) == EXPECTED_RU_EARLY_MARKERS, "Russian early-marker identity regression")
     require(all(int(marker_hits.get(marker, 0)) > 0 for marker in EXPECTED_RU_EARLY_MARKERS),
             "Russian early-game marker regression")
     require(text.get("accented_e_file_count") == 0, "accented-e normalization regression")
@@ -146,9 +146,6 @@ def main() -> int:
     out = build / "qarro_regression_bundle_v3_11_audit.json"
     out.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
-    # The workflow artifact already uploads qarro_ci_out_v3_8/**. Mirror the
-    # read-only audit evidence there when running in CI so a GREEN ROM carries
-    # the exact regression proof that gated it. Outside CI this is a no-op.
     ci_out = root.parent / "qarro_ci_out_v3_8"
     if ci_out.is_dir():
         for name in (
