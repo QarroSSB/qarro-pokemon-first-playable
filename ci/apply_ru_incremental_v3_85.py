@@ -196,6 +196,7 @@ SCRIPTS = [
     "localize_battle_message_utility_quality_v3_209.py",
     "localize_battle_message_classic_effects_quality_v3_212.py",
     "localize_battle_message_sleep_energy_quality_v3_213.py",
+    "localize_fame_checker_person_cards_quality_v3_216.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
