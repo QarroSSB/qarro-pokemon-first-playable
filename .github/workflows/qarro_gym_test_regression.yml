@@ -66,6 +66,11 @@ jobs:
           rom_path=root/'Qarro_FIRST_PLAYABLE_v3_8.gba'
           generated=(root/'trainers_frlg.generated.h').read_text(encoding='utf-8')
           diff=(root/'qarro_applied_diff_v3_8.patch').read_text(encoding='utf-8',errors='replace')
+          build_workflow=Path('.github/workflows/qarro_first_playable_build.yml').read_text(encoding='utf-8')
+          pinned='e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7'
+          assert f'PINNED: {pinned}' in build_workflow
+          assert f'ref: {pinned}' in build_workflow
+          assert 'make -C upstream -j4 -O firered' in build_workflow
           def load(n): return json.loads((root/n).read_text(encoding='utf-8'))
           built=load('qarro_built_rom_v3_12_audit.json')
           rx=re.compile(r'^\s*(?:\[DIFFICULTY_[A-Z0-9_]+\])?\[(TRAINER_[A-Z0-9_]+)\]\s*=\s*$',re.M)
@@ -96,7 +101,7 @@ jobs:
             assert qol['ashBondTouched'] is False and qol['ashCapTouched'] is False
             bundle=load('qarro_regression_bundle_v3_11_audit.json'); assert bundle['policy']=='FireRed / Expansion 1.17.0 / Gen I-V' and bundle['qolRegression']=='PASS'
             protected=load('qarro_protected_features_v3_13_audit.json'); assert protected['ashBondTouched'] is False and protected['ashCapTouched'] is False and protected['protectedPathHits']==0 and protected['protectedDiffLineHits']==0
-            print(f'PASS regression {n}: {sha[:16]}...; six-member Gym source pools + final 5-of-6 runtime + QoL + protected features OK')
+            print(f'PASS regression {n}: {sha[:16]}...; pinned FireRed upstream + six-member Gym source pools + final 5-of-6 runtime + QoL + protected features OK')
           PY
 
       - name: Install mGBA runtime smoke dependencies
@@ -126,7 +131,7 @@ jobs:
           from pathlib import Path
           import hashlib,json,os
           rom=Path('baseline/Qarro_FIRST_PLAYABLE_v3_8.gba'); out=Path('regression_out'); out.mkdir(exist_ok=True)
-          report={'marker':'QARRO_TRAINER_REGRESSION_GYM_5OF6_20260921','sourceCommit':os.environ.get('GITHUB_SHA'),'sourceBuildRun':int(os.environ['BUILD_RUN_ID']) if os.environ.get('BUILD_RUN_ID') else None,'sourceArtifact':os.environ.get('BUILD_ARTIFACT'),'romSha256':hashlib.sha256(rom.read_bytes()).hexdigest() if rom.is_file() else None,'staticPassesRequested':5,'emulatorBootPassesRequested':5,'scope':'exact same-commit FireRed build + six-member Gym source pools + final Gym 5-of-6 runtime wiring + QoL/protected evidence + mGBA boot smoke','legacyFiveOfSixBaseline':True}
+          report={'marker':'QARRO_TRAINER_REGRESSION_GYM_5OF6_20260921','sourceCommit':os.environ.get('GITHUB_SHA'),'sourceBuildRun':int(os.environ['BUILD_RUN_ID']) if os.environ.get('BUILD_RUN_ID') else None,'sourceArtifact':os.environ.get('BUILD_ARTIFACT'),'romSha256':hashlib.sha256(rom.read_bytes()).hexdigest() if rom.is_file() else None,'staticPassesRequested':5,'emulatorBootPassesRequested':5,'scope':'exact same-commit FireRed build + pinned Expansion 1.17.0 upstream + six-member Gym source pools + final Gym 5-of-6 runtime wiring + QoL/protected evidence + mGBA boot smoke','legacyFiveOfSixBaseline':True}
           (out/'gym_test_regression_report.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
           PY
 
