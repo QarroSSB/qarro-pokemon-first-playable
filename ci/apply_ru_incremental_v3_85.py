@@ -199,6 +199,7 @@ SCRIPTS = [
     "localize_fame_checker_person_cards_quality_v3_216.py",
     "localize_fame_checker_koga_agatha_quality_v3_217.py",
     "localize_fame_checker_lance_giovanni_quality_v3_218.py",
+    "localize_fame_checker_locations_oak_misty_quality_v3_219.py",
 ]
 
 VERSION_RE = re.compile(r"_v3_(\d+)\.py$")
