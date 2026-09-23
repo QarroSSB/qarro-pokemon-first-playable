@@ -90,9 +90,10 @@ def main() -> int:
     require(set(fonts) == EXPECTED_RU_FONT_ATLASES,
             "FireRed font-atlas identity regression")
     for name, stats in fonts.items():
-        require(stats.get("cyrillic_nonempty", 0) >= 66, f"Cyrillic glyph regression in {name}")
+        require(stats.get("cyrillic_nonempty") == EXPECTED_RU_CYRILLIC_GLYPHS,
+                f"Cyrillic glyph regression in {name}")
         require(stats.get("min_ink_pixels", 0) > 0, f"empty Cyrillic ink regression in {name}")
-        require(stats.get("advance_raster_matches", 0) >= 66,
+        require(stats.get("advance_raster_matches") == EXPECTED_RU_CYRILLIC_GLYPHS,
                 f"Cyrillic raster/advance regression in {name}")
 
     text = ru.get("text", {})
