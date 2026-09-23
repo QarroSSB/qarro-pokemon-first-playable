@@ -28,6 +28,10 @@ EXPECTED_RU_FONT_ATLASES = {
     "latin_small_narrower.png", "latin_short_narrow.png",
     "latin_short_narrower.png",
 }
+EXPECTED_RU_FONT_STAT_KEYS = {
+    "cyrillic_nonempty", "min_ink_pixels", "min_advance", "max_advance",
+    "advance_raster_matches",
+}
 
 
 def load(path: Path) -> dict:
@@ -90,6 +94,8 @@ def main() -> int:
     require(set(fonts) == EXPECTED_RU_FONT_ATLASES,
             "FireRed font-atlas identity regression")
     for name, stats in fonts.items():
+        require(isinstance(stats, dict) and set(stats) == EXPECTED_RU_FONT_STAT_KEYS,
+                f"Cyrillic font-stat schema regression in {name}")
         require(stats.get("cyrillic_nonempty") == EXPECTED_RU_CYRILLIC_GLYPHS,
                 f"Cyrillic glyph regression in {name}")
         require(stats.get("min_ink_pixels", 0) > 0, f"empty Cyrillic ink regression in {name}")
