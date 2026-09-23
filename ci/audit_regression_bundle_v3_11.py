@@ -95,6 +95,8 @@ def main() -> int:
         require(stats.get("min_ink_pixels", 0) > 0, f"empty Cyrillic ink regression in {name}")
         require(stats.get("advance_raster_matches") == EXPECTED_RU_CYRILLIC_GLYPHS,
                 f"Cyrillic raster/advance regression in {name}")
+        require(4 <= stats.get("min_advance", 0) <= stats.get("max_advance", 0) <= 16,
+                f"Cyrillic advance-range regression in {name}")
 
     text = ru.get("text", {})
     require(text.get("scanned_text_files", 0) >= EXPECTED_RU_SCANNED_FILES,
