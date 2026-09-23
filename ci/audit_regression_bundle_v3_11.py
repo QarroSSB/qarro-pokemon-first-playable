@@ -20,6 +20,12 @@ EXPECTED_RU_SCANNED_FILES = 1471
 EXPECTED_RU_FILES_WITH_CYRILLIC = 16
 EXPECTED_RU_CYRILLIC_CHARACTERS = 9480
 EXPECTED_RU_EARLY_MARKERS = {"Привет", "ПОКЕМОН", "ПАЛЛЕТ", "ОУК", "МАМА", "Пора идти"}
+EXPECTED_RU_FONT_ATLASES = {
+    "latin_small_narrow.png", "latin_small.png", "latin_normal.png",
+    "latin_short.png", "latin_narrow.png", "latin_narrower.png",
+    "latin_small_narrower.png", "latin_short_narrow.png",
+    "latin_short_narrower.png",
+}
 
 
 def load(path: Path) -> dict:
@@ -79,7 +85,8 @@ def main() -> int:
             "RU foundation policy drift")
     require(ru.get("cyrillic_glyph_count", 0) >= 66, "Cyrillic charmap coverage regression")
     fonts = ru.get("fonts", {})
-    require(len(fonts) == 9, "FireRed font-atlas coverage regression")
+    require(set(fonts) == EXPECTED_RU_FONT_ATLASES,
+            "FireRed font-atlas identity regression")
     for name, stats in fonts.items():
         require(stats.get("cyrillic_nonempty", 0) >= 66, f"Cyrillic glyph regression in {name}")
         require(stats.get("min_ink_pixels", 0) > 0, f"empty Cyrillic ink regression in {name}")
