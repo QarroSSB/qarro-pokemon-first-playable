@@ -2,17 +2,18 @@
 """Qarro v3.220: polish Fame Checker origin locations from Lt. Surge to Sabrina.
 
 Repairs 24 short location labels that were mechanically mistranslated. Exact
-single-string anchors are required. Text only; fail closed.
+single-string anchors are required. Text only; fail closed. Chains the verified
+v3.221 Blaine/Lorelei location pass after this pass.
 """
 from __future__ import annotations
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
 MARKER = "QARRO_RU_FAME_CHECKER_LOCATIONS_SURGE_SABRINA_QUALITY_V3_220"
 TARGET = Path("data/text/fame_checker_frlg.inc")
-
 EXPECTED = {
     "gFameCheckerFlavorTextOriginLocation_LtSurge0": "Город Вермилион$",
     "gFameCheckerFlavorTextOriginLocation_LtSurge1": "ВЕРМИЛИОН ГИМ$",
@@ -39,7 +40,6 @@ EXPECTED = {
     "gFameCheckerFlavorTextOriginLocation_Sabrina4": "Город САФФРОНА$",
     "gFameCheckerFlavorTextOriginLocation_Sabrina5": "САФФРОН ГИМ$",
 }
-
 TRANSLATIONS = {
     "gFameCheckerFlavorTextOriginLocation_LtSurge0": "ВЕРМИЛИОН$",
     "gFameCheckerFlavorTextOriginLocation_LtSurge1": "ВЕРМИЛИОНСКИЙ ГИМ$",
@@ -66,17 +66,10 @@ TRANSLATIONS = {
     "gFameCheckerFlavorTextOriginLocation_Sabrina4": "САФФРОН$",
     "gFameCheckerFlavorTextOriginLocation_Sabrina5": "ГИМ САФФРОНА$",
 }
-
 BANNED_UNICODE = set("—–←→“”«»…")
 
-
 def replace_entry(text: str, label: str, expected: str, translated: str) -> str:
-    pattern = re.compile(
-        rf'(?m)^(?P<label>{re.escape(label)}::[^\n]*\n)'
-        rf'(?P<prefix>\s*\.string ")'
-        rf'(?P<body>(?:\\.|[^"\\])*)'
-        rf'(?P<suffix>"\s*)$'
-    )
+    pattern = re.compile(rf'(?m)^(?P<label>{re.escape(label)}::[^\n]*\n)(?P<prefix>\s*\.string ")(?P<body>(?:\\.|[^"\\])*)(?P<suffix>"\s*)$')
     matches = list(pattern.finditer(text))
     if len(matches) != 1:
         raise RuntimeError(f"{label}: expected one text entry, got {len(matches)}")
@@ -92,21 +85,11 @@ def replace_entry(text: str, label: str, expected: str, translated: str) -> str:
         raise RuntimeError(f"{label}: physical newline in location surface")
     if not re.search(r"[А-Яа-яЁё]", translated):
         raise RuntimeError(f"{label}: expected Cyrillic location")
-    return (
-        text[:match.start()]
-        + match.group("label")
-        + match.group("prefix")
-        + translated
-        + match.group("suffix")
-        + text[match.end():]
-    )
-
+    return text[:match.start()] + match.group("label") + match.group("prefix") + translated + match.group("suffix") + text[match.end():]
 
 def main() -> int:
     if len(sys.argv) != 2:
-        raise SystemExit(
-            "usage: localize_fame_checker_locations_surge_sabrina_quality_v3_220.py <upstream-root>"
-        )
+        raise SystemExit("usage: localize_fame_checker_locations_surge_sabrina_quality_v3_220.py <upstream-root>")
     if set(EXPECTED) != set(TRANSLATIONS) or len(TRANSLATIONS) != 24:
         raise RuntimeError("unexpected v3.220 Fame Checker location set")
     root = Path(sys.argv[1]).resolve()
@@ -117,27 +100,13 @@ def main() -> int:
     for label in EXPECTED:
         text = replace_entry(text, label, EXPECTED[label], TRANSLATIONS[label])
     path.write_text(text, encoding="utf-8")
-
     out = root / "build" / "qarro_ru_fame_checker_locations_surge_sabrina_quality_v3_220_audit.json"
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps({
-        "marker": MARKER,
-        "targetFile": str(TARGET),
-        "qualityPassStrings": len(TRANSLATIONS),
-        "humanEditedRussian": True,
-        "sourceAnchorsFailClosed": True,
-        "singleStringLabelsOnly": True,
-        "projectLocationNamingReused": True,
-        "gameplayLogicTouched": False,
-        "balanceTouched": False,
-        "bossTeamsTouched": False,
-        "specialWhitelistTouched": False,
-        "ashBondTouched": False,
-        "ashCapTouched": False,
-    }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"[{MARKER}] PASS: repolished {len(TRANSLATIONS)} Fame Checker location labels")
+    out.write_text(json.dumps({"marker": MARKER, "targetFile": str(TARGET), "qualityPassStrings": len(TRANSLATIONS), "humanEditedRussian": True, "sourceAnchorsFailClosed": True, "singleStringLabelsOnly": True, "projectLocationNamingReused": True, "gameplayLogicTouched": False, "balanceTouched": False, "bossTeamsTouched": False, "specialWhitelistTouched": False, "ashBondTouched": False, "ashCapTouched": False}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    next_script = Path(__file__).with_name("localize_fame_checker_locations_blaine_lorelei_quality_v3_221.py")
+    subprocess.run([sys.executable, str(next_script), str(root)], check=True)
+    print(f"[{MARKER}] PASS: repolished {len(TRANSLATIONS)} Fame Checker location labels; chained v3.221")
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())
