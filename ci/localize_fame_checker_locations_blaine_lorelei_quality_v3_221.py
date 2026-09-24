@@ -3,11 +3,13 @@
 
 Targets only the 12 single-string origin-location labels verified against the
 pinned FireRed upstream. The current body must already be a simple Cyrillic
-location surface; labels are unique and replacements are text-only.
+location surface; labels are unique and replacements are text-only. Chains the
+verified v3.222 Bruno/Agatha location pass after this pass.
 """
 from __future__ import annotations
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -93,7 +95,9 @@ def main() -> int:
         "ashBondTouched": False,
         "ashCapTouched": False,
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"[{MARKER}] PASS: repolished {len(TRANSLATIONS)} Fame Checker location labels")
+    next_script = Path(__file__).with_name("localize_fame_checker_locations_bruno_agatha_quality_v3_222.py")
+    subprocess.run([sys.executable, str(next_script), str(root)], check=True)
+    print(f"[{MARKER}] PASS: repolished {len(TRANSLATIONS)} Fame Checker location labels; chained v3.222")
     return 0
 
 
