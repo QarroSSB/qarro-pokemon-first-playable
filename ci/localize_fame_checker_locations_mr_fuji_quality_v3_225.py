@@ -3,10 +3,12 @@
 
 Targets only Mr. Fuji's six single-string origin-location labels verified
 against the pinned FireRed upstream. Text only; fail closed on non-Cyrillic surfaces.
+Chains the verified Giovanni location pass after this pass.
 """
 from __future__ import annotations
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -60,6 +62,8 @@ def main() -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({"marker": MARKER, "targetFile": str(TARGET), "qualityPassStrings": len(TRANSLATIONS), "sourceLabelsVerifiedAgainstPinnedUpstream": True, "sourceSurfacesRequiredCyrillic": True, "singleStringLabelsOnly": True, "humanEditedRussian": True, "previousSurfaces": before, "gameplayLogicTouched": False, "balanceTouched": False, "bossTeamsTouched": False, "specialWhitelistTouched": False, "ashBondTouched": False, "ashCapTouched": False}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"[{MARKER}] PASS: repolished {len(TRANSLATIONS)} Fame Checker location labels")
+    next_pass = Path(__file__).with_name("localize_fame_checker_locations_giovanni_quality_v3_226.py")
+    subprocess.run([sys.executable, str(next_pass), str(root)], check=True)
     return 0
 
 
