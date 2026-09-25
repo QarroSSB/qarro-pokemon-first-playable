@@ -60,6 +60,12 @@ def main() -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({"marker": MARKER, "targetFile": str(TARGET), "qualityPassStrings": len(TRANSLATIONS), "sourceLabelsVerifiedAgainstPinnedUpstream": True, "sourceSurfacesRequiredCyrillic": True, "singleStringLabelsOnly": True, "humanEditedRussian": True, "previousSurfaces": before, "gameplayLogicTouched": False, "balanceTouched": False, "bossTeamsTouched": False, "specialWhitelistTouched": False, "ashBondTouched": False, "ashCapTouched": False}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"[{MARKER}] PASS: repolished {len(TRANSLATIONS)} Fame Checker location labels")
+
+    next_script = Path(__file__).with_name("localize_fame_checker_objects_prof_oak_quality_v3_227.py")
+    if not next_script.is_file():
+        raise RuntimeError(f"missing chained localization pass: {next_script.name}")
+    import subprocess
+    subprocess.run([sys.executable, str(next_script), str(root)], check=True)
     return 0
 
 
