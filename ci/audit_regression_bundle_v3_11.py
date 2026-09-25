@@ -1,0 +1,185 @@
+#!/usr/bin/env python3
+"""Read-only consolidated regression gate for the Qarro FireRed build.
+
+Runs after the existing QoL and RU foundation audits. It verifies that their
+machine-readable reports exist and still encode the confirmed user policy:
+FireRed / Expansion 1.17.0 / Gen I-V, readable Cyrillic coverage, no money
+loss on defeat, failed-catch Ball refund only, the one-time post-Pokedex
+starter kit, no Exp. Share on the Gym test branch, and the confirmed
+post-Viridian visible ground-item progression. It changes no gameplay data
+and does not touch Ash Bond/Cap.
+"""
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+MARKER = "QARRO_REGRESSION_BUNDLE_V3_11"
+EXPECTED_RU_POLICY = "FireRed / Expansion 1.17.0 / Gen I-V; Pokemon+Move+Ability names may remain English"
+EXPECTED_RU_CYRILLIC_GLYPHS = 66
+EXPECTED_RU_SCANNED_FILES = 1471
+EXPECTED_RU_FILES_WITH_CYRILLIC = 16
+EXPECTED_RU_CYRILLIC_CHARACTERS = 9480
+EXPECTED_RU_EARLY_MARKERS = {"Привет", "ПОКЕМОН", "ПАЛЛЕТ", "ОУК", "МАМА", "Пора идти"}
+EXPECTED_RU_FONT_ATLASES = {
+    "latin_small_narrow.png", "latin_small.png", "latin_normal.png",
+    "latin_short.png", "latin_narrow.png", "latin_narrower.png",
+    "latin_small_narrower.png", "latin_short_narrow.png",
+    "latin_short_narrower.png",
+}
+EXPECTED_RU_FONT_STAT_KEYS = {
+    "cyrillic_nonempty", "min_ink_pixels", "min_advance", "max_advance",
+    "advance_raster_matches",
+}
+EXPECTED_RU_TEXT_STAT_KEYS = {
+    "scanned_text_files", "files_with_cyrillic", "cyrillic_characters",
+    "early_marker_hits", "files_still_containing_accented_e",
+    "accented_e_file_count",
+}
+
+
+def load(path: Path) -> dict:
+    if not path.is_file():
+        raise RuntimeError(f"missing prerequisite audit: {path}")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"invalid prerequisite audit: {path}") from exc
+    if not isinstance(data, dict):
+        raise RuntimeError(f"unexpected audit root type: {path}")
+    return data
+
+
+def require(condition: bool, message: str) -> None:
+    if not condition:
+        raise RuntimeError(message)
+
+
+def main() -> int:
+    if len(sys.argv) != 2:
+        print(f"usage: {Path(sys.argv[0]).name} <upstream-root>", file=sys.stderr)
+        return 2
+
+    root = Path(sys.argv[1]).resolve()
+    build = root / "build"
+    qol = load(build / "qarro_qol_regression_v3_10_audit.json")
+    ru = load(build / "qarro_ru_foundation_v3_9_audit.json")
+    ground = load(build / "qarro_ground_items_v3_23_audit.json")
+
+    require(qol.get("marker") == "QARRO_QOL_REGRESSION_V3_10", "QoL audit marker drift")
+    money = qol.get("money", {})
+    catch = qol.get("failedCatchBall", {})
+    kit = qol.get("starterKit", {})
+    exp_share = qol.get("expShare", {})
+    require(money.get("removeMoneyCalls") == 0, "defeat money regression")
+    require(money.get("winRewardPreserved") is True, "trainer win reward regression")
+    require(catch.get("refundCalls") == 1, "failed-catch Ball refund count regression")
+    require(catch.get("refundAfterSuccessfulCaptureReturn") is True, "Ball refund path regression")
+    require(catch.get("successStillConsumesBall") is True, "successful catch consumption regression")
+    require(catch.get("safariExcluded") is True, "Safari Ball path regression")
+    require(kit.get("oneTimeSceneGuard") is True, "starter kit one-time guard regression")
+    require(kit.get("pokeBallsTotal") == 20, "starter Poké Ball total regression")
+    require(kit.get("potions") == 10, "starter Potion total regression")
+    require(kit.get("antidotes") == 5, "starter Antidote total regression")
+    require(kit.get("paralyzeHeals") == 5, "starter Paralyze Heal total regression")
+    require(kit.get("duplicateNewGameGrant") is False, "duplicate starter grant regression")
+    require(exp_share.get("enabled") is False, "Gym test Exp. Share enabled regression")
+    require(exp_share.get("oakGrant") is False, "Gym test Oak Exp. Share grant regression")
+    require(exp_share.get("partyWideFlag") is False, "Gym test party-wide Exp. Share regression")
+    require(exp_share.get("nativeItemMode") == "GEN_5", "Gym test Exp. Share item-mode regression")
+    require(qol.get("ashBondTouched") is False and qol.get("ashCapTouched") is False,
+            "Ash invariant regression in QoL audit")
+
+    policy = ru.get("policy", "")
+    require(policy == EXPECTED_RU_POLICY, "RU foundation policy drift")
+    require(ru.get("cyrillic_glyph_count") == EXPECTED_RU_CYRILLIC_GLYPHS,
+            "Cyrillic charmap coverage regression")
+    fonts = ru.get("fonts", {})
+    require(set(fonts) == EXPECTED_RU_FONT_ATLASES,
+            "FireRed font-atlas identity regression")
+    for name, stats in fonts.items():
+        require(isinstance(stats, dict) and set(stats) == EXPECTED_RU_FONT_STAT_KEYS,
+                f"Cyrillic font-stat schema regression in {name}")
+        require(stats.get("cyrillic_nonempty") == EXPECTED_RU_CYRILLIC_GLYPHS,
+                f"Cyrillic glyph regression in {name}")
+        require(stats.get("min_ink_pixels", 0) > 0, f"empty Cyrillic ink regression in {name}")
+        require(stats.get("advance_raster_matches") == EXPECTED_RU_CYRILLIC_GLYPHS,
+                f"Cyrillic raster/advance regression in {name}")
+        require(4 <= stats.get("min_advance", 0) <= stats.get("max_advance", 0) <= 16,
+                f"Cyrillic advance-range regression in {name}")
+
+    text = ru.get("text", {})
+    require(isinstance(text, dict) and set(text) == EXPECTED_RU_TEXT_STAT_KEYS,
+            "Russian localization text-stat schema regression")
+    require(text.get("scanned_text_files", 0) >= EXPECTED_RU_SCANNED_FILES,
+            "Russian localization scan coverage regression")
+    require(text.get("files_with_cyrillic", 0) >= EXPECTED_RU_FILES_WITH_CYRILLIC,
+            "Russian localization file-count regression")
+    require(text.get("cyrillic_characters", 0) >= EXPECTED_RU_CYRILLIC_CHARACTERS,
+            "Russian localization character-count regression")
+    marker_hits = text.get("early_marker_hits", {})
+    require(isinstance(marker_hits, dict), "missing Russian early-marker evidence")
+    require(set(marker_hits) == EXPECTED_RU_EARLY_MARKERS, "Russian early-marker identity regression")
+    require(all(int(marker_hits.get(marker, 0)) > 0 for marker in EXPECTED_RU_EARLY_MARKERS),
+            "Russian early-game marker regression")
+    require(text.get("accented_e_file_count") == 0, "accented-e normalization regression")
+    require(text.get("files_still_containing_accented_e") == [], "accented-e file-list regression")
+
+    require(ground.get("marker") == "QARRO_GROUND_ITEMS_V3_23", "ground-item audit marker drift")
+    require(ground.get("preViridianHiddenRemoved") == 1,
+            "pre-Viridian custom pickup regression")
+    require(ground.get("visibleCustomPickupCount") == 4,
+            "post-Viridian visible pickup count regression")
+    pickups = ground.get("visiblePostViridianPickups", [])
+    require(isinstance(pickups, list) and len(pickups) == 4,
+            "post-Viridian pickup evidence regression")
+    require(all(isinstance(p, dict) and p.get("map") in {"Route2_Frlg", "Route3_Frlg", "Route4_Frlg"}
+                for p in pickups), "ground-item route progression regression")
+    require(ground.get("ashBondTouched") is False and ground.get("ashCapTouched") is False,
+            "Ash invariant regression in ground-item audit")
+
+    report = {
+        "marker": MARKER,
+        "policy": "FireRed / Expansion 1.17.0 / Gen I-V",
+        "qolRegression": "PASS",
+        "noExpShare": "PASS",
+        "ruFoundation": "PASS",
+        "ruBaseline": {
+            "scannedTextFilesAtLeast": EXPECTED_RU_SCANNED_FILES,
+            "filesWithCyrillicAtLeast": EXPECTED_RU_FILES_WITH_CYRILLIC,
+            "cyrillicCharactersAtLeast": EXPECTED_RU_CYRILLIC_CHARACTERS,
+            "earlyMarkersRequired": sorted(EXPECTED_RU_EARLY_MARKERS),
+            "accentedEFiles": 0,
+        },
+        "groundItems": "PASS",
+        "ashBondTouched": False,
+        "ashCapTouched": False,
+    }
+    out = build / "qarro_regression_bundle_v3_11_audit.json"
+    out.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    ci_out = root.parent / "qarro_ci_out_v3_8"
+    if ci_out.is_dir():
+        for name in (
+            "qarro_qol_regression_v3_10_audit.json",
+            "qarro_ru_foundation_v3_9_audit.json",
+            "qarro_ground_items_v3_23_audit.json",
+            "qarro_regression_bundle_v3_11_audit.json",
+        ):
+            src = build / name
+            if not src.is_file():
+                raise RuntimeError(f"missing audit evidence for artifact: {src}")
+            (ci_out / name).write_bytes(src.read_bytes())
+        print(f"[{MARKER}] preserved 4 regression audit reports in {ci_out}")
+
+    print(
+        f"[{MARKER}] PASS: QoL + no-Exp-Share + RU foundation + ground-item policies remain internally consistent; "
+        f"RU baseline >= {EXPECTED_RU_FILES_WITH_CYRILLIC} files / {EXPECTED_RU_CYRILLIC_CHARACTERS} chars"
+    )
+    print(f"audit: {out}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

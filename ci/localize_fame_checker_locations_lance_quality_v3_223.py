@@ -1,24 +1,26 @@
 #!/usr/bin/env python3
-"""Qarro v3.227: polish Fame Checker origin object names for Prof. Oak.
+"""Qarro v3.223: polish Fame Checker origin locations for Lance.
 
-Targets only Prof. Oak's six single-string origin-object labels verified
-against the pinned FireRed upstream. Text only; fail closed on non-Cyrillic surfaces.
+Targets only Lance's six single-string origin-location labels verified against
+the pinned FireRed upstream. Text only; fail closed on non-Cyrillic surfaces.
+Chains the verified Bill location pass after this pass.
 """
 from __future__ import annotations
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
-MARKER = "QARRO_RU_FAME_CHECKER_OBJECTS_PROF_OAK_QUALITY_V3_227"
+MARKER = "QARRO_RU_FAME_CHECKER_LOCATIONS_LANCE_QUALITY_V3_223"
 TARGET = Path("data/text/fame_checker_frlg.inc")
 TRANSLATIONS = {
-    "gFameCheckerFlavorTextOriginObjectName_ProfOak0": "ВЫВЕСКА$",
-    "gFameCheckerFlavorTextOriginObjectName_ProfOak1": "ПРОФ. ОУК$",
-    "gFameCheckerFlavorTextOriginObjectName_ProfOak2": "ПОМОЩНИК$",
-    "gFameCheckerFlavorTextOriginObjectName_ProfOak3": "ЖУРНАЛ ПОКЕМОНОВ$",
-    "gFameCheckerFlavorTextOriginObjectName_ProfOak4": "АГАТА$",
-    "gFameCheckerFlavorTextOriginObjectName_ProfOak5": "ПОМОЩНИК$",
+    "gFameCheckerFlavorTextOriginLocation_Lance0": "ЛИГА ПОКЕМОНОВ$",
+    "gFameCheckerFlavorTextOriginLocation_Lance1": "ЛИГА ПОКЕМОНОВ$",
+    "gFameCheckerFlavorTextOriginLocation_Lance2": "САФФРОН$",
+    "gFameCheckerFlavorTextOriginLocation_Lance3": "УНИВЕРМАГ СЕЛАДОНА$",
+    "gFameCheckerFlavorTextOriginLocation_Lance4": "ПЛАТО ИНДИГО$",
+    "gFameCheckerFlavorTextOriginLocation_Lance5": "ПЛАТО ИНДИГО$",
 }
 BANNED_UNICODE = set("—–←→“”«»…")
 
@@ -44,8 +46,6 @@ def replace_entry(text: str, label: str, translated: str) -> tuple[str, str]:
 def main() -> int:
     if len(sys.argv) != 2:
         raise SystemExit(f"usage: {Path(sys.argv[0]).name} <upstream-root>")
-    if len(TRANSLATIONS) != 6:
-        raise RuntimeError("unexpected v3.227 Fame Checker object-name set")
     root = Path(sys.argv[1]).resolve()
     path = root / TARGET
     if not path.is_file():
@@ -56,10 +56,12 @@ def main() -> int:
         text, old = replace_entry(text, label, translated)
         before[label] = old
     path.write_text(text, encoding="utf-8")
-    out = root / "build" / "qarro_ru_fame_checker_objects_prof_oak_quality_v3_227_audit.json"
+    out = root / "build" / "qarro_ru_fame_checker_locations_lance_quality_v3_223_audit.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({"marker": MARKER, "targetFile": str(TARGET), "qualityPassStrings": len(TRANSLATIONS), "sourceLabelsVerifiedAgainstPinnedUpstream": True, "sourceSurfacesRequiredCyrillic": True, "singleStringLabelsOnly": True, "humanEditedRussian": True, "previousSurfaces": before, "gameplayLogicTouched": False, "balanceTouched": False, "bossTeamsTouched": False, "specialWhitelistTouched": False, "ashBondTouched": False, "ashCapTouched": False}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"[{MARKER}] PASS: repolished {len(TRANSLATIONS)} Fame Checker object-name labels")
+    print(f"[{MARKER}] PASS: repolished {len(TRANSLATIONS)} Fame Checker location labels")
+    next_pass = Path(__file__).with_name("localize_fame_checker_locations_bill_quality_v3_224.py")
+    subprocess.run([sys.executable, str(next_pass), str(root)], check=True)
     return 0
 
 

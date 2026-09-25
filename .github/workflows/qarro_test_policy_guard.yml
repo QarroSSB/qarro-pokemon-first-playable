@@ -1,0 +1,37 @@
+name: Qarro isolated Gym test policy guard
+
+on:
+  push:
+    branches:
+      - test/gym-5of6-rework-20260911
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-policy-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact test commit
+        uses: actions/checkout@v4
+
+      - name: Verify isolated Gym test policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "test/gym-5of6-rework-20260911"
+          grep -F 'GYM_PATH = "ci/gym_five_v3_25.py"' ci/balance_kanto_v3_2_base.py
+          grep -F 'noLegendaryGymAnchors"] = True' ci/balance_kanto_v3_2.py
+          grep -F 'noUnapprovedMythicalGymAnchors"] = True' ci/balance_kanto_v3_2.py
+          grep -F '"TRAINER_LEADER_ERIKA": "Celebi"' ci/balance_kanto_v3_2.py
+          grep -F '"TRAINER_LEADER_SABRINA": "Mew"' ci/balance_kanto_v3_2.py
+          grep -F 'BASE_COMMIT = "cdce73eba8ca7c7b6c2ef12eca199e197abe2687"' ci/qol_v3_5.py
+          grep -F 'Exp. Share intentionally absent' ci/qol_v3_5.py
+          grep -F 'ashBondTouched": False' ci/gym_five_v3_25.py
+          grep -F 'ashCapTouched": False' ci/gym_five_v3_25.py
+          grep -F 'PINNED: e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7' .github/workflows/qarro_first_playable_build.yml
+          grep -F 'make -C upstream -j4 -O firered' .github/workflows/qarro_first_playable_build.yml
+          grep -F '"policy": "FireRed / Expansion 1.17.0 / Gen I-V"' ci/audit_regression_bundle_v3_11.py
+          echo 'PASS: isolated Gym test keeps FireRed/Expansion 1.17.0, Gen I-V, no Exp. Share, no Legendary Gym anchors, only approved Mythicals, and protected Ash features untouched'

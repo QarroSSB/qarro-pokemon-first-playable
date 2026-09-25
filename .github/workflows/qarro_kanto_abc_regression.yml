@@ -1,0 +1,22 @@
+name: Qarro Kanto A-B-C regression (legacy manual)
+
+# Legacy 6v6 A/B/C selector regression.
+# The isolated Gym 5-of-6 test branch intentionally replaced this runtime model.
+# Keep this workflow available for historical/manual inspection, but do not gate
+# pushes on the incompatible legacy contract. Current Gym behaviour is gated by
+# qarro_gym_five_contract.yml and qarro_gym_test_regression.yml.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  legacy-contract-not-applicable:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain legacy scope
+        run: |
+          echo 'Legacy Kanto A/B/C 6v6 selector regression is intentionally not a push gate on the Gym 5-of-6 test branch.'
+          echo 'Use the current Gym 5-of-6 contract and Gym test regression for this branch.'

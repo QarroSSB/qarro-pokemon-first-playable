@@ -1,0 +1,68 @@
+name: Qarro Boss Hidden Power audit
+
+on:
+  push:
+    branches: [test/gym-5of6-rework-20260911]
+    paths:
+      - 'ci/audit_boss_hidden_power_v3_32.py'
+      - '.github/workflows/qarro_boss_hidden_power_audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PINNED: e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7
+
+jobs:
+  expansion-learnability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout Qarro isolated test branch
+        uses: actions/checkout@v4
+        with:
+          path: qarro-repo
+
+      - name: Checkout exact Expansion 1.17.0
+        uses: actions/checkout@v4
+        with:
+          repository: rh-hideout/pokeemerald-expansion
+          ref: e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7
+          path: upstream
+
+      - name: Verify exact pinned commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C upstream rev-parse HEAD)" = "$PINNED"
+
+      - name: Audit all Hidden Power replacements against all_learnables
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 qarro-repo/ci/audit_boss_hidden_power_v3_32.py upstream
+
+      - name: Build native trainerproc parser
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C upstream/tools/trainerproc clean
+          make -C upstream/tools/trainerproc
+
+      - name: Protect Ash integration paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git -C qarro-repo diff HEAD^ HEAD --name-only | grep -Eqi 'ash.?bond|ash.?cap'; then
+            echo 'Forbidden Ash Bond/Ash Cap path touched' >&2
+            exit 1
+          fi
+          echo 'PASS: Ash Bond/Ash Cap untouched'
+
+      - name: Upload semantic audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: Qarro-boss-hidden-power-${{ github.run_number }}
+          retention-days: 30
+          path: upstream/build/qarro_boss_hidden_power_v3_32_audit.json
