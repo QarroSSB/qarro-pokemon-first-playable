@@ -24,7 +24,7 @@ BANNED_UNICODE = set("—–←→“”«»…")
 
 
 def replace_entry(text: str, label: str, translated: str) -> tuple[str, str]:
-    pattern = re.compile(rf'(?m)^(?P<label>{re.escape(label)}::[^\\n]*\\n)(?P<prefix>\\s*\\.string ")(?P<body>(?:\\\\.|[^"\\\\])*)(?P<suffix>"\\s*)$')
+    pattern = re.compile(rf'(?m)^(?P<label>{re.escape(label)}::[^\n]*\n)(?P<prefix>\s*\.string ")(?P<body>(?:\\.|[^"\\])*)(?P<suffix>"\s*)$')
     matches = list(pattern.finditer(text))
     if len(matches) != 1:
         raise RuntimeError(f"{label}: expected one text entry, got {len(matches)}")
