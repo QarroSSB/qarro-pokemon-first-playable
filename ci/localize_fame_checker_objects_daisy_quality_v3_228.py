@@ -55,6 +55,11 @@ def main() -> int:
     for label, translated in TRANSLATIONS.items():
         text, old = replace_entry(text, label, translated)
         before[label] = old
+    # Fail closed before writing: every target must have the intended final surface.
+    for label, translated in TRANSLATIONS.items():
+        _, verified = replace_entry(text, label, translated)
+        if verified != translated:
+            raise RuntimeError(f"{label}: post-translation verification failed: {verified!r}")
     path.write_text(text, encoding="utf-8")
     out = root / "build" / "qarro_ru_fame_checker_objects_daisy_quality_v3_228_audit.json"
     out.parent.mkdir(parents=True, exist_ok=True)
