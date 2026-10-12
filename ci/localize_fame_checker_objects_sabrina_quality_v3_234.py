@@ -149,6 +149,12 @@ def main() -> int:
     print(
         f"[{MARKER}] PASS: repolished {len(TRANSLATIONS)} Sabrina Fame Checker object labels"
     )
+
+    next_script = Path(__file__).with_name("localize_fame_checker_objects_blaine_quality_v3_235.py")
+    if not next_script.is_file():
+        raise RuntimeError(f"missing chained localization pass: {next_script.name}")
+    import subprocess
+    subprocess.run([sys.executable, str(next_script), str(root)], check=True)
     return 0
 
 
