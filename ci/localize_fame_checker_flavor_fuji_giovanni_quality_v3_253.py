@@ -174,6 +174,12 @@ def main() -> int:
     print(
         f"[{MARKER}] PASS: repolished {len(TRANSLATIONS)} Mr. Fuji/Giovanni Fame Checker flavor entries"
     )
+
+    next_script = Path(__file__).with_name("audit_fame_checker_flavor_fit_v3_254.py")
+    if not next_script.is_file():
+        raise RuntimeError(f"missing chained Fame Checker QA pass: {next_script.name}")
+    import subprocess
+    subprocess.run([sys.executable, str(next_script), str(root)], check=True)
     return 0
 
 
